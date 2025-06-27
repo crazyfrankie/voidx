@@ -6,10 +6,12 @@ import (
 	"log"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
+	"github.com/crazyfrankie/voidx/internal/service"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/response"
 )
@@ -25,16 +27,18 @@ var (
 	}
 )
 
-type ChatHandler struct{}
+type ChatHandler struct {
+	svc *service.ChatService
+}
 
-func NewChatHandler() *ChatHandler {
-	return &ChatHandler{}
+func NewChatHandler(svc *service.ChatService) *ChatHandler {
+	return &ChatHandler{svc: svc}
 }
 
 func (h *ChatHandler) RegisterRoute(r *gin.RouterGroup) {
-	chatGroup := r.Group("chat")
+	chatGroup := r.Group("app")
 	{
-		chatGroup.POST("", h.Completion())
+		chatGroup.POST("/:appid", h.Completion())
 	}
 }
 
@@ -43,6 +47,12 @@ func (h *ChatHandler) Completion() gin.HandlerFunc {
 		var chatReq req.ChatReq
 		if err := c.ShouldBind(&chatReq); err != nil {
 			response.Error(c, errno.Success)
+			return
+		}
+
+		appID := c.Param("appid")
+		if _, err := uuid.Parse(appID); err != nil {
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -81,8 +91,7 @@ func (h *ChatHandler) Completion() gin.HandlerFunc {
 			//fmt.Printf("\n\nReasoning Process:\n%s\n", choice.ReasoningContent)
 			//fmt.Printf("\nFinal Answer:\n%s\n", choice.Content)
 			response.SuccessWithData(c, map[string]any{
-				"reasoningProcess": choice.ReasoningContent,
-				"finalAnswer":      choice.Content,
+				"content": choice.Content,
 			})
 		}
 	}

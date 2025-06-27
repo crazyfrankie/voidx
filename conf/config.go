@@ -21,14 +21,16 @@ var (
 )
 
 type Config struct {
-	Server string `yaml:"server"`
-	MySQL  MySQL  `yaml:"mysql"`
-	Redis  Redis  `yaml:"redis"`
-	MinIO  MinIO  `yaml:"minio"`
+	Server  string  `yaml:"server"`
+	Postgre Postgre `yaml:"postgre"`
+	Redis   Redis   `yaml:"redis"`
+	MinIO   MinIO   `yaml:"minio"`
 }
 
-type MySQL struct {
-	DSN string `yaml:"dsn"`
+type Postgre struct {
+	DSN         string `yaml:"dsn"`
+	PoolSize    int    `yaml:"poolSize"`
+	PoolMaxTime int64  `yaml:"poolMaxTime"`
 }
 
 type Redis struct {
@@ -71,7 +73,7 @@ func initConf() {
 	}
 
 	if env == Test {
-		pretty.Printf("%v", config)
+		pretty.Printf("%v\n", config)
 	}
 }
 

@@ -8,13 +8,19 @@ package ioc
 
 import (
 	"github.com/crazyfrankie/voidx/internal/controller"
+	"github.com/crazyfrankie/voidx/internal/repository/dao"
+	"github.com/crazyfrankie/voidx/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 // Injectors from wire.go:
 
 func InitEngine() *gin.Engine {
-	chatHandler := controller.NewChatHandler()
-	engine := InitWeb(chatHandler)
+	v := InitMiddlewares()
+	db := InitDB()
+	chatDao := dao.NewChatDao(db)
+	chatService := service.NewChatService(chatDao)
+	chatHandler := controller.NewChatHandler(chatService)
+	engine := InitWeb(v, chatHandler)
 	return engine
 }

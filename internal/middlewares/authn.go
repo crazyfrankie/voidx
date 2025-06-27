@@ -1,11 +1,11 @@
 package middlewares
 
 import (
-	"net/http"
+	"github.com/gin-gonic/gin"
 )
 
-func Auth() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func Auth() gin.HandlerFunc {
+	return func(c *gin.Context) {
 
 	}
 }
