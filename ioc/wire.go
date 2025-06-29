@@ -14,7 +14,8 @@ import (
 func InitEngine() *gin.Engine {
 	wire.Build(
 		InitDB,
-
+		InitLLM,
+		
 		dao.NewChatDao,
 		service.NewChatService,
 		controller.NewChatHandler,

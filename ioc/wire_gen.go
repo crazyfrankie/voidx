@@ -17,9 +17,10 @@ import (
 
 func InitEngine() *gin.Engine {
 	v := InitMiddlewares()
+	llm := InitLLM()
 	db := InitDB()
 	chatDao := dao.NewChatDao(db)
-	chatService := service.NewChatService(chatDao)
+	chatService := service.NewChatService(llm, chatDao)
 	chatHandler := controller.NewChatHandler(chatService)
 	engine := InitWeb(v, chatHandler)
 	return engine
