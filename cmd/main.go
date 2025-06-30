@@ -7,14 +7,25 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 
 	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/ioc"
 )
 
 func main() {
+	prefix := "conf"
+	envFile := filepath.Join(prefix, ".env")
+
+	err := godotenv.Load(envFile)
+	if err != nil {
+		panic(err)
+	}
+
 	engine := ioc.InitEngine()
 
 	srv := &http.Server{

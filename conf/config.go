@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/joho/godotenv"
 	"github.com/kr/pretty"
 	"github.com/spf13/viper"
 )
@@ -53,13 +52,6 @@ func GetConf() *Config {
 
 func initConf() {
 	prefix := "conf"
-	envFile := filepath.Join(prefix, ".env")
-
-	err := godotenv.Load(envFile)
-	if err != nil {
-		panic(err)
-	}
-
 	env := getEnv()
 	cfgFile := filepath.Join(prefix, filepath.Join(env, "conf.yml"))
 	viper.SetConfigFile(cfgFile)
