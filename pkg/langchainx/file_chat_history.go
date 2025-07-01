@@ -9,99 +9,95 @@ import (
 	"sync"
 
 	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/schema"
 )
 
-// MessageType 表示消息的类型
-type MessageType string
-
-const (
-	// MessageTypeHuman 表示人类消息
-	MessageTypeHuman MessageType = "human"
-	// MessageTypeAI 表示AI消息
-	MessageTypeAI MessageType = "ai"
-	// MessageTypeSystem 表示系统消息
-	MessageTypeSystem MessageType = "system"
-	// MessageTypeGeneric 表示通用消息
-	MessageTypeGeneric MessageType = "generic"
-)
-
-// StoredMessage 是存储在文件中的消息格式
+// StoredMessage is the message format stored in the file
 type StoredMessage struct {
-	Type    MessageType `json:"type"`
-	Content string      `json:"content"`
-	Name    string      `json:"name,omitempty"`
+	Type    llms.ChatMessageType `json:"type"`
+	Content string               `json:"content"`
+	Name    string               `json:"name,omitempty"`
 }
 
-// FileChatHistory 实现了基于文件的聊天历史记录
-type FileChatHistory struct {
-	filePath string
-	mutex    sync.Mutex
+// FileChatMessageHistory implements chat history storage using a file
+type FileChatMessageHistory struct {
+	// FilePath is the path to the file storing chat history
+	FilePath string
+	// CreateDirIfNotExist if true, creates directory if it doesn't exist
+	CreateDirIfNotExist bool
+	// mutex protects file operations
+	mutex sync.Mutex
 }
 
-// NewFileChatHistory 创建一个新的基于文件的聊天历史记录
-func NewFileChatHistory(filePath string) (*FileChatHistory, error) {
-	// 确保目录存在
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("创建目录失败: %w", err)
-	}
+// Statically assert that FileChatMessageHistory implement the chat message history interface.
+var _ schema.ChatMessageHistory = &FileChatMessageHistory{}
 
-	// 如果文件不存在，创建一个空的JSON数组文件
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		if err := os.WriteFile(filePath, []byte("[]"), 0644); err != nil {
-			return nil, fmt.Errorf("创建历史记录文件失败: %w", err)
+// NewFileChatMessageHistory creates a new file-based chat message history
+func NewFileChatMessageHistory(options ...FileChatMessageHistoryOption) (*FileChatMessageHistory, error) {
+	h := applyChatOptions(options...)
+
+	// Ensure directory exists if needed
+	if h.CreateDirIfNotExist {
+		dir := filepath.Dir(h.FilePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create directory: %w", err)
 		}
 	}
 
-	return &FileChatHistory{
-		filePath: filePath,
-	}, nil
+	// Create an empty JSON array file if it doesn't exist
+	if _, err := os.Stat(h.FilePath); os.IsNotExist(err) {
+		if err := os.WriteFile(h.FilePath, []byte("[]"), 0600); err != nil {
+			return nil, fmt.Errorf("failed to create history file: %w", err)
+		}
+	}
+
+	return h, nil
 }
 
-// loadMessages 从文件加载消息
-func (f *FileChatHistory) loadMessages() ([]StoredMessage, error) {
-	data, err := os.ReadFile(f.filePath)
+// loadMessages loads messages from the file
+func (h *FileChatMessageHistory) loadMessages() ([]StoredMessage, error) {
+	data, err := os.ReadFile(h.FilePath)
 	if err != nil {
-		return nil, fmt.Errorf("读取历史记录文件失败: %w", err)
+		return nil, fmt.Errorf("failed to read history file: %w", err)
 	}
 
 	var messages []StoredMessage
 	if err := json.Unmarshal(data, &messages); err != nil {
-		return nil, fmt.Errorf("解析历史记录文件失败: %w", err)
+		return nil, fmt.Errorf("failed to parse history file: %w", err)
 	}
 
 	return messages, nil
 }
 
-// saveMessages 保存消息到文件
-func (f *FileChatHistory) saveMessages(messages []StoredMessage) error {
+// saveMessages saves messages to the file
+func (h *FileChatMessageHistory) saveMessages(messages []StoredMessage) error {
 	data, err := json.MarshalIndent(messages, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化消息失败: %w", err)
+		return fmt.Errorf("failed to serialize messages: %w", err)
 	}
 
-	if err := os.WriteFile(f.filePath, data, 0644); err != nil {
-		return fmt.Errorf("写入历史记录文件失败: %w", err)
+	if err := os.WriteFile(h.FilePath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write history file: %w", err)
 	}
 
 	return nil
 }
 
-// convertToStoredMessage 将 ChatMessage 转换为 StoredMessage
+// convertToStoredMessage converts ChatMessage to StoredMessage
 func convertToStoredMessage(message llms.ChatMessage) StoredMessage {
-	var msgType MessageType
+	var msgType llms.ChatMessageType
 	var name string
 
-	switch msg := message.(type) {
-	case llms.HumanChatMessage:
-		msgType = MessageTypeHuman
-	case llms.AIChatMessage:
-		msgType = MessageTypeAI
-	case llms.SystemChatMessage:
-		msgType = MessageTypeSystem
-	case llms.ChatMessage:
-		msgType = MessageTypeGeneric
-		name = string(msg.GetType())
+	switch message.GetType() {
+	case llms.ChatMessageTypeHuman:
+		msgType = llms.ChatMessageTypeHuman
+	case llms.ChatMessageTypeAI:
+		msgType = llms.ChatMessageTypeAI
+	case llms.ChatMessageTypeSystem:
+		msgType = llms.ChatMessageTypeSystem
+	default:
+		msgType = llms.ChatMessageTypeGeneric
+		name = string(message.GetType())
 	}
 
 	return StoredMessage{
@@ -111,14 +107,14 @@ func convertToStoredMessage(message llms.ChatMessage) StoredMessage {
 	}
 }
 
-// convertToChatMessage 将 StoredMessage 转换为 ChatMessage
+// convertToChatMessage converts StoredMessage to ChatMessage
 func convertToChatMessage(message StoredMessage) llms.ChatMessage {
 	switch message.Type {
-	case MessageTypeHuman:
+	case llms.ChatMessageTypeHuman:
 		return llms.HumanChatMessage{Content: message.Content}
-	case MessageTypeAI:
+	case llms.ChatMessageTypeAI:
 		return llms.AIChatMessage{Content: message.Content}
-	case MessageTypeSystem:
+	case llms.ChatMessageTypeSystem:
 		return llms.SystemChatMessage{Content: message.Content}
 	default:
 		return llms.GenericChatMessage{
@@ -128,12 +124,12 @@ func convertToChatMessage(message StoredMessage) llms.ChatMessage {
 	}
 }
 
-// AddMessage 添加一条消息到历史记录
-func (f *FileChatHistory) AddMessage(ctx context.Context, message llms.ChatMessage) error {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+// AddMessage adds a message to the history
+func (h *FileChatMessageHistory) AddMessage(ctx context.Context, message llms.ChatMessage) error {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 
-	messages, err := f.loadMessages()
+	messages, err := h.loadMessages()
 	if err != nil {
 		return err
 	}
@@ -141,33 +137,33 @@ func (f *FileChatHistory) AddMessage(ctx context.Context, message llms.ChatMessa
 	storedMessage := convertToStoredMessage(message)
 	messages = append(messages, storedMessage)
 
-	return f.saveMessages(messages)
+	return h.saveMessages(messages)
 }
 
-// AddUserMessage 添加一条用户消息到历史记录
-func (f *FileChatHistory) AddUserMessage(ctx context.Context, message string) error {
-	return f.AddMessage(ctx, llms.HumanChatMessage{Content: message})
+// AddUserMessage adds a user message to the history
+func (h *FileChatMessageHistory) AddUserMessage(ctx context.Context, message string) error {
+	return h.AddMessage(ctx, llms.HumanChatMessage{Content: message})
 }
 
-// AddAIMessage 添加一条AI消息到历史记录
-func (f *FileChatHistory) AddAIMessage(ctx context.Context, message string) error {
-	return f.AddMessage(ctx, llms.AIChatMessage{Content: message})
+// AddAIMessage adds an AI message to the history
+func (h *FileChatMessageHistory) AddAIMessage(ctx context.Context, message string) error {
+	return h.AddMessage(ctx, llms.AIChatMessage{Content: message})
 }
 
-// Clear 清空历史记录
-func (f *FileChatHistory) Clear(ctx context.Context) error {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+// Clear clears the history
+func (h *FileChatMessageHistory) Clear(ctx context.Context) error {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 
-	return f.saveMessages([]StoredMessage{})
+	return h.saveMessages([]StoredMessage{})
 }
 
-// Messages 获取所有历史消息
-func (f *FileChatHistory) Messages(ctx context.Context) ([]llms.ChatMessage, error) {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+// Messages gets all history messages
+func (h *FileChatMessageHistory) Messages(ctx context.Context) ([]llms.ChatMessage, error) {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 
-	storedMessages, err := f.loadMessages()
+	storedMessages, err := h.loadMessages()
 	if err != nil {
 		return nil, err
 	}
@@ -180,15 +176,15 @@ func (f *FileChatHistory) Messages(ctx context.Context) ([]llms.ChatMessage, err
 	return messages, nil
 }
 
-// SetMessages 设置历史消息
-func (f *FileChatHistory) SetMessages(ctx context.Context, messages []llms.ChatMessage) error {
-	f.mutex.Lock()
-	defer f.mutex.Unlock()
+// SetMessages sets the history messages
+func (h *FileChatMessageHistory) SetMessages(ctx context.Context, messages []llms.ChatMessage) error {
+	h.mutex.Lock()
+	defer h.mutex.Unlock()
 
 	storedMessages := make([]StoredMessage, len(messages))
 	for i, msg := range messages {
 		storedMessages[i] = convertToStoredMessage(msg)
 	}
 
-	return f.saveMessages(storedMessages)
+	return h.saveMessages(storedMessages)
 }
