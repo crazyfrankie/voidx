@@ -7,7 +7,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/controller"
 )
 
-func InitWeb(middlewares []gin.HandlerFunc, chat *controller.ChatHandler) *gin.Engine {
+func InitWeb(middlewares []gin.HandlerFunc, chat *controller.AppHandler) *gin.Engine {
 	srv := gin.Default()
 	srv.Use(middlewares...)
 

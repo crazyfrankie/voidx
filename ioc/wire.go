@@ -15,10 +15,10 @@ func InitEngine() *gin.Engine {
 	wire.Build(
 		InitDB,
 		InitLLM,
-		
-		dao.NewChatDao,
-		service.NewChatService,
-		controller.NewChatHandler,
+
+		dao.NewAppDao,
+		service.NewAppService,
+		controller.NewAppHandler,
 
 		InitMiddlewares,
 		InitWeb,

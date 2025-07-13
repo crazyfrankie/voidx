@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/schema"
 
 	"github.com/crazyfrankie/voidx/conf"
-	"github.com/crazyfrankie/voidx/internal/repository/dao"
+	"github.com/crazyfrankie/voidx/internal/repository/dao/model"
 )
 
 func InitDB() *gorm.DB {
@@ -36,7 +36,7 @@ func InitDB() *gorm.DB {
 	sqlDB.SetMaxOpenConns(conf.GetConf().Postgre.PoolSize)
 	sqlDB.SetConnMaxLifetime(time.Duration(conf.GetConf().Postgre.PoolMaxTime))
 
-	db.AutoMigrate(&dao.App{})
+	model.AutoMigrate(db)
 
 	return db
 }
