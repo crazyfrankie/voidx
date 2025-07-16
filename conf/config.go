@@ -24,6 +24,7 @@ type Config struct {
 	Postgre Postgre `yaml:"postgre"`
 	Redis   Redis   `yaml:"redis"`
 	MinIO   MinIO   `yaml:"minio"`
+	JWT     JWT     `yaml:"jwt"`
 }
 
 type Postgre struct {
@@ -40,6 +41,11 @@ type MinIO struct {
 	Endpoint  []string `yaml:"endpoint"`
 	SecretKey string   `yaml:"secretKey"`
 	AccessKey string   `yaml:"accessKey"`
+}
+
+type JWT struct {
+	SignAlgo  string `yaml:"signAlgo"`
+	SecretKey string `yaml:"secretKey"`
 }
 
 func GetConf() *Config {

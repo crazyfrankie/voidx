@@ -2,6 +2,7 @@ package ioc
 
 import (
 	"fmt"
+	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"os"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	"gorm.io/gorm/schema"
 
 	"github.com/crazyfrankie/voidx/conf"
-	"github.com/crazyfrankie/voidx/internal/repository/dao/model"
 )
 
 func InitDB() *gorm.DB {
@@ -36,7 +36,9 @@ func InitDB() *gorm.DB {
 	sqlDB.SetMaxOpenConns(conf.GetConf().Postgre.PoolSize)
 	sqlDB.SetConnMaxLifetime(time.Duration(conf.GetConf().Postgre.PoolMaxTime))
 
-	model.AutoMigrate(db)
+	if err := entity.AutoMigrate(db); err != nil {
+		panic(err)
+	}
 
 	return db
 }

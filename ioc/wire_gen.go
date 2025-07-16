@@ -7,21 +7,28 @@
 package ioc
 
 import (
-	"github.com/crazyfrankie/voidx/internal/controller"
-	"github.com/crazyfrankie/voidx/internal/repository/dao"
-	"github.com/crazyfrankie/voidx/internal/service"
+	"github.com/crazyfrankie/voidx/internal/app"
+	"github.com/crazyfrankie/voidx/internal/auth"
 	"github.com/gin-gonic/gin"
+	"github.com/google/wire"
 )
 
 // Injectors from wire.go:
 
 func InitEngine() *gin.Engine {
-	v := InitMiddlewares()
-	llm := InitLLM()
+	cmdable := InitCache()
+	tokenService := InitJWT(cmdable)
+	v := InitMiddlewares(tokenService)
 	db := InitDB()
-	appDao := dao.NewAppDao(db)
-	appService := service.NewAppService(llm, appDao)
-	appHandler := controller.NewAppHandler(appService)
-	engine := InitWeb(v, appHandler)
+	llm := InitLLM()
+	appModule := app.InitAppModule(db, llm)
+	appHandler := appModule.Handler
+	authModule := auth.InitAuthModule(db, cmdable, tokenService)
+	authHandler := authModule.Handler
+	engine := InitWeb(v, appHandler, authHandler)
 	return engine
 }
+
+// wire.go:
+
+var BaseSet = wire.NewSet(InitCache, InitDB, InitLLM, InitJWT)
