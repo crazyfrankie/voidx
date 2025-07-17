@@ -41,7 +41,7 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 			}
 		}
 
-		refresh, err := c.Cookie("cloud_refresh")
+		refresh, err := c.Cookie("llmops_refresh")
 		if err != nil {
 			response.Error(c, errno.ErrUnauthorized)
 			return

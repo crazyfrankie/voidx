@@ -12,6 +12,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/pkg/consts"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 )
 
@@ -49,47 +50,8 @@ func (s *AppService) CreateApp(ctx context.Context, createReq req.CreateAppReq) 
 		return uuid.Nil, err
 	}
 
-	// 创建草稿配置
-	draftConfig := map[string]interface{}{
-		"model_config": map[string]interface{}{
-			"provider": "openai",
-			"model":    "gpt-3.5-turbo",
-			"parameters": map[string]interface{}{
-				"temperature":       0.7,
-				"top_p":             1.0,
-				"frequency_penalty": 0.0,
-				"presence_penalty":  0.0,
-				"max_tokens":        1000,
-			},
-		},
-		"dialog_round":  10,
-		"preset_prompt": "",
-		"tools":         []interface{}{},
-		"workflows":     []interface{}{},
-		"datasets":      []interface{}{},
-		"retrieval_config": map[string]interface{}{
-			"retrieval_strategy": "semantic",
-			"k":                  3,
-			"score":              0.7,
-		},
-		"long_term_memory": map[string]interface{}{
-			"enable": false,
-		},
-		"opening_statement":      "",
-		"opening_questions":      []interface{}{},
-		"speech_to_text":         map[string]interface{}{"enable": false},
-		"text_to_speech":         map[string]interface{}{"enable": false, "voice": "alloy", "auto_play": false},
-		"suggested_after_answer": map[string]interface{}{"enable": false},
-		"review_config": map[string]interface{}{
-			"enable":         false,
-			"keywords":       []interface{}{},
-			"inputs_config":  map[string]interface{}{"enable": false, "preset_response": ""},
-			"outputs_config": map[string]interface{}{"enable": false},
-		},
-	}
-
 	// 创建草稿配置版本
-	draftAppConfigVersion, err := s.repo.CreateAppConfigVersion(ctx, app.ID, 0, "draft", draftConfig)
+	draftAppConfigVersion, err := s.repo.CreateAppConfigVersion(ctx, app.ID, 0, "draft", consts.DefaultAppConfig)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -301,10 +263,8 @@ func (s *AppService) GetAppsWithPage(ctx context.Context, pageReq req.GetAppsWit
 	return appResps, paginator, nil
 }
 
-// 辅助函数：从上下文中获取当前用户ID
+// getCurrentUserID 从上下文中获取当前用户ID
 func getCurrentUserID(ctx context.Context) (uuid.UUID, error) {
-	// 在实际项目中，这里应该从上下文中获取当前用户ID
-	// 这里为了简化，我们假设上下文中有一个键为"user_id"的值
 	userID, ok := ctx.Value("user_id").(string)
 	if !ok {
 		return uuid.Nil, errno.ErrUnauthorized.AppendBizMessage("未登录")
@@ -319,10 +279,10 @@ func getCurrentUserID(ctx context.Context) (uuid.UUID, error) {
 	return id, nil
 }
 
-// 辅助函数：生成随机字符串
+// 生成随机字符串
 func generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	rand.Seed(time.Now().UnixNano())
+	rand.New(rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[rand.Intn(len(charset))]

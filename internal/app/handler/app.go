@@ -1,8 +1,6 @@
 package handler
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -53,13 +51,13 @@ func (h *AppHandler) RegisterRoute(r *gin.RouterGroup) {
 		appGroup.POST("/:appID/conversation/tasks/:taskID/stop", h.StopDebugChat)
 		appGroup.GET("/:appID/conversation/messages", h.GetDebugConversationMessagesWithPage)
 
-		// 发布配置相关
+		// 已发布配置相关
 		appGroup.GET("/:appID/published-config", h.GetPublishedConfig)
 		appGroup.POST("/:appID/published-config/regenerate-web-app-token", h.RegenerateWebAppToken)
 	}
 }
 
-// CreateApp 创建新的APP
+// CreateApp 创建应用
 func (h *AppHandler) CreateApp(c *gin.Context) {
 	var createReq req.CreateAppReq
 	if err := c.ShouldBindJSON(&createReq); err != nil {
@@ -76,7 +74,7 @@ func (h *AppHandler) CreateApp(c *gin.Context) {
 	response.SuccessWithData(c, gin.H{"id": appID})
 }
 
-// GetApp 获取指定的应用基础信息
+// GetApp 获取应用
 func (h *AppHandler) GetApp(c *gin.Context) {
 	appIDStr := c.Param("appID")
 	appID, err := uuid.Parse(appIDStr)
@@ -94,7 +92,7 @@ func (h *AppHandler) GetApp(c *gin.Context) {
 	response.SuccessWithData(c, app)
 }
 
-// UpdateApp 更新指定的应用
+// UpdateApp 更新应用
 func (h *AppHandler) UpdateApp(c *gin.Context) {
 	appIDStr := c.Param("appID")
 	appID, err := uuid.Parse(appIDStr)
@@ -135,7 +133,7 @@ func (h *AppHandler) CopyApp(c *gin.Context) {
 	response.SuccessWithData(c, gin.H{"id": newAppID})
 }
 
-// DeleteApp 删除指定的应用
+// DeleteApp 删除应用
 func (h *AppHandler) DeleteApp(c *gin.Context) {
 	appIDStr := c.Param("appID")
 	appID, err := uuid.Parse(appIDStr)
@@ -370,13 +368,6 @@ func (h *AppHandler) DebugChat(c *gin.Context) {
 		return
 	}
 
-	// 设置响应头，支持SSE
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("Transfer-Encoding", "chunked")
-	c.Writer.WriteHeader(http.StatusOK)
-
 	// 调用服务发起调试对话，并将结果流式返回
 	if err := h.appService.DebugChat(c.Request.Context(), appID, chatReq, c.Writer); err != nil {
 		// 错误处理已经在流式响应中完成
@@ -435,7 +426,7 @@ func (h *AppHandler) GetDebugConversationMessagesWithPage(c *gin.Context) {
 	})
 }
 
-// GetPublishedConfig 获取应用的发布配置信息
+// GetPublishedConfig 获取已发布的配置
 func (h *AppHandler) GetPublishedConfig(c *gin.Context) {
 	appIDStr := c.Param("appID")
 	appID, err := uuid.Parse(appIDStr)
@@ -443,17 +434,15 @@ func (h *AppHandler) GetPublishedConfig(c *gin.Context) {
 		response.Error(c, errno.ErrValidate.AppendBizMessage("应用ID格式不正确"))
 		return
 	}
-
-	config, err := h.appService.GetPublishedConfig(c.Request.Context(), appID)
+	publishedConfig, err := h.appService.GetPublishedConfig(c.Request.Context(), appID)
 	if err != nil {
 		response.Error(c, err)
 		return
 	}
-
-	response.SuccessWithData(c, config)
+	response.SuccessWithData(c, publishedConfig)
 }
 
-// RegenerateWebAppToken 重新生成WebApp凭证标识
+// RegenerateWebAppToken 重新生成WebApp令牌
 func (h *AppHandler) RegenerateWebAppToken(c *gin.Context) {
 	appIDStr := c.Param("appID")
 	appID, err := uuid.Parse(appIDStr)
@@ -467,6 +456,5 @@ func (h *AppHandler) RegenerateWebAppToken(c *gin.Context) {
 		response.Error(c, err)
 		return
 	}
-
-	response.SuccessWithData(c, gin.H{"jwt": token})
+	response.SuccessWithData(c, gin.H{"token": token})
 }

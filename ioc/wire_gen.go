@@ -7,6 +7,7 @@
 package ioc
 
 import (
+	"github.com/crazyfrankie/voidx/internal/account"
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
 	"github.com/gin-gonic/gin"
@@ -25,7 +26,9 @@ func InitEngine() *gin.Engine {
 	appHandler := appModule.Handler
 	authModule := auth.InitAuthModule(db, cmdable, tokenService)
 	authHandler := authModule.Handler
-	engine := InitWeb(v, appHandler, authHandler)
+	accountModule := account.InitAccountModule(db)
+	accountHandler := accountModule.Handler
+	engine := InitWeb(v, appHandler, authHandler, accountHandler)
 	return engine
 }
 

@@ -2,14 +2,14 @@ package service
 
 import (
 	"context"
-	"github.com/google/uuid"
 
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/crazyfrankie/voidx/internal/auth/repository"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
+	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/jwt"
 )
 
