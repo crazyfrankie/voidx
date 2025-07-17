@@ -10,12 +10,10 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 )
 
-// LLMService LLM 服务接口
 type LLMService struct {
 	llmCore *llm.LanguageModelManager
 }
 
-// NewLLMService 创建 LLM 服务
 func NewLLMService(llmCore *llm.LanguageModelManager) *LLMService {
 	return &LLMService{
 		llmCore: llmCore,
@@ -264,7 +262,6 @@ func (s *LLMService) getDefaultModelConfig() map[string]interface{} {
 	}
 }
 
-// 辅助函数：转换特性
 func convertFeatures(features []entity.ModelFeature) []string {
 	result := make([]string, 0, len(features))
 	for _, feature := range features {
@@ -273,7 +270,6 @@ func convertFeatures(features []entity.ModelFeature) []string {
 	return result
 }
 
-// 辅助函数：转换参数
 func convertParameters(parameters []entity.ModelParameter) []resp.ModelParameterResp {
 	result := make([]resp.ModelParameterResp, 0, len(parameters))
 	for _, param := range parameters {

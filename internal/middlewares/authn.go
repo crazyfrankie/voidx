@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -35,7 +36,7 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 		access, err := h.token.GetAccessToken(c)
 		if err == nil {
 			if claims, err := h.token.ParseToken(access); err == nil {
-				c.Set("user_id", claims.UID)
+				c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_id", claims.UID))
 				c.Next()
 				return
 			}
@@ -48,7 +49,7 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 		}
 		tokens, err := h.token.TryRefresh(refresh, c.Request.UserAgent())
 		if err != nil {
-			response.Error(c, errno.ErrInternalServer)
+			response.Error(c, errno.ErrUnauthorized)
 			return
 		}
 

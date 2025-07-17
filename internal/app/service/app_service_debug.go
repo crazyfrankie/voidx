@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/tools"
 
+	coreEntity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
@@ -338,7 +341,7 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, req req.Deb
 			"conversation_id":   conversation.ID.String(),
 			"message_id":        createdMessage.ID.String(),
 			"task_id":           taskID.String(),
-			"event":             "message",
+			"event":             "message_start",
 			"answer":            "",
 			"thought":           "",
 			"observation":       "",
@@ -358,6 +361,78 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, req req.Deb
 			return
 		}
 
+		// 检查审核配置
+		reviewConfig := make(map[string]interface{})
+		if rc, exists := draftConfig["review_config"]; exists {
+			if rcMap, ok := rc.(map[string]interface{}); ok {
+				reviewConfig = rcMap
+			}
+		}
+
+		// 验证输入内容
+		if passed, response := s.validateReviewConfig(taskCtx, req.Query, reviewConfig); !passed {
+			// 输入未通过审核，返回预设响应
+			sendSSEEvent("message", map[string]interface{}{
+				"id":                taskID.String(),
+				"conversation_id":   conversation.ID.String(),
+				"message_id":        createdMessage.ID.String(),
+				"task_id":           taskID.String(),
+				"event":             "agent_message",
+				"answer":            response,
+				"thought":           "输入内容未通过审核",
+				"observation":       "",
+				"tool":              nil,
+				"tool_input":        nil,
+				"total_token_count": len([]rune(response)),
+				"total_price":       0.0,
+				"latency":           0.0,
+			})
+
+			// 更新消息状态
+			createdMessage.Answer = response
+			createdMessage.Status = "normal"
+			s.repo.UpdateMessage(taskCtx, createdMessage)
+
+			// 保存审核结果
+			s.saveAgentThought(taskCtx, &entity.AgentThought{
+				MessageID:       createdMessage.ID,
+				Event:           "agent_message",
+				Thought:         "输入内容未通过审核",
+				Answer:          response,
+				TotalTokenCount: len([]rune(response)),
+				TotalPrice:      0.0,
+				Latency:         0.0,
+				Ctime:           time.Now().Unix(),
+			})
+			return
+		}
+
+		// 使用LLM服务加载语言模型
+		llmModel, err := s.llmService.LoadLanguageModel(modelConfig)
+		if err != nil {
+			sendSSEEvent("error", map[string]interface{}{
+				"error": fmt.Sprintf("加载语言模型失败: %v", err),
+			})
+			return
+		}
+
+		// 发送思考事件
+		sendSSEEvent("message", map[string]interface{}{
+			"id":                taskID.String(),
+			"conversation_id":   conversation.ID.String(),
+			"message_id":        createdMessage.ID.String(),
+			"task_id":           taskID.String(),
+			"event":             "agent_thought",
+			"thought":           "正在分析用户问题...",
+			"answer":            "",
+			"observation":       "",
+			"tool":              nil,
+			"tool_input":        nil,
+			"total_token_count": 0,
+			"total_price":       0.0,
+			"latency":           0.0,
+		})
+
 		// 构建完整的提示消息
 		promptMessage, err := s.buildPromptMessage(taskCtx, req.Query, draftConfig, conversation)
 		if err != nil {
@@ -367,8 +442,26 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, req req.Deb
 			return
 		}
 
+		// 发送生成回答事件
+		sendSSEEvent("message", map[string]interface{}{
+			"id":                taskID.String(),
+			"conversation_id":   conversation.ID.String(),
+			"message_id":        createdMessage.ID.String(),
+			"task_id":           taskID.String(),
+			"event":             "agent_thought",
+			"thought":           "正在生成回答...",
+			"answer":            "",
+			"observation":       "",
+			"tool":              nil,
+			"tool_input":        nil,
+			"total_token_count": 0,
+			"total_price":       0.0,
+			"latency":           0.0,
+		})
+
 		// 调用LLM生成响应
-		answer, err := s.generateResponse(taskCtx, promptMessage, modelConfig)
+		startTime := time.Now()
+		answer, err := s.generateResponseWithLLM(taskCtx, llmModel, promptMessage, req.ImageUrls)
 		if err != nil {
 			// 检查是否是因为任务被取消
 			if errors.Is(taskCtx.Err(), context.Canceled) {
@@ -387,13 +480,68 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, req req.Deb
 			return
 		}
 
+		// 计算延迟
+		latency := time.Since(startTime).Seconds()
+
+		// 验证输出内容
+		if !s.validateOutputContent(taskCtx, answer, reviewConfig) {
+			// 输出未通过审核，返回提示信息
+			auditResponse := "抱歉，生成的回答包含不当内容，请重新尝试。"
+
+			sendSSEEvent("message", map[string]interface{}{
+				"id":                taskID.String(),
+				"conversation_id":   conversation.ID.String(),
+				"message_id":        createdMessage.ID.String(),
+				"task_id":           taskID.String(),
+				"event":             "agent_message",
+				"answer":            auditResponse,
+				"thought":           "生成的回答未通过审核",
+				"observation":       "",
+				"tool":              nil,
+				"tool_input":        nil,
+				"total_token_count": len([]rune(auditResponse)),
+				"total_price":       0.0,
+				"latency":           latency,
+			})
+
+			// 更新消息状态
+			createdMessage.Answer = auditResponse
+			createdMessage.Status = "normal"
+			s.repo.UpdateMessage(taskCtx, createdMessage)
+
+			// 保存审核结果
+			s.saveAgentThought(taskCtx, &entity.AgentThought{
+				MessageID:       createdMessage.ID,
+				Event:           "agent_message",
+				Thought:         "生成的回答未通过审核",
+				Answer:          auditResponse,
+				TotalTokenCount: len([]rune(auditResponse)),
+				TotalPrice:      0.0,
+				Latency:         latency,
+				Ctime:           time.Now().Unix(),
+			})
+			return
+		}
+
 		// 流式发送答案
-		s.streamAnswer(taskCtx, answer, taskID, conversation.ID, createdMessage.ID, sendSSEEvent)
+		s.streamAnswerWithStats(taskCtx, answer, taskID, conversation.ID, createdMessage.ID, latency, sendSSEEvent)
 
 		// 更新消息状态
 		createdMessage.Answer = answer
 		createdMessage.Status = "normal"
 		s.repo.UpdateMessage(taskCtx, createdMessage)
+
+		// 保存Agent思考过程到数据库
+		s.saveAgentThought(taskCtx, &entity.AgentThought{
+			MessageID:       createdMessage.ID,
+			Event:           "agent_message",
+			Thought:         "分析用户问题并生成回答",
+			Answer:          answer,
+			TotalTokenCount: len([]rune(answer)), // 简单的token计算
+			TotalPrice:      0.0,                 // 实际应该根据模型定价计算
+			Latency:         latency,
+			Ctime:           time.Now().Unix(),
+		})
 	}()
 
 	return nil
@@ -609,8 +757,8 @@ func (s *AppService) streamAnswer(ctx context.Context, answer string, taskID, co
 	}
 }
 
-// generateResponse 生成响应
-func (s *AppService) generateResponse(ctx context.Context, prompt string, modelConfig map[string]interface{}) (string, error) {
+// generateResponseWithLLM 使用LLM生成响应
+func (s *AppService) generateResponseWithLLM(ctx context.Context, llmModel coreEntity.BaseLanguageModel, prompt string, imageUrls []string) (string, error) {
 	// 检查上下文是否被取消
 	select {
 	case <-ctx.Done():
@@ -618,40 +766,258 @@ func (s *AppService) generateResponse(ctx context.Context, prompt string, modelC
 	default:
 	}
 
-	// 获取模型配置
-	modelName, ok := modelConfig["model"].(string)
+	// 构建消息内容
+	messageContent := llmModel.ConvertToHumanMessage(prompt, imageUrls)
+
+	// 调用LLM生成内容
+	response, err := llmModel.GenerateContent(ctx, []llms.MessageContent{messageContent})
+	if err != nil {
+		return "", fmt.Errorf("LLM生成内容失败: %w", err)
+	}
+
+	// 提取生成的文本
+	if len(response.Choices) == 0 {
+		return "", fmt.Errorf("LLM未返回任何响应")
+	}
+
+	choice := response.Choices[0]
+
+	// 直接获取Content内容 - 修复类型错误
+	return choice.Content, nil
+}
+
+// streamAnswerWithStats 流式发送答案并包含统计信息
+func (s *AppService) streamAnswerWithStats(ctx context.Context, answer string, taskID, conversationID, messageID uuid.UUID, latency float64, sendSSEEvent func(string, interface{})) {
+	// 按字符流式发送
+	runes := []rune(answer)
+	chunkSize := 5 // 每次发送5个字符
+	totalTokens := len(runes)
+
+	var currentAnswer strings.Builder
+
+	for i := 0; i < len(runes); i += chunkSize {
+		// 检查上下文是否被取消
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		end := i + chunkSize
+		if end > len(runes) {
+			end = len(runes)
+		}
+
+		chunk := string(runes[i:end])
+		currentAnswer.WriteString(chunk)
+
+		// 计算进度
+		progress := float64(end) / float64(totalTokens)
+
+		sendSSEEvent("message", map[string]interface{}{
+			"id":                taskID.String(),
+			"conversation_id":   conversationID.String(),
+			"message_id":        messageID.String(),
+			"task_id":           taskID.String(),
+			"event":             "agent_message",
+			"answer":            chunk,
+			"thought":           "",
+			"observation":       "",
+			"tool":              nil,
+			"tool_input":        nil,
+			"total_token_count": totalTokens,
+			"total_price":       0.0, // 实际应该根据模型定价计算
+			"latency":           latency,
+			"progress":          progress,
+		})
+
+		// 模拟流式效果
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// saveAgentThought 保存Agent思考过程到数据库
+func (s *AppService) saveAgentThought(ctx context.Context, thought *entity.AgentThought) error {
+	// 使用repository保存思考过程
+	_, err := s.repo.CreateAgentThought(ctx,
+		thought.MessageID,
+		thought.Event,
+		thought.Thought,
+		thought.Observation,
+		thought.Tool,
+		thought.ToolInput,
+		thought.Answer,
+		thought.TotalTokenCount,
+		thought.TotalPrice,
+		thought.Latency,
+	)
+	return err
+}
+
+// calculateTokenPrice 计算token价格
+func (s *AppService) calculateTokenPrice(llmModel coreEntity.BaseLanguageModel, inputTokens, outputTokens int) float64 {
+	inputPrice, outputPrice, unit := llmModel.GetPricing()
+
+	// 计算总价格
+	totalPrice := (float64(inputTokens)*inputPrice + float64(outputTokens)*outputPrice) / unit
+
+	return totalPrice
+}
+
+// processTools 处理工具配置，转换为LangChain工具
+func (s *AppService) processTools(ctx context.Context, draftConfig map[string]interface{}) ([]tools.Tool, error) {
+	var allTools []tools.Tool
+
+	// 处理内置工具和API工具
+	if toolsConfig, exists := draftConfig["tools"]; exists {
+		if toolsList, ok := toolsConfig.([]interface{}); ok {
+			for _, toolItem := range toolsList {
+				if toolMap, ok := toolItem.(map[string]interface{}); ok {
+					tool, err := s.createToolFromConfig(toolMap)
+					if err != nil {
+						continue // 忽略错误的工具配置
+					}
+					if tool != nil {
+						allTools = append(allTools, tool)
+					}
+				}
+			}
+		}
+	}
+
+	// 处理知识库检索工具
+	if datasets, exists := draftConfig["datasets"]; exists {
+		if datasetsList, ok := datasets.([]interface{}); ok && len(datasetsList) > 0 {
+			// 创建知识库检索工具
+			// 这里应该调用检索服务来创建工具
+			// 暂时跳过，实际实现时需要集成检索服务
+		}
+	}
+
+	// 处理工作流工具
+	if workflows, exists := draftConfig["workflows"]; exists {
+		if workflowsList, ok := workflows.([]interface{}); ok && len(workflowsList) > 0 {
+			for _, workflowItem := range workflowsList {
+				if workflowMap, ok := workflowItem.(map[string]interface{}); ok {
+					if workflowID, exists := workflowMap["id"]; exists {
+						// 创建工作流工具
+						// 这里应该调用工作流服务来创建工具
+						// 暂时跳过，实际实现时需要集成工作流服务
+						_ = workflowID
+					}
+				}
+			}
+		}
+	}
+
+	return allTools, nil
+}
+
+// createToolFromConfig 根据配置创建工具
+func (s *AppService) createToolFromConfig(toolConfig map[string]interface{}) (tools.Tool, error) {
+	toolType, ok := toolConfig["type"].(string)
 	if !ok {
-		return "", errno.ErrValidate.AppendBizMessage("模型名称配置不正确")
+		return nil, fmt.Errorf("工具类型配置错误")
 	}
 
-	// 获取模型参数
-	temperature := 0.7
-	if temp, ok := modelConfig["temperature"].(float64); ok {
-		temperature = temp
-	}
-
-	maxTokens := 2048
-	if m, ok := modelConfig["max_tokens"].(float64); ok {
-		maxTokens = int(m)
-	}
-
-	// 模拟调用LLM生成响应
-	// 这里应该替换为实际的LLM调用，比如调用OpenAI、Azure OpenAI等
-	// 示例中我们模拟一个简单的回答
-
-	// 检查是否被取消
-	select {
-	case <-ctx.Done():
-		return "", ctx.Err()
+	switch toolType {
+	case "builtin_tool":
+		return s.createBuiltinTool(toolConfig)
+	case "api_tool":
+		return s.createAPITool(toolConfig)
 	default:
+		return nil, fmt.Errorf("不支持的工具类型: %s", toolType)
+	}
+}
+
+// createBuiltinTool 创建内置工具
+func (s *AppService) createBuiltinTool(toolConfig map[string]interface{}) (tools.Tool, error) {
+	// 这里应该根据内置工具配置创建相应的工具
+	// 由于需要集成内置工具管理器，暂时返回nil
+	// 实际实现时需要：
+	// 1. 获取工具提供者ID和工具ID
+	// 2. 调用内置工具管理器创建工具实例
+	// 3. 设置工具参数
+
+	return nil, nil
+}
+
+// createAPITool 创建API工具
+func (s *AppService) createAPITool(toolConfig map[string]interface{}) (tools.Tool, error) {
+	// 这里应该根据API工具配置创建相应的工具
+	// 由于需要集成API工具管理器，暂时返回nil
+	// 实际实现时需要：
+	// 1. 获取API工具的配置信息
+	// 2. 创建HTTP调用工具
+	// 3. 设置请求参数和响应处理
+
+	return nil, nil
+}
+
+// validateReviewConfig 验证审核配置
+func (s *AppService) validateReviewConfig(ctx context.Context, input string, reviewConfig map[string]interface{}) (bool, string) {
+	// 检查审核是否启用
+	enable, ok := reviewConfig["enable"].(bool)
+	if !ok || !enable {
+		return true, "" // 审核未启用，直接通过
 	}
 
-	// 模拟LLM处理时间
-	time.Sleep(1 * time.Second)
+	// 检查输入审核
+	if inputsConfig, exists := reviewConfig["inputs_config"]; exists {
+		if inputsMap, ok := inputsConfig.(map[string]interface{}); ok {
+			if inputEnable, ok := inputsMap["enable"].(bool); ok && inputEnable {
+				// 执行输入审核
+				if keywords, exists := reviewConfig["keywords"]; exists {
+					if keywordsList, ok := keywords.([]interface{}); ok {
+						for _, keyword := range keywordsList {
+							if keywordStr, ok := keyword.(string); ok {
+								if strings.Contains(input, keywordStr) {
+									// 发现敏感词，返回预设响应
+									if presetResponse, exists := inputsMap["preset_response"]; exists {
+										if response, ok := presetResponse.(string); ok {
+											return false, response
+										}
+									}
+									return false, "您的输入包含敏感内容，请重新输入。"
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
 
-	// 根据模型和提示生成简单的回答
-	answer := fmt.Sprintf("这是使用模型 %s (温度: %.2f, 最大token: %d) 对您的问题的回答。\n\n您的问题：%s\n\n我理解您的问题，并会尽力为您提供帮助。",
-		modelName, temperature, maxTokens, prompt)
+	return true, ""
+}
 
-	return answer, nil
+// validateOutputContent 验证输出内容
+func (s *AppService) validateOutputContent(ctx context.Context, output string, reviewConfig map[string]interface{}) bool {
+	// 检查审核是否启用
+	enable, ok := reviewConfig["enable"].(bool)
+	if !ok || !enable {
+		return true // 审核未启用，直接通过
+	}
+
+	// 检查输出审核
+	if outputsConfig, exists := reviewConfig["outputs_config"]; exists {
+		if outputsMap, ok := outputsConfig.(map[string]interface{}); ok {
+			if outputEnable, ok := outputsMap["enable"].(bool); ok && outputEnable {
+				// 执行输出审核
+				if keywords, exists := reviewConfig["keywords"]; exists {
+					if keywordsList, ok := keywords.([]interface{}); ok {
+						for _, keyword := range keywordsList {
+							if keywordStr, ok := keyword.(string); ok {
+								if strings.Contains(output, keywordStr) {
+									return false // 发现敏感词，输出不通过
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return true
 }

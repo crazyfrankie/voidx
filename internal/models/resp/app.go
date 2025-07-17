@@ -83,7 +83,7 @@ type DebugConversationMessageResp struct {
 	AgentThoughts   []AgentThought `json:"agent_thoughts"`
 	Query           string         `json:"query"`
 	Answer          string         `json:"answer"`
-	TotalTokenCount int            `json:"totalToken_count"`
+	TotalTokenCount int            `json:"total_token_count"`
 	TotalPrice      float64        `json:"total_price"`
 	Latency         float64        `json:"latency"`
 	Ctime           int64          `json:"ctime"`

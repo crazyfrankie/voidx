@@ -2,7 +2,6 @@ package ioc
 
 import (
 	"fmt"
-	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"os"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"gorm.io/gorm/schema"
 
 	"github.com/crazyfrankie/voidx/conf"
+	"github.com/crazyfrankie/voidx/internal/models/entity"
 )
 
 func InitDB() *gorm.DB {

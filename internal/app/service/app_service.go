@@ -226,7 +226,7 @@ func (s *AppService) GetAppsWithPage(ctx context.Context, pageReq req.GetAppsWit
 	}
 
 	// 获取应用分页列表
-	apps, total, err := s.repo.GetAppsWithPage(ctx, accountID, pageReq.Page, pageReq.PageSize, pageReq.SearchWord)
+	apps, total, err := s.repo.GetAppsWithPage(ctx, accountID, pageReq.CurrentPage, pageReq.PageSize, pageReq.SearchWord)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -251,7 +251,7 @@ func (s *AppService) GetAppsWithPage(ctx context.Context, pageReq req.GetAppsWit
 
 	// 构建分页器
 	paginator := &resp.Paginator{
-		CurrentPage: pageReq.Page,
+		CurrentPage: pageReq.CurrentPage,
 		PageSize:    pageReq.PageSize,
 		TotalPage:   int(total) / pageReq.PageSize,
 		TotalRecord: int(total),

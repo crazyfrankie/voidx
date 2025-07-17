@@ -10,12 +10,10 @@ import (
 	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
-// AppHandler 应用控制器
 type AppHandler struct {
 	appService *service.AppService
 }
 
-// NewAppHandler 创建应用控制器
 func NewAppHandler(appService *service.AppService) *AppHandler {
 	return &AppHandler{
 		appService: appService,
