@@ -1,0 +1,26 @@
+model: ernie-lite-8k
+label: 文心一言 Lite 8K
+model_type: chat
+features:
+  - agent_thought
+context_window: 8192
+max_output_tokens: 4096
+attributes:
+  mode: chat
+metadata:
+  pricing:
+    input: 0.003
+    output: 0.006
+    unit: 1000
+parameters:
+  - name: temperature
+    use_template: temperature
+  - name: top_p
+    use_template: top_p
+  - name: presence_penalty
+    use_template: presence_penalty
+  - name: frequency_penalty
+    use_template: frequency_penalty
+  - name: max_tokens
+    use_template: max_tokens
+    max: 4096

@@ -285,3 +285,20 @@ func (d *AppDao) CreateAppDatasetJoin(ctx context.Context, appID, datasetID uuid
 		DatasetID: datasetID,
 	}).Error
 }
+
+// GetRecentMessages 获取最近的消息记录
+func (d *AppDao) GetRecentMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*entity.Message, error) {
+	var messages []*entity.Message
+	err := d.db.WithContext(ctx).
+		Where("conversation_id = ? AND status IN (?) AND answer != ''", conversationID, []string{"stop", "normal"}).
+		Order("ctime DESC").
+		Limit(limit).
+		Find(&messages).Error
+
+	// 反转数组以获得正确的时间顺序
+	for i, j := 0, len(messages)-1; i < j; i, j = i+1, j-1 {
+		messages[i], messages[j] = messages[j], messages[i]
+	}
+
+	return messages, err
+}

@@ -1,12 +1,13 @@
 package handler
 
 import (
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+
 	"github.com/crazyfrankie/voidx/internal/account/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/response"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 type AccountHandler struct {

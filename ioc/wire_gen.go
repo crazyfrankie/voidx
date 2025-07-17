@@ -10,6 +10,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/account"
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
+	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -21,17 +22,19 @@ func InitEngine() *gin.Engine {
 	tokenService := InitJWT(cmdable)
 	v := InitMiddlewares(tokenService)
 	db := InitDB()
-	llm := InitLLM()
-	appModule := app.InitAppModule(db, llm)
+	languageModelManager := InitLLMCore()
+	llmModule := llm.InitLLMModule(languageModelManager)
+	appModule := app.InitAppModule(db, languageModelManager, llmModule)
 	appHandler := appModule.Handler
 	authModule := auth.InitAuthModule(db, cmdable, tokenService)
 	authHandler := authModule.Handler
 	accountModule := account.InitAccountModule(db)
 	accountHandler := accountModule.Handler
-	engine := InitWeb(v, appHandler, authHandler, accountHandler)
+	llmHandler := llmModule.Handler
+	engine := InitWeb(v, appHandler, authHandler, accountHandler, llmHandler)
 	return engine
 }
 
 // wire.go:
 
-var BaseSet = wire.NewSet(InitCache, InitDB, InitLLM, InitJWT)
+var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT)

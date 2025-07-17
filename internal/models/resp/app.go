@@ -76,3 +76,15 @@ type PublishedConfigResp struct {
 		Status string `json:"status"`
 	} `json:"web_app"`
 }
+
+type DebugConversationMessageResp struct {
+	ID              uuid.UUID      `json:"id"`
+	ConversationID  uuid.UUID      `json:"conversation_id"`
+	AgentThoughts   []AgentThought `json:"agent_thoughts"`
+	Query           string         `json:"query"`
+	Answer          string         `json:"answer"`
+	TotalTokenCount int            `json:"totalToken_count"`
+	TotalPrice      float64        `json:"total_price"`
+	Latency         float64        `json:"latency"`
+	Ctime           int64          `json:"ctime"`
+}

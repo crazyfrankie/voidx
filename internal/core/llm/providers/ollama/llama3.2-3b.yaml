@@ -1,0 +1,22 @@
+model: llama3.2-3b
+label: Llama 3.2 3B
+model_type: chat
+features:
+  - agent_thought
+context_window: 8192
+max_output_tokens: 2048
+attributes:
+  mode: chat
+metadata:
+  pricing:
+    input: 0.0
+    output: 0.0
+    unit: 1000
+parameters:
+  - name: temperature
+    use_template: temperature
+  - name: top_p
+    use_template: top_p
+  - name: max_tokens
+    use_template: max_tokens
+    max: 2048

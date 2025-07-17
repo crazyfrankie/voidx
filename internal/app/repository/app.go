@@ -126,3 +126,8 @@ func (r *AppRepo) DeleteAppDatasetJoins(ctx context.Context, appID uuid.UUID) er
 func (r *AppRepo) CreateAppDatasetJoin(ctx context.Context, appID, datasetID uuid.UUID) error {
 	return r.dao.CreateAppDatasetJoin(ctx, appID, datasetID)
 }
+
+// GetRecentMessages 获取最近的消息记录
+func (r *AppRepo) GetRecentMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*entity.Message, error) {
+	return r.dao.GetRecentMessages(ctx, conversationID, limit)
+}

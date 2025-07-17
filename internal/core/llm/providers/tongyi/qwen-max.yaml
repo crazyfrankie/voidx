@@ -1,0 +1,27 @@
+model: qwen-max
+label: 通义千问 Max
+model_type: chat
+features:
+  - tool_call
+  - agent_thought
+context_window: 32768
+max_output_tokens: 8192
+attributes:
+  mode: chat
+metadata:
+  pricing:
+    input: 0.02
+    output: 0.06
+    unit: 1000
+parameters:
+  - name: temperature
+    use_template: temperature
+  - name: top_p
+    use_template: top_p
+  - name: presence_penalty
+    use_template: presence_penalty
+  - name: frequency_penalty
+    use_template: frequency_penalty
+  - name: max_tokens
+    use_template: max_tokens
+    max: 8192

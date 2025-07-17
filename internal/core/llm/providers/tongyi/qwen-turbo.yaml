@@ -1,0 +1,27 @@
+model: qwen-turbo
+label: 通义千问 Turbo
+model_type: chat
+features:
+  - tool_call
+  - agent_thought
+context_window: 8192
+max_output_tokens: 1500
+attributes:
+  mode: chat
+metadata:
+  pricing:
+    input: 0.003
+    output: 0.006
+    unit: 1000
+parameters:
+  - name: temperature
+    use_template: temperature
+  - name: top_p
+    use_template: top_p
+  - name: presence_penalty
+    use_template: presence_penalty
+  - name: frequency_penalty
+    use_template: frequency_penalty
+  - name: max_tokens
+    use_template: max_tokens
+    max: 1500

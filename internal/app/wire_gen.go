@@ -11,16 +11,18 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app/repository"
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/app/service"
-	"github.com/tmc/langchaingo/llms/openai"
+	"github.com/crazyfrankie/voidx/internal/core/llm"
+	llm2 "github.com/crazyfrankie/voidx/internal/llm"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitAppModule(db *gorm.DB, llm *openai.LLM) *AppModule {
+func InitAppModule(db *gorm.DB, llmCore *llm.LanguageModelManager, llmModule *llm2.LLMModule) *AppModule {
 	appDao := dao.NewAppDao(db)
 	appRepo := repository.NewAppRepo(appDao)
-	appService := service.NewAppService(appRepo, llm)
+	llmService := llmModule.Service
+	appService := service.NewAppService(appRepo, llmCore, llmService)
 	appHandler := handler.NewAppHandler(appService)
 	appModule := &AppModule{
 		Handler: appHandler,

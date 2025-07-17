@@ -4,12 +4,14 @@ import (
 	"github.com/crazyfrankie/voidx/internal/account"
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
+	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/middlewares"
 	"github.com/crazyfrankie/voidx/pkg/jwt"
 	"github.com/gin-gonic/gin"
 )
 
-func InitWeb(middlewares []gin.HandlerFunc, app *app.Handler, auth *auth.Handler, account *account.Handler) *gin.Engine {
+func InitWeb(middlewares []gin.HandlerFunc, app *app.Handler, auth *auth.Handler,
+	account *account.Handler, llm *llm.Handler) *gin.Engine {
 	srv := gin.Default()
 	srv.Use(middlewares...)
 
@@ -18,6 +20,7 @@ func InitWeb(middlewares []gin.HandlerFunc, app *app.Handler, auth *auth.Handler
 	auth.RegisterRoute(apiGroup)
 	app.RegisterRoute(apiGroup)
 	account.RegisterRoute(apiGroup)
+	llm.RegisterRoute(apiGroup)
 
 	return srv
 }

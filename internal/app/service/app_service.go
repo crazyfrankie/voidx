@@ -3,12 +3,12 @@ package service
 import (
 	"context"
 	"math/rand"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/llms/openai"
 
 	"github.com/crazyfrankie/voidx/internal/app/repository"
+	"github.com/crazyfrankie/voidx/internal/core/llm"
+	llmService "github.com/crazyfrankie/voidx/internal/llm/service"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
@@ -16,17 +16,17 @@ import (
 	"github.com/crazyfrankie/voidx/pkg/errno"
 )
 
-// AppService 应用服务
 type AppService struct {
-	repo *repository.AppRepo
-	llm  *openai.LLM
+	repo             *repository.AppRepo
+	languageModelMgr *llm.LanguageModelManager
+	llmService       *llmService.LLMService
 }
 
-// NewAppService 创建应用服务
-func NewAppService(repo *repository.AppRepo, llm *openai.LLM) *AppService {
+func NewAppService(repo *repository.AppRepo, languageModelMgr *llm.LanguageModelManager, llmSvc *llmService.LLMService) *AppService {
 	return &AppService{
-		repo: repo,
-		llm:  llm,
+		repo:             repo,
+		languageModelMgr: languageModelMgr,
+		llmService:       llmSvc,
 	}
 }
 
@@ -263,7 +263,46 @@ func (s *AppService) GetAppsWithPage(ctx context.Context, pageReq req.GetAppsWit
 	return appResps, paginator, nil
 }
 
-// getCurrentUserID 从上下文中获取当前用户ID
+// updateAppDatasetJoins 更新应用知识库关联
+func (s *AppService) updateAppDatasetJoins(ctx context.Context, appID uuid.UUID, draftConfig map[string]interface{}) error {
+	// 先删除现有关联
+	if err := s.repo.DeleteAppDatasetJoins(ctx, appID); err != nil {
+		return err
+	}
+
+	// 添加新关联
+	if datasets, exists := draftConfig["datasets"]; exists {
+		if datasetList, ok := datasets.([]interface{}); ok {
+			for _, dataset := range datasetList {
+				if datasetMap, ok := dataset.(map[string]interface{}); ok {
+					if idStr, exists := datasetMap["id"]; exists {
+						if datasetID, err := uuid.Parse(idStr.(string)); err == nil {
+							if err := s.repo.CreateAppDatasetJoin(ctx, appID, datasetID); err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// createPublishHistory 创建发布历史记录
+func (s *AppService) createPublishHistory(ctx context.Context, appID uuid.UUID, draftConfig map[string]interface{}) error {
+	// 获取当前最大发布版本
+	maxVersion, err := s.repo.GetMaxPublishedVersion(ctx, appID)
+	if err != nil {
+		return err
+	}
+
+	// 创建发布历史记录
+	_, err = s.repo.CreateAppConfigVersion(ctx, appID, maxVersion+1, "published", draftConfig)
+	return err
+}
+
 func getCurrentUserID(ctx context.Context) (uuid.UUID, error) {
 	userID, ok := ctx.Value("user_id").(string)
 	if !ok {
@@ -279,10 +318,8 @@ func getCurrentUserID(ctx context.Context) (uuid.UUID, error) {
 	return id, nil
 }
 
-// 生成随机字符串
 func generateRandomString(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	rand.New(rand.NewSource(time.Now().UnixNano()))
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[rand.Intn(len(charset))]

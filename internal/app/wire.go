@@ -7,8 +7,9 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app/repository"
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/app/service"
+	llmcore "github.com/crazyfrankie/voidx/internal/core/llm"
+	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/google/wire"
-	"github.com/tmc/langchaingo/llms/openai"
 	"gorm.io/gorm"
 )
 
@@ -18,7 +19,7 @@ type AppModule struct {
 	Handler *Handler
 }
 
-func InitAppModule(db *gorm.DB, llm *openai.LLM) *AppModule {
+func InitAppModule(db *gorm.DB, llmCore *llmcore.LanguageModelManager, llmModule *llm.LLMModule) *AppModule {
 	wire.Build(
 		dao.NewAppDao,
 		repository.NewAppRepo,
@@ -26,6 +27,7 @@ func InitAppModule(db *gorm.DB, llm *openai.LLM) *AppModule {
 		handler.NewAppHandler,
 
 		wire.Struct(new(AppModule), "*"),
+		wire.FieldsOf(new(*llm.LLMModule), "Service"),
 	)
 	return new(AppModule)
 }

@@ -1,19 +1,22 @@
-model: moonshot-v1-128k
-label: moonshot-v1-128k
+model: gpt-4o
+label: GPT-4o
 model_type: chat
 features:
   - tool_call
   - agent_thought
   - image_input
-context_window: 131072
-max_output_tokens: 131072
+context_window: 128000
+max_output_tokens: 4096
 attributes:
-  model: moonshot-v1-128k
+  mode: chat
+metadata:
+  pricing:
+    input: 0.0025
+    output: 0.01
+    unit: 1000
 parameters:
   - name: temperature
     use_template: temperature
-    max: 1
-    default: 0.85
   - name: top_p
     use_template: top_p
   - name: presence_penalty
@@ -22,10 +25,4 @@ parameters:
     use_template: frequency_penalty
   - name: max_tokens
     use_template: max_tokens
-    default: 4096
-metadata:
-  pricing:
-    input: 0.0600
-    output: 0.0600
-    unit: 0.001
-    currency: RMB
+    max: 4096

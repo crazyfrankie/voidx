@@ -1,19 +1,21 @@
-model: moonshot-v1-32k
-label: moonshot-v1-32k
+model: moonshot-v1-8k
+label: Moonshot v1 8K
 model_type: chat
 features:
   - tool_call
   - agent_thought
-  - image_input
-context_window: 32768
-max_output_tokens: 32768
+context_window: 8192
+max_output_tokens: 4096
 attributes:
-  model: moonshot-v1-32k
+  mode: chat
+metadata:
+  pricing:
+    input: 0.012
+    output: 0.012
+    unit: 1000
 parameters:
   - name: temperature
     use_template: temperature
-    max: 1
-    default: 0.85
   - name: top_p
     use_template: top_p
   - name: presence_penalty
@@ -22,10 +24,4 @@ parameters:
     use_template: frequency_penalty
   - name: max_tokens
     use_template: max_tokens
-    default: 4096
-metadata:
-  pricing:
-    input: 0.0240
-    output: 0.0240
-    unit: 0.001
-    currency: RMB
+    max: 4096

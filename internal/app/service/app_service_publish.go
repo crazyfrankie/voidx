@@ -2,10 +2,8 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/google/uuid"
-	"gorm.io/datatypes"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
@@ -204,18 +202,4 @@ func (s *AppService) GetPublishHistoriesWithPage(ctx context.Context, appID uuid
 	}
 
 	return historyResps, paginator, nil
-}
-
-// convertToJSONType 转换为JSON类型的辅助函数
-func convertToJSONType(value interface{}) (datatypes.JSON, error) {
-	if value == nil {
-		return nil, nil
-	}
-
-	jsonData, err := json.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-
-	return datatypes.JSON(jsonData), nil
 }
