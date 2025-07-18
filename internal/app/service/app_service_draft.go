@@ -7,12 +7,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 // GetDraftAppConfig 获取应用的最新草稿配置
 func (s *AppService) GetDraftAppConfig(ctx context.Context, appID uuid.UUID) (map[string]interface{}, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func (s *AppService) GetDraftAppConfig(ctx context.Context, appID uuid.UUID) (ma
 // UpdateDraftAppConfig 更新应用的最新草稿配置
 func (s *AppService) UpdateDraftAppConfig(ctx context.Context, appID uuid.UUID, draftConfig map[string]interface{}) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}

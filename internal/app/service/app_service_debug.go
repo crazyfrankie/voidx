@@ -19,6 +19,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 // TaskManager 任务管理器，用于管理调试聊天任务
@@ -92,7 +93,7 @@ func (tm *TaskManager) GetTaskContext(taskID uuid.UUID) (*TaskContext, bool) {
 // GetDebugConversationSummary 获取调试会话长期记忆
 func (s *AppService) GetDebugConversationSummary(ctx context.Context, appID uuid.UUID) (string, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -136,7 +137,7 @@ func (s *AppService) GetDebugConversationSummary(ctx context.Context, appID uuid
 // UpdateDebugConversationSummary 更新调试会话长期记忆
 func (s *AppService) UpdateDebugConversationSummary(ctx context.Context, appID uuid.UUID, summary string) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -197,7 +198,7 @@ func (s *AppService) UpdateDebugConversationSummary(ctx context.Context, appID u
 // DeleteDebugConversation 删除调试会话
 func (s *AppService) DeleteDebugConversation(ctx context.Context, appID uuid.UUID) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -230,7 +231,7 @@ func (s *AppService) DeleteDebugConversation(ctx context.Context, appID uuid.UUI
 // DebugChat 发起调试对话
 func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, req req.DebugChatReq, w http.ResponseWriter) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -550,7 +551,7 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, req req.Deb
 // StopDebugChat 停止调试聊天任务
 func (s *AppService) StopDebugChat(ctx context.Context, appID, taskID uuid.UUID) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -588,7 +589,7 @@ func (s *AppService) StopDebugChat(ctx context.Context, appID, taskID uuid.UUID)
 // GetDebugConversationMessagesWithPage 获取调试会话分页消息列表
 func (s *AppService) GetDebugConversationMessagesWithPage(ctx context.Context, appID uuid.UUID, req req.GetDebugConversationMessagesWithPageReq) ([]*resp.DebugConversationMessageResp, *resp.Paginator, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return nil, nil, err
 	}

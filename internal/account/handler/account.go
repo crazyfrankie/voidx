@@ -2,12 +2,12 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/account/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/response"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 type AccountHandler struct {
@@ -30,10 +30,7 @@ func (h *AccountHandler) RegisterRoute(r *gin.RouterGroup) {
 
 func (h *AccountHandler) GetAccount() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.Request.Context().Value("user_id").(string)
-		uid, _ := uuid.Parse(id)
-
-		resp, err := h.svc.GetAccountByID(c.Request.Context(), uid)
+		resp, err := h.svc.GetAccountByID(c.Request.Context())
 		if err != nil {
 			response.Error(c, err)
 			return
@@ -51,10 +48,13 @@ func (h *AccountHandler) UpdatePassword() gin.HandlerFunc {
 			return
 		}
 
-		id := c.Request.Context().Value("user_id").(string)
-		uid, _ := uuid.Parse(id)
+		uid, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
 
-		err := h.svc.UpdatePassword(c.Request.Context(), uid, updateReq.Password)
+		err = h.svc.UpdatePassword(c.Request.Context(), uid, updateReq.Password)
 		if err != nil {
 			response.Error(c, err)
 			return
@@ -72,10 +72,13 @@ func (h *AccountHandler) UpdateName() gin.HandlerFunc {
 			return
 		}
 
-		id := c.Request.Context().Value("user_id").(string)
-		uid, _ := uuid.Parse(id)
+		uid, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
 
-		err := h.svc.UpdateName(c.Request.Context(), uid, updateReq.Name)
+		err = h.svc.UpdateName(c.Request.Context(), uid, updateReq.Name)
 		if err != nil {
 			response.Error(c, err)
 			return
@@ -93,10 +96,13 @@ func (h *AccountHandler) UpdateAvatar() gin.HandlerFunc {
 			return
 		}
 
-		id := c.Request.Context().Value("user_id").(string)
-		uid, _ := uuid.Parse(id)
+		uid, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
 
-		err := h.svc.UpdateAvatar(c.Request.Context(), uid, updateReq.Avatar)
+		err = h.svc.UpdateAvatar(c.Request.Context(), uid, updateReq.Avatar)
 		if err != nil {
 			response.Error(c, err)
 			return

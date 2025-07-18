@@ -24,6 +24,7 @@ func (h *AuthHandler) RegisterRoute(r *gin.RouterGroup) {
 	authGroup := r.Group("auth")
 	{
 		authGroup.POST("login", h.Login())
+		authGroup.GET("logout", h.Logout())
 	}
 }
 
@@ -44,6 +45,18 @@ func (h *AuthHandler) Login() gin.HandlerFunc {
 		c.SetSameSite(http.SameSiteLaxMode)
 		c.Header("x-access-token", tokens[0])
 		c.SetCookie("llmops_refresh", tokens[1], int(time.Hour*24), "/", "", false, true)
+
+		response.Success(c)
+	}
+}
+
+func (h *AuthHandler) Logout() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		err := h.svc.Logout(c.Request.Context(), c.Request.UserAgent())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
 
 		response.Success(c)
 	}

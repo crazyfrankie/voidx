@@ -6,12 +6,13 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 // GetPublishedConfig 获取已发布的配置
 func (s *AppService) GetPublishedConfig(ctx context.Context, appID uuid.UUID) (map[string]interface{}, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func (s *AppService) GetPublishedConfig(ctx context.Context, appID uuid.UUID) (m
 // RegenerateWebAppToken 重新生成WebApp令牌
 func (s *AppService) RegenerateWebAppToken(ctx context.Context, appID uuid.UUID) (string, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return "", err
 	}

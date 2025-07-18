@@ -11,6 +11,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/jwt"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 type AuthService struct {
@@ -28,7 +29,7 @@ func (s *AuthService) Login(ctx context.Context, ua string, loginReq req.LoginRe
 		return nil, errno.ErrNotFound.AppendBizMessage("账号不存在或者密码错误，请核实后重试")
 	}
 
-	var uid string
+	var uid uuid.UUID
 	// create user
 	if account.ID == uuid.Nil {
 		if hashPasswd, err := bcrypt.GenerateFromPassword([]byte(loginReq.Password), bcrypt.DefaultCost); err == nil {
@@ -39,16 +40,25 @@ func (s *AuthService) Login(ctx context.Context, ua string, loginReq req.LoginRe
 			if err != nil {
 				return nil, err
 			}
-			uid = newUser.ID.String()
+			uid = newUser.ID
 		} else {
 			return nil, err
 		}
 	} else {
-		uid = account.ID.String()
+		uid = account.ID
 		if err = bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(loginReq.Password)); err != nil {
 			return nil, errno.ErrNotFound.AppendBizMessage("账号不存在或者密码错误，请核实后重试")
 		}
 	}
 
 	return s.token.GenerateToken(uid, ua)
+}
+
+func (s *AuthService) Logout(ctx context.Context, ua string) error {
+	uid, err := util.GetCurrentUserID(ctx)
+	if err != nil {
+		return err
+	}
+
+	return s.token.CleanToken(ctx, uid, ua)
 }

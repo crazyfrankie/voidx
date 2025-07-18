@@ -14,6 +14,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/pkg/consts"
 	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 type AppService struct {
@@ -33,7 +34,7 @@ func NewAppService(repo *repository.AppRepo, languageModelMgr *llm.LanguageModel
 // CreateApp 创建应用
 func (s *AppService) CreateApp(ctx context.Context, createReq req.CreateAppReq) (uuid.UUID, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -68,7 +69,7 @@ func (s *AppService) CreateApp(ctx context.Context, createReq req.CreateAppReq) 
 // GetApp 获取应用
 func (s *AppService) GetApp(ctx context.Context, appID uuid.UUID) (*resp.AppResp, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +104,7 @@ func (s *AppService) GetApp(ctx context.Context, appID uuid.UUID) (*resp.AppResp
 // UpdateApp 更新应用
 func (s *AppService) UpdateApp(ctx context.Context, appID uuid.UUID, updateReq req.UpdateAppReq) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -140,7 +141,7 @@ func (s *AppService) UpdateApp(ctx context.Context, appID uuid.UUID, updateReq r
 // DeleteApp 删除应用
 func (s *AppService) DeleteApp(ctx context.Context, appID uuid.UUID) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -167,7 +168,7 @@ func (s *AppService) DeleteApp(ctx context.Context, appID uuid.UUID) error {
 // CopyApp 拷贝应用
 func (s *AppService) CopyApp(ctx context.Context, appID uuid.UUID) (uuid.UUID, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -220,7 +221,7 @@ func (s *AppService) CopyApp(ctx context.Context, appID uuid.UUID) (uuid.UUID, e
 // GetAppsWithPage 获取应用分页列表
 func (s *AppService) GetAppsWithPage(ctx context.Context, pageReq req.GetAppsWithPageReq) ([]*resp.AppResp, *resp.Paginator, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -301,21 +302,6 @@ func (s *AppService) createPublishHistory(ctx context.Context, appID uuid.UUID, 
 	// 创建发布历史记录
 	_, err = s.repo.CreateAppConfigVersion(ctx, appID, maxVersion+1, "published", draftConfig)
 	return err
-}
-
-func getCurrentUserID(ctx context.Context) (uuid.UUID, error) {
-	userID, ok := ctx.Value("user_id").(string)
-	if !ok {
-		return uuid.Nil, errno.ErrUnauthorized.AppendBizMessage("未登录")
-	}
-
-	// 解析用户ID
-	id, err := uuid.Parse(userID)
-	if err != nil {
-		return uuid.Nil, errno.ErrUnauthorized.AppendBizMessage("用户ID格式不正确")
-	}
-
-	return id, nil
 }
 
 func generateRandomString(length int) string {

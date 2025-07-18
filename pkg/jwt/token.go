@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ type TokenService struct {
 }
 
 type Claims struct {
-	UID string `json:"uid"`
+	UID uuid.UUID `json:"uid"`
 	jwt.RegisteredClaims
 }
 
@@ -29,7 +30,7 @@ func NewTokenService(cmd redis.Cmdable, signAlgo string, secret string) *TokenSe
 	return &TokenService{cmd: cmd, signAlgo: signAlgo, secretKey: []byte(secret)}
 }
 
-func (s *TokenService) GenerateToken(uid string, ua string) ([]string, error) {
+func (s *TokenService) GenerateToken(uid uuid.UUID, ua string) ([]string, error) {
 	res := make([]string, 2)
 	access, err := s.newToken(uid, time.Hour)
 	if err != nil {
@@ -53,7 +54,7 @@ func (s *TokenService) GenerateToken(uid string, ua string) ([]string, error) {
 	return res, nil
 }
 
-func (s *TokenService) newToken(uid string, duration time.Duration) (string, error) {
+func (s *TokenService) newToken(uid uuid.UUID, duration time.Duration) (string, error) {
 	now := time.Now()
 	claims := &Claims{
 		UID: uid,
@@ -115,7 +116,7 @@ func (s *TokenService) TryRefresh(refresh string, ua string) ([]string, error) {
 	return []string{access, refresh}, nil
 }
 
-func (s *TokenService) CleanToken(ctx context.Context, uid string, ua string) error {
+func (s *TokenService) CleanToken(ctx context.Context, uid uuid.UUID, ua string) error {
 	return s.cmd.Del(ctx, tokenKey(uid, ua)).Err()
 }
 
@@ -137,7 +138,7 @@ func (s *TokenService) GetAccessToken(c *gin.Context) (string, error) {
 	return strs[1], nil
 }
 
-func tokenKey(uid string, ua string) string {
+func tokenKey(uid uuid.UUID, ua string) string {
 	hash := hashUA(ua)
 	return fmt.Sprintf("refresh_token:%s:%s", uid, hash)
 }

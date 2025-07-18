@@ -8,12 +8,13 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 // PublishDraftAppConfig 发布应用的草稿配置
 func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -71,7 +72,7 @@ func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID)
 // CancelPublishAppConfig 取消发布应用配置
 func (s *AppService) CancelPublishAppConfig(ctx context.Context, appID uuid.UUID) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -105,7 +106,7 @@ func (s *AppService) CancelPublishAppConfig(ctx context.Context, appID uuid.UUID
 // FallbackHistoryToDraft 回退历史版本到草稿
 func (s *AppService) FallbackHistoryToDraft(ctx context.Context, appID uuid.UUID, versionID uuid.UUID) error {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func (s *AppService) FallbackHistoryToDraft(ctx context.Context, appID uuid.UUID
 // GetPublishHistoriesWithPage 获取发布历史分页列表
 func (s *AppService) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUID, pageReq req.GetPublishHistoriesWithPageReq) ([]*resp.AppConfigVersionResp, *resp.Paginator, error) {
 	// 获取当前用户ID
-	accountID, err := getCurrentUserID(ctx)
+	accountID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
