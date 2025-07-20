@@ -6,7 +6,6 @@ import (
 
 	"github.com/crazyfrankie/voidx/internal/core/llm"
 	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
-	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 )
 
@@ -89,27 +88,6 @@ func (s *LLMService) GetModelsByType(ctx context.Context, modelType string) (map
 	}
 
 	return result, nil
-}
-
-// CreateModel 创建模型实例
-func (s *LLMService) CreateModel(ctx context.Context, createReq req.CreateModelReq) (entity.BaseLanguageModel, error) {
-	// 验证配置
-	if err := s.llmCore.ValidateModelConfig(createReq.Provider, createReq.ModelName, createReq.Config); err != nil {
-		return nil, fmt.Errorf("invalid model config: %w", err)
-	}
-
-	// 创建模型实例
-	model, err := s.llmCore.CreateModel(createReq.Provider, createReq.ModelName, createReq.Config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create model: %w", err)
-	}
-
-	return model, nil
-}
-
-// ValidateModelConfig 验证模型配置
-func (s *LLMService) ValidateModelConfig(ctx context.Context, validateReq req.ValidateModelConfigReq) error {
-	return s.llmCore.ValidateModelConfig(validateReq.Provider, validateReq.ModelName, validateReq.Config)
 }
 
 // GetModelEntity 获取模型实体信息

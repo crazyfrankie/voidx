@@ -1,4 +1,4 @@
-package llm
+package provider
 
 import (
 	"fmt"
@@ -7,12 +7,12 @@ import (
 	"github.com/tmc/langchaingo/llms/openai"
 
 	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
-	deepseekpkg "github.com/crazyfrankie/voidx/internal/core/llm/providers/deepseek"
-	moonshotpkg "github.com/crazyfrankie/voidx/internal/core/llm/providers/moonshot"
-	ollamapkg "github.com/crazyfrankie/voidx/internal/core/llm/providers/ollama"
-	openaipkg "github.com/crazyfrankie/voidx/internal/core/llm/providers/openai"
-	tongyipkg "github.com/crazyfrankie/voidx/internal/core/llm/providers/tongyi"
-	wenxinpkg "github.com/crazyfrankie/voidx/internal/core/llm/providers/wenxin"
+	deepseekpkg "github.com/crazyfrankie/voidx/internal/core/llm/models/deepseek"
+	moonshotpkg "github.com/crazyfrankie/voidx/internal/core/llm/models/moonshot"
+	ollamapkg "github.com/crazyfrankie/voidx/internal/core/llm/models/ollama"
+	openaipkg "github.com/crazyfrankie/voidx/internal/core/llm/models/openai"
+	tongyipkg "github.com/crazyfrankie/voidx/internal/core/llm/models/tongyi"
+	wenxinpkg "github.com/crazyfrankie/voidx/internal/core/llm/models/wenxin"
 )
 
 // GetOpenAIModelFactory returns the model factory for OpenAI
@@ -25,23 +25,11 @@ func GetOpenAIModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 			}
 
 			// Apply configuration options
-			//if apiKey, exists := config["api_key"]; exists {
-			//	if key, ok := apiKey.(string); ok {
-			//		options = append(options, openai.WithAPIKey(key))
-			//	}
-			//}
-
 			if baseURL, exists := config["base_url"]; exists {
 				if url, ok := baseURL.(string); ok {
 					options = append(options, openai.WithBaseURL(url))
 				}
 			}
-
-			//if temperature, exists := config["temperature"]; exists {
-			//	if temp, ok := temperature.(float64); ok {
-			//		options = append(options, openai.WithTemperature(temp))
-			//	}
-			//}
 
 			chat, err := openaipkg.NewChat(options...)
 			if err != nil {
@@ -78,12 +66,6 @@ func GetMoonshotModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 			}
 
 			// Apply configuration options
-			//if temperature, exists := config["temperature"]; exists {
-			//	if temp, ok := temperature.(float64); ok {
-			//		options = append(options, openai.WithTemperature(temp))
-			//	}
-			//}
-
 			chat, err := moonshotpkg.NewChat(options...)
 			if err != nil {
 				return nil, err
@@ -106,12 +88,6 @@ func GetDeepSeekModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 			}
 
 			// Apply configuration options
-			//if temperature, exists := config["temperature"]; exists {
-			//	if temp, ok := temperature.(float64); ok {
-			//		options = append(options, openai.WithTemperature(temp))
-			//	}
-			//}
-
 			chat, err := deepseekpkg.NewChat(options...)
 			if err != nil {
 				return nil, err

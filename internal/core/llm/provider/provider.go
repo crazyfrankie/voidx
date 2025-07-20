@@ -1,4 +1,4 @@
-package llm
+package provider
 
 import (
 	"fmt"
@@ -55,7 +55,7 @@ func (p *Provider) loadModelEntities() error {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	providerPath := filepath.Join(currentDir, "internal", "core", "llm", "providers", p.Name)
+	providerPath := filepath.Join(currentDir, "internal", "core", "llm", "models", p.Name)
 
 	// Read positions.yaml to get the list of model names
 	positionsFile := filepath.Join(providerPath, "positions.yaml")
