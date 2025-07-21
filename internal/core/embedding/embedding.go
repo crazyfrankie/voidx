@@ -4,25 +4,26 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"github.com/tmc/langchaingo/embeddings/huggingface"
 	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/pkoukk/tiktoken-go"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/crazyfrankie/voidx/pkg/embeddings"
 )
 
 type EmbeddingService struct {
 	cmd      redis.Cmdable
-	Embedder *huggingface.Huggingface
+	embedder *embeddings.OpenAI
 }
 
-func NewEmbeddingService(cmd redis.Cmdable, embedder *huggingface.Huggingface) *EmbeddingService {
-	return &EmbeddingService{cmd: cmd, Embedder: embedder}
+func NewEmbeddingService(cmd redis.Cmdable, embedder *embeddings.OpenAI) *EmbeddingService {
+	return &EmbeddingService{cmd: cmd, embedder: embedder}
 }
 
 func (s *EmbeddingService) Embeddings(ctx context.Context, query string) ([]float32, error) {
-	return s.Embedder.EmbedQuery(ctx, query)
+	return s.embedder.EmbedQuery(ctx, query)
 }
 
 func (s *EmbeddingService) StoreEmbedded(ctx context.Context, query string, embedded []float32) error {

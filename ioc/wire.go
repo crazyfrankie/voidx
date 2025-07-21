@@ -7,15 +7,18 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
 	"github.com/crazyfrankie/voidx/internal/llm"
+	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
 
-var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT)
+var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT, InitEmbedding, InitVectorStore)
 
 func InitEngine() *gin.Engine {
 	wire.Build(
 		BaseSet,
+
+		vecstore.NewVecStoreService,
 
 		auth.InitAuthModule,
 		app.InitAppModule,

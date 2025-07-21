@@ -8,7 +8,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/app/service"
 	llmcore "github.com/crazyfrankie/voidx/internal/core/llm"
-	"github.com/crazyfrankie/voidx/internal/llm"
+	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/google/wire"
 	"gorm.io/gorm"
 )
@@ -19,7 +19,8 @@ type AppModule struct {
 	Handler *Handler
 }
 
-func InitAppModule(db *gorm.DB, llmCore *llmcore.LanguageModelManager, llmModule *llm.LLMModule) *AppModule {
+func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService,
+	llmCore *llmcore.LanguageModelManager) *AppModule {
 	wire.Build(
 		dao.NewAppDao,
 		repository.NewAppRepo,
@@ -27,7 +28,6 @@ func InitAppModule(db *gorm.DB, llmCore *llmcore.LanguageModelManager, llmModule
 		handler.NewAppHandler,
 
 		wire.Struct(new(AppModule), "*"),
-		wire.FieldsOf(new(*llm.LLMModule), "Service"),
 	)
 	return new(AppModule)
 }

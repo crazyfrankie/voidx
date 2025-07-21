@@ -88,3 +88,7 @@ type DebugConversationMessageResp struct {
 	Latency         float64        `json:"latency"`
 	Ctime           int64          `json:"ctime"`
 }
+
+type AppDebugChatResp struct {
+	Content string `json:"content"`
+}

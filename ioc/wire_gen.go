@@ -11,6 +11,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
 	"github.com/crazyfrankie/voidx/internal/llm"
+	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -22,14 +23,17 @@ func InitEngine() *gin.Engine {
 	tokenService := InitJWT(cmdable)
 	v := InitMiddlewares(tokenService)
 	db := InitDB()
+	openAI := InitEmbedding()
+	store := InitVectorStore(openAI)
+	vecStoreService := vecstore.NewVecStoreService(store)
 	languageModelManager := InitLLMCore()
-	llmModule := llm.InitLLMModule(languageModelManager)
-	appModule := app.InitAppModule(db, languageModelManager, llmModule)
+	appModule := app.InitAppModule(db, vecStoreService, languageModelManager)
 	appHandler := appModule.Handler
 	authModule := auth.InitAuthModule(db, cmdable, tokenService)
 	authHandler := authModule.Handler
 	accountModule := account.InitAccountModule(db)
 	accountHandler := accountModule.Handler
+	llmModule := llm.InitLLMModule(languageModelManager)
 	llmHandler := llmModule.Handler
 	engine := InitWeb(v, appHandler, authHandler, accountHandler, llmHandler)
 	return engine
@@ -37,4 +41,4 @@ func InitEngine() *gin.Engine {
 
 // wire.go:
 
-var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT)
+var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT, InitEmbedding, InitVectorStore)

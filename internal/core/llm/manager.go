@@ -40,17 +40,17 @@ func (lmm *LanguageModelManager) initialize() error {
 	}
 
 	providersPath := filepath.Join(currentDir, "internal", "core", "llm", "models")
-	providersYamlPath := filepath.Join(providersPath, "models.yaml")
+	providersYamlPath := filepath.Join(providersPath, "providers.yaml")
 
 	// Read models.yaml
 	providersData, err := os.ReadFile(providersYamlPath)
 	if err != nil {
-		return fmt.Errorf("failed to read models.yaml: %w", err)
+		return fmt.Errorf("failed to read providers.yaml: %w", err)
 	}
 
 	var providersConfig []entity.ProviderEntity
 	if err := yaml.Unmarshal(providersData, &providersConfig); err != nil {
-		return fmt.Errorf("failed to unmarshal models.yaml: %w", err)
+		return fmt.Errorf("failed to unmarshal providers.yaml: %w", err)
 	}
 
 	// Initialize each provider

@@ -25,6 +25,7 @@ type Config struct {
 	Redis   Redis   `yaml:"redis"`
 	MinIO   MinIO   `yaml:"minio"`
 	JWT     JWT     `yaml:"jwt"`
+	Milvus  Milvus  `yaml:"milvus"`
 }
 
 type Postgre struct {
@@ -46,6 +47,11 @@ type MinIO struct {
 type JWT struct {
 	SignAlgo  string `yaml:"signAlgo"`
 	SecretKey string `yaml:"secretKey"`
+}
+
+type Milvus struct {
+	Addr   string `yaml:"addr"`
+	DBName string `yaml:"dbName"`
 }
 
 func GetConf() *Config {

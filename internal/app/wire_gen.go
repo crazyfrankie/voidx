@@ -12,17 +12,16 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/app/service"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
-	llm2 "github.com/crazyfrankie/voidx/internal/llm"
+	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitAppModule(db *gorm.DB, llmCore *llm.LanguageModelManager, llmModule *llm2.LLMModule) *AppModule {
+func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, llmCore *llm.LanguageModelManager) *AppModule {
 	appDao := dao.NewAppDao(db)
 	appRepo := repository.NewAppRepo(appDao)
-	llmService := llmModule.Service
-	appService := service.NewAppService(appRepo, llmCore, llmService)
+	appService := service.NewAppService(appRepo, vecStore, llmCore)
 	appHandler := handler.NewAppHandler(appService)
 	appModule := &AppModule{
 		Handler: appHandler,

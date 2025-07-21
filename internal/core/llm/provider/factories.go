@@ -66,6 +66,13 @@ func GetMoonshotModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 			}
 
 			// Apply configuration options
+			// Apply configuration options
+			if baseURL, exists := config["base_url"]; exists {
+				if url, ok := baseURL.(string); ok {
+					options = append(options, openai.WithBaseURL(url))
+				}
+			}
+
 			chat, err := moonshotpkg.NewChat(options...)
 			if err != nil {
 				return nil, err
@@ -88,6 +95,12 @@ func GetDeepSeekModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 			}
 
 			// Apply configuration options
+			if baseURL, exists := config["base_url"]; exists {
+				if url, ok := baseURL.(string); ok {
+					options = append(options, openai.WithBaseURL(url))
+				}
+			}
+
 			chat, err := deepseekpkg.NewChat(options...)
 			if err != nil {
 				return nil, err
@@ -109,6 +122,13 @@ func GetTongyiModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 				openai.WithModel(modelName),
 			}
 
+			// Apply configuration options
+			if baseURL, exists := config["base_url"]; exists {
+				if url, ok := baseURL.(string); ok {
+					options = append(options, openai.WithBaseURL(url))
+				}
+			}
+			
 			chat, err := tongyipkg.NewChat(options...)
 			if err != nil {
 				return nil, err

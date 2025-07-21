@@ -1,19 +1,20 @@
 package ioc
 
 import (
+	"github.com/gin-gonic/gin"
+
 	"github.com/crazyfrankie/voidx/internal/account"
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
 	"github.com/crazyfrankie/voidx/internal/llm"
-	"github.com/crazyfrankie/voidx/internal/middlewares"
 	"github.com/crazyfrankie/voidx/pkg/jwt"
-	"github.com/gin-gonic/gin"
+	"github.com/crazyfrankie/voidx/pkg/middlewares"
 )
 
-func InitWeb(middlewares []gin.HandlerFunc, app *app.Handler, auth *auth.Handler,
+func InitWeb(mws []gin.HandlerFunc, app *app.Handler, auth *auth.Handler,
 	account *account.Handler, llm *llm.Handler) *gin.Engine {
 	srv := gin.Default()
-	srv.Use(middlewares...)
+	srv.Use(mws...)
 
 	apiGroup := srv.Group("api")
 
