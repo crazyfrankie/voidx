@@ -2,13 +2,13 @@ package ioc
 
 import (
 	"context"
+	"github.com/crazyfrankie/voidx/pkg/langchainx/embeddings"
 
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/tmc/langchaingo/vectorstores/milvus"
 
 	"github.com/crazyfrankie/voidx/conf"
-	"github.com/crazyfrankie/voidx/pkg/embeddings"
 )
 
 func InitVectorStore(embedder *embeddings.OpenAI) *milvus.Store {

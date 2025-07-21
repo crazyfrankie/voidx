@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "title": "First Article",
+    "content": "This is the content of the first article about technology and innovation.",
+    "author": "Alice Smith",
+    "category": "Technology",
+    "published": true
+  },
+  {
+    "id": 2,
+    "title": "Second Article",
+    "content": "This article discusses the latest trends in artificial intelligence and machine learning.",
+    "author": "Bob Johnson",
+    "category": "AI/ML",
+    "published": false
+  },
+  {
+    "id": 3,
+    "title": "Third Article",
+    "content": "An in-depth analysis of cloud computing platforms and their benefits for modern businesses.",
+    "author": "Carol Williams",
+    "category": "Cloud Computing",
+    "published": true
+  }
+]

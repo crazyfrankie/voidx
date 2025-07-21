@@ -4,13 +4,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"github.com/crazyfrankie/voidx/pkg/langchainx/embeddings"
 	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/pkoukk/tiktoken-go"
 	"github.com/redis/go-redis/v9"
-
-	"github.com/crazyfrankie/voidx/pkg/embeddings"
 )
 
 type EmbeddingService struct {

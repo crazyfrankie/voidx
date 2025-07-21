@@ -1,4 +1,4 @@
-package langchainx
+package memory
 
 // FileChatMessageHistoryOption is a function that configures a FileChatMessageHistory.
 type FileChatMessageHistoryOption func(*FileChatMessageHistory)

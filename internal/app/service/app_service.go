@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
+	memory2 "github.com/crazyfrankie/voidx/pkg/langchainx/memory"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/chains"
 	"github.com/tmc/langchaingo/memory"
@@ -12,7 +13,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
-	"github.com/crazyfrankie/voidx/pkg/langchainx"
 )
 
 type AppService struct {
@@ -37,7 +37,7 @@ func NewAppService(repo *repository.AppRepo, vecStore *vecstore.VecStoreService,
 }
 
 func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, chatReq req.DebugChatReq) (resp.AppDebugChatResp, error) {
-	chatHis, err := langchainx.NewFileChatMessageHistory(langchainx.WithFilePath("storage/memory/chat_history.json"))
+	chatHis, err := memory2.NewFileChatMessageHistory(memory2.WithFilePath("storage/memory/chat_history.json"))
 	if err != nil {
 		return resp.AppDebugChatResp{}, err
 	}

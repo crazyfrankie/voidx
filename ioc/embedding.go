@@ -1,11 +1,11 @@
 package ioc
 
 import (
-	"github.com/crazyfrankie/voidx/pkg/embeddings"
+	embeddings2 "github.com/crazyfrankie/voidx/pkg/langchainx/embeddings"
 	"github.com/tmc/langchaingo/llms/openai"
 )
 
-func InitEmbedding() *embeddings.OpenAI {
+func InitEmbedding() *embeddings2.OpenAI {
 	client, err := openai.New(
 		openai.WithBaseURL("https://dashscope.aliyuncs.com/compatible-mode/v1"),
 		openai.WithEmbeddingModel("text-embedding-v4"),
@@ -14,7 +14,7 @@ func InitEmbedding() *embeddings.OpenAI {
 		panic(err)
 	}
 
-	embedding, err := embeddings.NewOpenAI(embeddings.WithClient(*client))
+	embedding, err := embeddings2.NewOpenAI(embeddings2.WithClient(*client))
 	if err != nil {
 		panic(err)
 	}

@@ -1,4 +1,4 @@
-package langchainx
+package memory
 
 import (
 	"context"
