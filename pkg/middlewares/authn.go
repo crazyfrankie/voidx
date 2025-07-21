@@ -47,11 +47,12 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 			response.Error(c, errno.ErrUnauthorized)
 			return
 		}
-		tokens, err := h.token.TryRefresh(refresh, c.Request.UserAgent())
+		tokens, uid, err := h.token.TryRefresh(refresh, c.Request.UserAgent())
 		if err != nil {
 			response.Error(c, errno.ErrUnauthorized)
 			return
 		}
+		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_id", uid))
 
 		c.SetSameSite(http.SameSiteLaxMode)
 		c.Header("x-access-token", tokens[0])

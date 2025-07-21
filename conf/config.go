@@ -50,8 +50,9 @@ type JWT struct {
 }
 
 type Milvus struct {
-	Addr   string `yaml:"addr"`
-	DBName string `yaml:"dbName"`
+	Addr           string `yaml:"addr"`
+	DBName         string `yaml:"dbName"`
+	CollectionName string `yaml:"collectionName"`
 }
 
 func GetConf() *Config {

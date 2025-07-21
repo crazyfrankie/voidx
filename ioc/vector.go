@@ -19,7 +19,7 @@ func InitVectorStore(embedder *embeddings.OpenAI) *milvus.Store {
 	opts := []milvus.Option{
 		milvus.WithIndex(idx),
 		milvus.WithEmbedder(embedder),
-		milvus.WithCollectionName("dataset"),
+		milvus.WithCollectionName(conf.GetConf().Milvus.CollectionName),
 	}
 
 	store, err := milvus.New(context.Background(), client.Config{
