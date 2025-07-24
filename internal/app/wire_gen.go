@@ -12,6 +12,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/app/service"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"gorm.io/gorm"
 )
@@ -21,7 +22,8 @@ import (
 func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, llmCore *llm.LanguageModelManager) *AppModule {
 	appDao := dao.NewAppDao(db)
 	appRepo := repository.NewAppRepo(appDao)
-	appService := service.NewAppService(appRepo, vecStore, llmCore)
+	baseLanguageModel := InitModel(llmCore)
+	appService := service.NewAppService(appRepo, vecStore, baseLanguageModel)
 	appHandler := handler.NewAppHandler(appService)
 	appModule := &AppModule{
 		Handler: appHandler,
@@ -35,4 +37,15 @@ type Handler = handler.AppHandler
 
 type AppModule struct {
 	Handler *Handler
+}
+
+func InitModel(llmManager *llm.LanguageModelManager) entity.BaseLanguageModel {
+	model, err := llmManager.CreateModel("tongyi", "qwen-max", map[string]any{
+		"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return model
 }

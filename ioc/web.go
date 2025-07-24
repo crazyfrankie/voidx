@@ -1,6 +1,7 @@
 package ioc
 
 import (
+	"github.com/crazyfrankie/voidx/internal/upload"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/account"
@@ -12,7 +13,7 @@ import (
 )
 
 func InitWeb(mws []gin.HandlerFunc, app *app.Handler, auth *auth.Handler,
-	account *account.Handler, llm *llm.Handler) *gin.Engine {
+	account *account.Handler, llm *llm.Handler, upload *upload.Handler) *gin.Engine {
 	srv := gin.Default()
 	srv.Use(mws...)
 
@@ -22,6 +23,7 @@ func InitWeb(mws []gin.HandlerFunc, app *app.Handler, auth *auth.Handler,
 	app.RegisterRoute(apiGroup)
 	account.RegisterRoute(apiGroup)
 	llm.RegisterRoute(apiGroup)
+	upload.RegisterRoute(apiGroup)
 
 	return srv
 }

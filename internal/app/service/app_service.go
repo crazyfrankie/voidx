@@ -2,8 +2,7 @@ package service
 
 import (
 	"context"
-	"github.com/crazyfrankie/voidx/internal/core/llm"
-	memory2 "github.com/crazyfrankie/voidx/pkg/langchainx/memory"
+
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/chains"
 	"github.com/tmc/langchaingo/memory"
@@ -13,6 +12,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
+	file "github.com/crazyfrankie/voidx/pkg/langchainx/memory"
 )
 
 type AppService struct {
@@ -21,23 +21,16 @@ type AppService struct {
 	vecStore *vecstore.VecStoreService
 }
 
-func NewAppService(repo *repository.AppRepo, vecStore *vecstore.VecStoreService, llmManager *llm.LanguageModelManager) *AppService {
-	model, err := llmManager.CreateModel("tongyi", "qwen-max", map[string]any{
-		"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-	})
-	if err != nil {
-		panic(err)
-	}
-
+func NewAppService(repo *repository.AppRepo, vecStore *vecstore.VecStoreService, llm entity.BaseLanguageModel) *AppService {
 	return &AppService{
 		repo:     repo,
-		llm:      model,
+		llm:      llm,
 		vecStore: vecStore,
 	}
 }
 
 func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, chatReq req.DebugChatReq) (resp.AppDebugChatResp, error) {
-	chatHis, err := memory2.NewFileChatMessageHistory(memory2.WithFilePath("storage/memory/chat_history.json"))
+	chatHis, err := file.NewFileChatMessageHistory(file.WithFilePath("storage/memory/chat_history.json"))
 	if err != nil {
 		return resp.AppDebugChatResp{}, err
 	}

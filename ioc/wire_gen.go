@@ -11,6 +11,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
 	"github.com/crazyfrankie/voidx/internal/llm"
+	"github.com/crazyfrankie/voidx/internal/upload"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
@@ -35,10 +36,13 @@ func InitEngine() *gin.Engine {
 	accountHandler := accountModule.Handler
 	llmModule := llm.InitLLMModule(languageModelManager)
 	llmHandler := llmModule.Handler
-	engine := InitWeb(v, appHandler, authHandler, accountHandler, llmHandler)
+	client := InitMinIO()
+	uploadModule := upload.InitUploadModule(db, client)
+	uploadFileHandler := uploadModule.Handler
+	engine := InitWeb(v, appHandler, authHandler, accountHandler, llmHandler, uploadFileHandler)
 	return engine
 }
 
 // wire.go:
 
-var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT, InitEmbedding, InitVectorStore)
+var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT, InitEmbedding, InitVectorStore, InitMinIO)

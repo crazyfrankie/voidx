@@ -25,8 +25,8 @@ func Error(c *gin.Context, err error) {
 	}
 
 	c.JSON(http.StatusOK, Response{
-		Code:    50000,
-		Message: err.Error(),
+		Code:    errno.ErrInternalServer.BizStatusCode(),
+		Message: errno.ErrInternalServer.AppendBizMessage(err.Error()).BizMessage(),
 	})
 }
 

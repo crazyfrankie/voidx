@@ -39,9 +39,10 @@ type Redis struct {
 }
 
 type MinIO struct {
-	Endpoint  []string `yaml:"endpoint"`
-	SecretKey string   `yaml:"secretKey"`
-	AccessKey string   `yaml:"accessKey"`
+	Endpoint   []string          `yaml:"endpoint"`
+	BucketName map[string]string `yaml:"bucketName"`
+	SecretKey  string            `yaml:"secretKey"`
+	AccessKey  string            `yaml:"accessKey"`
 }
 
 type JWT struct {

@@ -66,7 +66,6 @@ func GetMoonshotModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 			}
 
 			// Apply configuration options
-			// Apply configuration options
 			if baseURL, exists := config["base_url"]; exists {
 				if url, ok := baseURL.(string); ok {
 					options = append(options, openai.WithBaseURL(url))
@@ -128,7 +127,7 @@ func GetTongyiModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 					options = append(options, openai.WithBaseURL(url))
 				}
 			}
-			
+
 			chat, err := tongyipkg.NewChat(options...)
 			if err != nil {
 				return nil, err

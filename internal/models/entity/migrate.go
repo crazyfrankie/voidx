@@ -5,5 +5,6 @@ import (
 )
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&App{}, &AppConfigVersion{}, AppConfig{}, &Conversation{}, &Message{}, &AgentThought{}, &AppDatasetJoin{}, &Account{})
+	return db.AutoMigrate(&App{}, &AppConfigVersion{}, AppConfig{}, &Conversation{}, &Message{},
+		&AgentThought{}, &AppDatasetJoin{}, &Account{}, &UploadFile{})
 }
