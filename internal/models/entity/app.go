@@ -1,9 +1,8 @@
 package entity
 
 import (
-	"github.com/google/uuid"
-
 	"github.com/crazyfrankie/voidx/pkg/consts"
+	"github.com/google/uuid"
 )
 
 // App AI应用基础模型类

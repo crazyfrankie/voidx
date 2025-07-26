@@ -1,17 +1,20 @@
 package entity
 
-import "github.com/google/uuid"
+import (
+	"github.com/crazyfrankie/voidx/pkg/consts"
+	"github.com/google/uuid"
+)
 
 // WechatConfig Agent微信配置信息
 type WechatConfig struct {
-	ID              uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	AppID           uuid.UUID `gorm:"type:uuid;not null;index:wechat_config_app_id_idx" json:"app_id"`
-	WechatAppID     string    `gorm:"size:255;default:''" json:"wechat_app_id"`
-	WechatAppSecret string    `gorm:"size:255;default:''" json:"wechat_app_secret"`
-	WechatToken     string    `gorm:"size:255;default:''" json:"wechat_token"`
-	Status          string    `gorm:"size:255;not null;default:''" json:"status"`
-	Utime           int64     `gorm:"autoUpdateTime" json:"utime"`
-	Ctime           int64     `gorm:"autoCreateTime" json:"ctime"`
+	ID              uuid.UUID                 `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	AppID           uuid.UUID                 `gorm:"type:uuid;not null;index:wechat_config_app_id_idx" json:"app_id"`
+	WechatAppID     string                    `gorm:"size:255;default:''" json:"wechat_app_id"`
+	WechatAppSecret string                    `gorm:"size:255;default:''" json:"wechat_app_secret"`
+	WechatToken     string                    `gorm:"size:255;default:''" json:"wechat_token"`
+	Status          consts.WechatConfigStatus `gorm:"size:255;not null;default:''" json:"status"`
+	Utime           int64                     `gorm:"autoUpdateTime" json:"utime"`
+	Ctime           int64                     `gorm:"autoCreateTime" json:"ctime"`
 }
 
 // WechatEndUser 微信公众号与终端用户标识关联表
