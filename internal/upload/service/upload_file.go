@@ -1,10 +1,13 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"github.com/crazyfrankie/voidx/pkg/consts"
+	"github.com/google/uuid"
 	"io"
-	"mime/multipart"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -15,20 +18,19 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/upload/repository"
 	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 const urlPrefix = "http://"
 
-type UploadFileService struct {
+type OssService struct {
 	repo        *repository.UploadFileRepo
 	minioClient *minio.Client
 	endpoint    string
 	bucketName  string
 }
 
-func NewUploadFileService(repo *repository.UploadFileRepo, minioClient *minio.Client) *UploadFileService {
-	return &UploadFileService{
+func NewOssService(repo *repository.UploadFileRepo, minioClient *minio.Client) *OssService {
+	return &OssService{
 		repo:        repo,
 		minioClient: minioClient,
 		endpoint:    conf.GetConf().MinIO.Endpoint[0],
@@ -37,54 +39,35 @@ func NewUploadFileService(repo *repository.UploadFileRepo, minioClient *minio.Cl
 }
 
 // UploadFile 上传文件到存储服务
-func (s *UploadFileService) UploadFile(ctx context.Context, fh *multipart.FileHeader, image bool) (resp.UploadFileResp, error) {
-	userID, err := util.GetCurrentUserID(ctx)
-	if err != nil {
-		return resp.UploadFileResp{}, err
-	}
-	file, err := fh.Open()
-	if err != nil {
-		return resp.UploadFileResp{}, err
-	}
-	defer file.Close()
-
-	// 检查文件大小（15MB限制）
-	if fh.Size > 15*1024*1024 {
-		return resp.UploadFileResp{}, errno.ErrValidate.AppendBizMessage("上传文件最大不能超过15MB")
-	}
-
-	// 1. 提取文件扩展名
-	extension := strings.ToLower(filepath.Ext(fh.Filename))
+func (s *OssService) UploadFile(ctx context.Context, data []byte, onlyImage bool, filename string, userID uuid.UUID) (resp.UploadFileResp, error) {
+	extension := strings.ToLower(filepath.Ext(filename))
 	if extension != "" {
-		extension = extension[1:] // 去掉点号
+		extension = extension[1:]
 	}
 
-	// 2. 验证文件类型
-	if image {
-		if !s.isAllowedExtension(extension, entity.AllowedImageExtensions) {
+	if onlyImage {
+		if !s.isAllowedExtension(extension, consts.AllowedImageExtension) {
 			return resp.UploadFileResp{}, errno.ErrValidate.AppendBizMessage(fmt.Sprintf("不支持的图片格式: .%s", extension))
 		}
 	} else {
-		allowedExtensions := append(entity.AllowedDocumentExtensions, entity.AllowedImageExtensions...)
+		allowedExtensions := append(consts.AllowedDocumentExtension, consts.AllowedImageExtension...)
 		if !s.isAllowedExtension(extension, allowedExtensions) {
 			return resp.UploadFileResp{}, errno.ErrValidate.AppendBizMessage(fmt.Sprintf("不支持的文件格式: .%s", extension))
 		}
 	}
 
-	key := fmt.Sprintf("%s/%s", userID.String(), fh.Filename)
+	key := fmt.Sprintf("%s/%s", userID.String(), filename)
 
-	// 3. 上传文件到存储服务
-	info, err := s.uploadToStorage(ctx, key, file, fh.Size)
+	info, err := s.uploadToStorage(ctx, key, data)
 	if err != nil {
 		return resp.UploadFileResp{}, errno.ErrInternalServer.AppendBizMessage("上传文件失败: " + err.Error())
 	}
 
-	// 4. 创建上传文件记录
 	uploadFile := &entity.UploadFile{
 		AccountID: userID,
-		Name:      fh.Filename,
+		Name:      filename,
 		Key:       key,
-		Size:      fh.Size,
+		Size:      int64(len(data)),
 		Extension: extension,
 		Hash:      info.ETag,
 	}
@@ -111,14 +94,49 @@ func (s *UploadFileService) UploadFile(ctx context.Context, fh *multipart.FileHe
 }
 
 // DownloadFile 下载文件
-func (s *UploadFileService) DownloadFile(ctx context.Context, key string) error {
-	// TODO
+func (s *OssService) DownloadFile(ctx context.Context, key string, targetPath string) error {
+	if err := ensureDirExists(targetPath); err != nil {
+		return fmt.Errorf("目标目录创建失败: %w", err)
+	}
+
+	object, err := s.minioClient.GetObject(
+		ctx,
+		s.bucketName,
+		key,
+		minio.GetObjectOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("获取文件对象失败: %w", err)
+	}
+	defer object.Close()
+
+	file, err := os.Create(targetPath)
+	if err != nil {
+		return fmt.Errorf("创建本地文件失败: %w", err)
+	}
+	defer file.Close()
+
+	if _, err := io.Copy(file, object); err != nil {
+		_ = os.Remove(targetPath)
+		return fmt.Errorf("文件下载失败: %w", err)
+	}
+
+	return nil
+}
+
+func ensureDirExists(path string) error {
+	dir := filepath.Dir(path)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 // uploadToStorage 上传文件到存储服务
-func (s *UploadFileService) uploadToStorage(ctx context.Context, key string, reader io.Reader, size int64) (minio.UploadInfo, error) {
-	info, err := s.minioClient.PutObject(ctx, s.bucketName, key, reader, size, minio.PutObjectOptions{})
+func (s *OssService) uploadToStorage(ctx context.Context, key string, data []byte) (minio.UploadInfo, error) {
+	info, err := s.minioClient.PutObject(ctx, s.bucketName, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
 	if err != nil {
 		return minio.UploadInfo{}, err
 	}
@@ -127,7 +145,7 @@ func (s *UploadFileService) uploadToStorage(ctx context.Context, key string, rea
 }
 
 // isAllowedExtension 检查扩展名是否被允许
-func (s *UploadFileService) isAllowedExtension(extension string, allowedExtensions []string) bool {
+func (s *OssService) isAllowedExtension(extension string, allowedExtensions []string) bool {
 	for _, allowed := range allowedExtensions {
 		if extension == allowed {
 			return true
@@ -136,6 +154,6 @@ func (s *UploadFileService) isAllowedExtension(extension string, allowedExtensio
 	return false
 }
 
-func (s *UploadFileService) getURL(key string) string {
+func (s *OssService) getURL(key string) string {
 	return urlPrefix + s.endpoint + "/" + s.bucketName + "/" + key
 }

@@ -21,10 +21,11 @@ import (
 func InitUploadModule(db *gorm.DB, minioCli *minio.Client) *UploadModule {
 	uploadFileDao := dao.NewUploadFileDao(db)
 	uploadFileRepo := repository.NewUploadFileRepo(uploadFileDao)
-	uploadFileService := service.NewUploadFileService(uploadFileRepo, minioCli)
-	uploadFileHandler := handler.NewUploadFileHandler(uploadFileService)
+	ossService := service.NewOssService(uploadFileRepo, minioCli)
+	uploadFileHandler := handler.NewUploadFileHandler(ossService)
 	uploadModule := &UploadModule{
 		Handler: uploadFileHandler,
+		Service: ossService,
 	}
 	return uploadModule
 }
@@ -33,8 +34,11 @@ func InitUploadModule(db *gorm.DB, minioCli *minio.Client) *UploadModule {
 
 type Handler = handler.UploadFileHandler
 
+type Service = service.OssService
+
 type UploadModule struct {
 	Handler *Handler
+	Service *Service
 }
 
-var ProviderSet = wire.NewSet(dao.NewUploadFileDao, repository.NewUploadFileRepo, service.NewUploadFileService, handler.NewUploadFileHandler)
+var ProviderSet = wire.NewSet(dao.NewUploadFileDao, repository.NewUploadFileRepo, service.NewOssService, handler.NewUploadFileHandler)

@@ -15,15 +15,16 @@ import (
 )
 
 type Handler = handler.UploadFileHandler
-
+type Service = service.OssService
 type UploadModule struct {
 	Handler *Handler
+	Service *Service
 }
 
 var ProviderSet = wire.NewSet(
 	dao.NewUploadFileDao,
 	repository.NewUploadFileRepo,
-	service.NewUploadFileService,
+	service.NewOssService,
 	handler.NewUploadFileHandler,
 )
 

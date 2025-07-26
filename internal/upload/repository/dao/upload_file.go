@@ -33,11 +33,7 @@ func (d *UploadFileDao) GetUploadFileByID(ctx context.Context, id uuid.UUID) (*e
 }
 
 // GetUploadFilesByAccountID 根据账户ID获取上传文件列表
-func (d *UploadFileDao) GetUploadFilesByAccountID(
-	ctx context.Context,
-	accountID uuid.UUID,
-	page, pageSize int,
-) ([]entity.UploadFile, int64, error) {
+func (d *UploadFileDao) GetUploadFilesByAccountID(ctx context.Context, accountID uuid.UUID, page, pageSize int) ([]entity.UploadFile, int64, error) {
 	var uploadFiles []entity.UploadFile
 	var total int64
 
