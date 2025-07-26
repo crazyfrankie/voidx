@@ -16,6 +16,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/pkoukk/tiktoken-go v0.1.6
 	github.com/redis/go-redis/v9 v9.11.0
+	github.com/sashabaranov/go-openai v1.40.5
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
 	github.com/tmc/langchaingo v0.1.13

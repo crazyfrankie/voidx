@@ -15,9 +15,11 @@ import (
 )
 
 type Handler = handler.AppHandler
+type Service = service.AppService
 
 type AppModule struct {
 	Handler *Handler
+	Service *Service
 }
 
 func InitModel(llmManager *llmcore.LanguageModelManager) entity.BaseLanguageModel {

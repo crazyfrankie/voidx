@@ -19,14 +19,6 @@ type CreateAppReq struct {
 	Description string `json:"description" binding:"required,max=500"`
 }
 
-type T struct {
-	FileList []struct {
-	} `json:"fileList"`
-	Icon        string `json:"icon"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
 // UpdateAppReq 更新应用请求
 type UpdateAppReq struct {
 	Name        string `json:"name" binding:"omitempty,max=100"`
@@ -68,4 +60,47 @@ type GetDebugConversationMessagesWithPageReq struct {
 	Page     int   `form:"page" binding:"required,min=1"`
 	PageSize int   `form:"page_size" binding:"required,min=1,max=100"`
 	Ctime    int64 `form:"ctime"` // 时间戳，用于游标分页
+}
+
+// GetConversationMessagesWithPageReq 获取会话消息分页列表请求
+type GetConversationMessagesWithPageReq struct {
+	Page     int   `form:"page" binding:"required,min=1"`
+	PageSize int   `form:"page_size" binding:"required,min=1,max=100"`
+	Ctime    int64 `form:"ctime"` // 时间戳，用于游标分页
+}
+
+// UpdateConversationNameReq 更新会话名称请求
+type UpdateConversationNameReq struct {
+	Name string `json:"name" binding:"required,max=100"`
+}
+
+// UpdateConversationIsPinnedReq 更新会话置顶状态请求
+type UpdateConversationIsPinnedReq struct {
+	IsPinned bool `json:"is_pinned"`
+}
+
+// UpdateAppConfigReq 更新应用配置请求
+type UpdateAppConfigReq struct {
+	ModelConfig      map[string]any   `json:"model_config,omitempty"`
+	DialogRound      int              `json:"dialog_round,omitempty"`
+	PresetPrompt     string           `json:"preset_prompt,omitempty"`
+	Workflows        []string         `json:"workflows,omitempty"`
+	Datasets         []string         `json:"datasets,omitempty"`
+	Tools            []map[string]any `json:"tools,omitempty"`
+	OpeningStatement string           `json:"opening_statement,omitempty"`
+	OpeningQuestions []string         `json:"opening_questions,omitempty"`
+	SpeechToText     map[string]any   `json:"speech_to_text,omitempty"`
+	TextToSpeech     map[string]any   `json:"text_to_speech,omitempty"`
+	ReviewConfig     map[string]any   `json:"review_config,omitempty"`
+}
+
+// UpdateAppSummaryReq 更新应用长记忆请求
+type UpdateAppSummaryReq struct {
+	Summary string `json:"summary" binding:"required"`
+}
+
+// AutoCreateAppReq AI自动创建应用请求
+type AutoCreateAppReq struct {
+	Name        string `json:"name" binding:"required,max=100"`
+	Description string `json:"description" binding:"required,max=500"`
 }

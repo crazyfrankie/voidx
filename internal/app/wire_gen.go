@@ -27,6 +27,7 @@ func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, llmCore *llm
 	appHandler := handler.NewAppHandler(appService)
 	appModule := &AppModule{
 		Handler: appHandler,
+		Service: appService,
 	}
 	return appModule
 }
@@ -35,8 +36,11 @@ func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, llmCore *llm
 
 type Handler = handler.AppHandler
 
+type Service = service.AppService
+
 type AppModule struct {
 	Handler *Handler
+	Service *Service
 }
 
 func InitModel(llmManager *llm.LanguageModelManager) entity.BaseLanguageModel {

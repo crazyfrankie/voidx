@@ -111,7 +111,7 @@ func (s *LLMService) GetModelEntity(ctx context.Context, provider, modelName str
 }
 
 // ProcessAndValidateModelConfig 处理并验证模型配置
-func (s *LLMService) ProcessAndValidateModelConfig(modelConfig map[string]interface{}) (map[string]interface{}, error) {
+func (s *LLMService) ProcessAndValidateModelConfig(modelConfig map[string]any) (map[string]any, error) {
 	// 检查模型配置格式
 	if modelConfig == nil {
 		return s.getDefaultModelConfig(), nil
@@ -141,10 +141,10 @@ func (s *LLMService) ProcessAndValidateModelConfig(modelConfig map[string]interf
 	}
 
 	// 处理参数
-	parameters := make(map[string]interface{})
-	configParams, ok := modelConfig["parameters"].(map[string]interface{})
+	parameters := make(map[string]any)
+	configParams, ok := modelConfig["parameters"].(map[string]any)
 	if !ok {
-		configParams = make(map[string]interface{})
+		configParams = make(map[string]any)
 	}
 
 	// 为每个参数设置值
@@ -179,7 +179,7 @@ func (s *LLMService) ProcessAndValidateModelConfig(modelConfig map[string]interf
 		parameters[param.Name] = value
 	}
 
-	return map[string]interface{}{
+	return map[string]any{
 		"provider":   providerName,
 		"model":      modelName,
 		"parameters": parameters,
@@ -187,7 +187,7 @@ func (s *LLMService) ProcessAndValidateModelConfig(modelConfig map[string]interf
 }
 
 // LoadLanguageModel 从模型配置加载语言模型
-func (s *LLMService) LoadLanguageModel(modelConfig map[string]interface{}) (entity.BaseLanguageModel, error) {
+func (s *LLMService) LoadLanguageModel(modelConfig map[string]any) (entity.BaseLanguageModel, error) {
 	// 验证并处理模型配置
 	validConfig, err := s.ProcessAndValidateModelConfig(modelConfig)
 	if err != nil {
@@ -196,7 +196,7 @@ func (s *LLMService) LoadLanguageModel(modelConfig map[string]interface{}) (enti
 
 	providerName := validConfig["provider"].(string)
 	modelName := validConfig["model"].(string)
-	parameters := validConfig["parameters"].(map[string]interface{})
+	parameters := validConfig["parameters"].(map[string]any)
 
 	// 创建模型实例
 	return s.llmCore.CreateModel(providerName, modelName, parameters)
@@ -229,11 +229,11 @@ func (s *LLMService) validateParameterType(value interface{}, paramType entity.M
 }
 
 // getDefaultModelConfig 获取默认模型配置
-func (s *LLMService) getDefaultModelConfig() map[string]interface{} {
-	return map[string]interface{}{
+func (s *LLMService) getDefaultModelConfig() map[string]any {
+	return map[string]any{
 		"provider": "openai",
 		"model":    "gpt-4o-mini",
-		"parameters": map[string]interface{}{
+		"parameters": map[string]any{
 			"temperature": 0.7,
 			"max_tokens":  1000,
 		},
