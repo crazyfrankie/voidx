@@ -174,7 +174,7 @@ func (s *ConversationService) CreateConversation(ctx context.Context, accountID 
 		ID:         uuid.New(),
 		AppID:      createReq.AppID,
 		Name:       createReq.Name,
-		InvokeFrom: createReq.InvokeFrom,
+		InvokeFrom: consts.InvokeFrom(createReq.InvokeFrom),
 		IsPinned:   false,
 		CreatedBy:  accountID,
 	}
@@ -203,7 +203,7 @@ func (s *ConversationService) CreateMessage(ctx context.Context, accountID uuid.
 		ID:             uuid.New(),
 		ConversationID: createReq.ConversationID,
 		AppID:          conversation.AppID,
-		InvokeFrom:     createReq.InvokeFrom,
+		InvokeFrom:     consts.InvokeFrom(createReq.InvokeFrom),
 		ImageUrls:      createReq.ImageUrls,
 		CreatedBy:      accountID,
 		Query:          createReq.Query,
@@ -322,7 +322,7 @@ func (s *ConversationService) getOpenAIClient() *openai.Client {
 }
 
 // SaveAgentThoughts 保存Agent思考过程到数据库
-func (s *ConversationService) SaveAgentThoughts(ctx context.Context, accountID, appID, conversationID, messageID uuid.UUID, agentThoughts []*entities.AgentThought) error {
+func (s *ConversationService) SaveAgentThoughts(ctx context.Context, accountID, appID, conversationID, messageID uuid.UUID, agentThoughts []entities.AgentThought) error {
 	// 构建最终答案
 	var finalAnswer string
 	var totalTokens int
@@ -351,7 +351,10 @@ func (s *ConversationService) SaveAgentThoughts(ctx context.Context, accountID, 
 	for _, thought := range agentThoughts {
 		agentThoughtEntity := &entity.AgentThought{
 			ID:                thought.ID,
+			AppID:             appID,
 			MessageID:         messageID,
+			ConversationID:    conversationID,
+			CreatedBy:         accountID,
 			Event:             string(thought.Event),
 			Thought:           thought.Thought,
 			Observation:       thought.Observation,

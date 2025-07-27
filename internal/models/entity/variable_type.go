@@ -29,7 +29,7 @@ func (t VariableType) String() string {
 }
 
 // GetDefaultValue 获取变量类型的默认值
-func (t VariableType) GetDefaultValue() interface{} {
+func (t VariableType) GetDefaultValue() any {
 	switch t {
 	case VariableTypeString:
 		return ""
@@ -38,7 +38,7 @@ func (t VariableType) GetDefaultValue() interface{} {
 	case VariableTypeBoolean:
 		return false
 	case VariableTypeArray:
-		return []interface{}{}
+		return []any{}
 	case VariableTypeObject:
 		return map[string]any{}
 	case VariableTypeAny:

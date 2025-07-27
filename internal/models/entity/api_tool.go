@@ -4,11 +4,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type Header struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 // ApiToolProvider API工具提供者模型
 type ApiToolProvider struct {
 	ID            uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
@@ -20,6 +15,11 @@ type ApiToolProvider struct {
 	Headers       []Header  `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"headers"`
 	Utime         int64     `gorm:"autoUpdateTime" json:"utime"`
 	Ctime         int64     `gorm:"autoCreateTime" json:"ctime"`
+}
+
+type Header struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 // ApiTool API工具表

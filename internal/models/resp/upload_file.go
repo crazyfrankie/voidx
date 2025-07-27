@@ -10,6 +10,7 @@ type UploadFileResp struct {
 	Key       string    `json:"key"`
 	Size      int64     `json:"size"`
 	Extension string    `json:"extension"`
+	MimeType  string    `json:"mime_type"`
 	URL       string    `json:"url"`
 	Ctime     int64     `json:"ctime"`
 }

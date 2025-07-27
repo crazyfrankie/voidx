@@ -7,16 +7,16 @@ import (
 
 // Conversation 交流会话模型
 type Conversation struct {
-	ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	AppID      uuid.UUID `gorm:"type:uuid;not null;index:conversation_app_id_idx" json:"app_id"`
-	Name       string    `gorm:"size:255;not null;default:''" json:"name"`
-	Summary    string    `gorm:"type:text;not null;default:''" json:"summary"`
-	IsPinned   bool      `gorm:"not null;default:false" json:"is_pinned"`
-	IsDeleted  bool      `gorm:"not null;default:false" json:"is_deleted"`
-	InvokeFrom string    `gorm:"size:255;not null;default:''" json:"invoke_from"`
-	CreatedBy  uuid.UUID `gorm:"type:uuid;index:conversation_app_created_by_idx" json:"created_by"`
-	Utime      int64     `gorm:"autoUpdateTime" json:"utime"`
-	Ctime      int64     `gorm:"autoCreateTime" json:"ctime"`
+	ID         uuid.UUID         `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	AppID      uuid.UUID         `gorm:"type:uuid;not null;index:conversation_app_id_idx" json:"app_id"`
+	Name       string            `gorm:"size:255;not null;default:''" json:"name"`
+	Summary    string            `gorm:"type:text;not null;default:''" json:"summary"`
+	IsPinned   bool              `gorm:"not null;default:false" json:"is_pinned"`
+	IsDeleted  bool              `gorm:"not null;default:false" json:"is_deleted"`
+	InvokeFrom consts.InvokeFrom `gorm:"size:255;not null;default:''" json:"invoke_from"`
+	CreatedBy  uuid.UUID         `gorm:"type:uuid;index:conversation_app_created_by_idx" json:"created_by"`
+	Utime      int64             `gorm:"autoUpdateTime" json:"utime"`
+	Ctime      int64             `gorm:"autoCreateTime" json:"ctime"`
 }
 
 // Message 交流消息模型
@@ -24,7 +24,7 @@ type Message struct {
 	ID                uuid.UUID            `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AppID             uuid.UUID            `gorm:"type:uuid;not null" json:"app_id"`
 	ConversationID    uuid.UUID            `gorm:"type:uuid;not null;index:message_conversation_id_idx" json:"conversation_id"`
-	InvokeFrom        string               `gorm:"size:255;not null;default:''" json:"invoke_from"`
+	InvokeFrom        consts.InvokeFrom    `gorm:"size:255;not null;default:''" json:"invoke_from"`
 	CreatedBy         uuid.UUID            `gorm:"type:uuid;not null;index:message_created_by_idx" json:"created_by"`
 	Query             string               `gorm:"type:text;not null;default:''" json:"query"`
 	ImageUrls         []string             `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"image_urls"`

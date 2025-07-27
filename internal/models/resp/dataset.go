@@ -28,7 +28,7 @@ type DocumentResp struct {
 	CharacterCount int       `json:"character_count"`
 	HitCount       int       `json:"hit_count"`
 	Enabled        bool      `json:"enabled"`
-	DisabledAt     *int64    `json:"disabled_at"`
+	DisabledAt     int64     `json:"disabled_at"`
 	Ctime          int64     `json:"ctime"`
 	Utime          int64     `json:"utime"`
 }
@@ -43,12 +43,12 @@ type DocumentStatusResp struct {
 	SegmentCount          int       `json:"segment_count"`
 	CompletedSegmentCount int       `json:"completed_segment_count"`
 	Status                string    `json:"status"`
-	ProcessingStartedAt   *int64    `json:"processing_started_at"`
-	ParsingCompletedAt    *int64    `json:"parsing_completed_at"`
-	SplittingCompletedAt  *int64    `json:"splitting_completed_at"`
-	IndexingCompletedAt   *int64    `json:"indexing_completed_at"`
-	CompletedAt           *int64    `json:"completed_at"`
-	StoppedAt             *int64    `json:"stopped_at"`
+	ProcessingStartedAt   int64     `json:"processing_started_at"`
+	ParsingCompletedAt    int64     `json:"parsing_completed_at"`
+	SplittingCompletedAt  int64     `json:"splitting_completed_at"`
+	IndexingCompletedAt   int64     `json:"indexing_completed_at"`
+	CompletedAt           int64     `json:"completed_at"`
+	StoppedAt             int64     `json:"stopped_at"`
 	Ctime                 int64     `json:"ctime"`
 }
 
