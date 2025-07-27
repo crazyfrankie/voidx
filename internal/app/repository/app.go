@@ -2,11 +2,14 @@ package repository
 
 import (
 	"context"
+	"github.com/crazyfrankie/voidx/pkg/consts"
 
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
+	"github.com/crazyfrankie/voidx/internal/models/req"
+	"github.com/crazyfrankie/voidx/internal/models/resp"
 )
 
 type AppRepo struct {
@@ -32,19 +35,23 @@ func (r *AppRepo) UpdateApp(ctx context.Context, app *entity.App) error {
 	return r.dao.UpdateApp(ctx, app)
 }
 
+func (r *AppRepo) UpdatesApp(ctx context.Context, appID uuid.UUID, updates map[string]any) error {
+	return r.dao.UpdatesApp(ctx, appID, updates)
+}
+
 // DeleteApp 删除应用
 func (r *AppRepo) DeleteApp(ctx context.Context, appID uuid.UUID) error {
 	return r.dao.DeleteApp(ctx, appID)
 }
 
 // GetAppsWithPage 获取应用分页列表
-func (r *AppRepo) GetAppsWithPage(ctx context.Context, accountID uuid.UUID, page int, pageSize int, searchWord string) ([]*entity.App, int64, error) {
+func (r *AppRepo) GetAppsWithPage(ctx context.Context, accountID uuid.UUID, page int, pageSize int, searchWord string) ([]*entity.App, int64, int64, error) {
 	return r.dao.GetAppsWithPage(ctx, accountID, page, pageSize, searchWord)
 }
 
 // CreateAppConfigVersion 创建应用配置版本
-func (r *AppRepo) CreateAppConfigVersion(ctx context.Context, appID uuid.UUID, version int, configType string, config map[string]interface{}) (*entity.AppConfigVersion, error) {
-	return r.dao.CreateAppConfigVersion(ctx, appID, version, configType, config)
+func (r *AppRepo) CreateAppConfigVersion(ctx context.Context, appCfgVer *entity.AppConfigVersion) (*entity.AppConfigVersion, error) {
+	return r.dao.CreateAppConfigVersion(ctx, appCfgVer)
 }
 
 // GetAppConfigVersion 获取应用配置版本
@@ -62,19 +69,14 @@ func (r *AppRepo) UpdateAppConfigVersion(ctx context.Context, appConfigVersion *
 	return r.dao.UpdateAppConfigVersion(ctx, appConfigVersion)
 }
 
-// GetPublishHistoriesWithPage 获取发布历史分页列表
-func (r *AppRepo) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUID, page int, pageSize int) ([]*entity.AppConfigVersion, int64, error) {
-	return r.dao.GetPublishHistoriesWithPage(ctx, appID, page, pageSize)
-}
-
 // GetMaxPublishedVersion 获取最大发布版本号
 func (r *AppRepo) GetMaxPublishedVersion(ctx context.Context, appID uuid.UUID) (int, error) {
 	return r.dao.GetMaxPublishedVersion(ctx, appID)
 }
 
 // CreateAppConfig 创建应用配置
-func (r *AppRepo) CreateAppConfig(ctx context.Context, appID uuid.UUID, config map[string]interface{}) (*entity.AppConfig, error) {
-	return r.dao.CreateAppConfig(ctx, appID, config)
+func (r *AppRepo) CreateAppConfig(ctx context.Context, appCfg *entity.AppConfig) (*entity.AppConfig, error) {
+	return r.dao.CreateAppConfig(ctx, appCfg)
 }
 
 // GetConversation 获取会话
@@ -92,11 +94,6 @@ func (r *AppRepo) UpdateConversation(ctx context.Context, conversation *entity.C
 	return r.dao.UpdateConversation(ctx, conversation)
 }
 
-// CreateMessage 创建消息
-func (r *AppRepo) CreateMessage(ctx context.Context, appID, conversationID, createdBy uuid.UUID, invokeFrom, query string, imageUrls []string) (*entity.Message, error) {
-	return r.dao.CreateMessage(ctx, appID, conversationID, createdBy, invokeFrom, query, imageUrls)
-}
-
 // UpdateMessage 更新消息
 func (r *AppRepo) UpdateMessage(ctx context.Context, message *entity.Message) error {
 	return r.dao.UpdateMessage(ctx, message)
@@ -105,11 +102,6 @@ func (r *AppRepo) UpdateMessage(ctx context.Context, message *entity.Message) er
 // GetDebugConversationMessagesWithPage 获取调试会话消息分页列表
 func (r *AppRepo) GetDebugConversationMessagesWithPage(ctx context.Context, conversationID uuid.UUID, page int, pageSize int, ctime int64) ([]*entity.Message, int64, error) {
 	return r.dao.GetDebugConversationMessagesWithPage(ctx, conversationID, page, pageSize, ctime)
-}
-
-// CreateAgentThought 创建智能体思考过程
-func (r *AppRepo) CreateAgentThought(ctx context.Context, messageID uuid.UUID, event, thought, observation, tool, toolInput, answer string, totalTokenCount int, totalPrice, latency float64) (*entity.AgentThought, error) {
-	return r.dao.CreateAgentThought(ctx, messageID, event, thought, observation, tool, toolInput, answer, totalTokenCount, totalPrice, latency)
 }
 
 // GetAppDatasetJoins 获取应用关联的知识库
@@ -130,4 +122,20 @@ func (r *AppRepo) CreateAppDatasetJoin(ctx context.Context, appID, datasetID uui
 // GetRecentMessages 获取最近的消息记录
 func (r *AppRepo) GetRecentMessages(ctx context.Context, conversationID uuid.UUID, limit int) ([]*entity.Message, error) {
 	return r.dao.GetRecentMessages(ctx, conversationID, limit)
+}
+
+func (r *AppRepo) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUID, pageReq req.GetPublishHistoriesWithPageReq) ([]*entity.AppConfigVersion, resp.Paginator, error) {
+	return r.dao.GetPublishHistoriesWithPage(ctx, appID, pageReq)
+}
+
+func (r *AppRepo) GetApiTool(ctx context.Context, provider string, name string, accountID uuid.UUID) (*entity.ApiTool, error) {
+	return r.dao.GetApiTool(ctx, provider, name, accountID)
+}
+
+func (r *AppRepo) GetWorkflows(ctx context.Context, workflowIDs []uuid.UUID, accountID uuid.UUID, status consts.WorkflowStatus) ([]*entity.Workflow, error) {
+	return r.dao.GetWorkflows(ctx, workflowIDs, accountID, status)
+}
+
+func (r *AppRepo) GetDatasets(ctx context.Context, workflowIDs []uuid.UUID, accountID uuid.UUID) ([]*entity.Dataset, error) {
+	return r.dao.GetDatasets(ctx, workflowIDs, accountID)
 }

@@ -2,13 +2,15 @@ package dao
 
 import (
 	"context"
+	"github.com/crazyfrankie/voidx/pkg/consts"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/crazyfrankie/voidx/internal/models/entity"
+	"github.com/crazyfrankie/voidx/internal/models/req"
+	"github.com/crazyfrankie/voidx/internal/models/resp"
 )
 
 type AppDao struct {
@@ -42,15 +44,19 @@ func (d *AppDao) UpdateApp(ctx context.Context, app *entity.App) error {
 	return d.db.WithContext(ctx).Save(app).Error
 }
 
+func (d *AppDao) UpdatesApp(ctx context.Context, appID uuid.UUID, updates map[string]any) error {
+	return d.db.WithContext(ctx).Where("id = ?", appID).Updates(updates).Error
+}
+
 // DeleteApp 删除应用
 func (d *AppDao) DeleteApp(ctx context.Context, appID uuid.UUID) error {
 	return d.db.WithContext(ctx).Delete(&entity.App{}, "id = ?", appID).Error
 }
 
 // GetAppsWithPage 获取应用分页列表
-func (d *AppDao) GetAppsWithPage(ctx context.Context, accountID uuid.UUID, page int, pageSize int, searchWord string) ([]*entity.App, int64, error) {
+func (d *AppDao) GetAppsWithPage(ctx context.Context, accountID uuid.UUID, page int, pageSize int, searchWord string) ([]*entity.App, int64, int64, error) {
 	var apps []*entity.App
-	var total int64
+	var totalRecords int64
 
 	query := d.db.WithContext(ctx).Model(&entity.App{}).Where("account_id = ?", accountID)
 
@@ -58,34 +64,49 @@ func (d *AppDao) GetAppsWithPage(ctx context.Context, accountID uuid.UUID, page 
 		query = query.Where("name LIKE ?", "%"+searchWord+"%")
 	}
 
-	// 获取总数
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
+	// 获取总记录数
+	if err := query.Count(&totalRecords).Error; err != nil {
+		return nil, 0, 0, err
 	}
+
+	// 计算总页数
+	totalPages := (totalRecords + int64(pageSize) - 1) / int64(pageSize)
 
 	// 获取分页数据
 	offset := (page - 1) * pageSize
 	if err := query.Order("ctime DESC").Offset(offset).Limit(pageSize).Find(&apps).Error; err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 
-	return apps, total, nil
+	return apps, totalRecords, totalPages, nil
 }
 
 // CreateAppConfigVersion 创建应用配置版本
-func (d *AppDao) CreateAppConfigVersion(ctx context.Context, appID uuid.UUID, version int, configType string, config map[string]interface{}) (*entity.AppConfigVersion, error) {
-	appConfigVersion := &entity.AppConfigVersion{
-		AppID:      appID,
-		Version:    version,
-		ConfigType: configType,
-		Config:     config,
-	}
-
-	if err := d.db.WithContext(ctx).Create(appConfigVersion).Error; err != nil {
+//
+//	func (d *AppDao) CreateAppConfigVersion(ctx context.Context, appID uuid.UUID, version int, configType string, config map[string]any) (*entity.AppConfigVersion, error) {
+//		var err error
+//
+//		appConfigVersion := &entity.AppConfigVersion{
+//			AppID:      appID,
+//			Version:    version,
+//			ConfigType: configType,
+//		}
+//		appConfigVersion.ModelConfig, err = sonic.Marshal(config)
+//		if err != nil {
+//			return nil, err
+//		}
+//
+//		if err := d.db.WithContext(ctx).Create(appConfigVersion).Error; err != nil {
+//			return nil, err
+//		}
+//
+//		return appConfigVersion, nil
+//	}
+func (d *AppDao) CreateAppConfigVersion(ctx context.Context, appCfgVer *entity.AppConfigVersion) (*entity.AppConfigVersion, error) {
+	if err := d.db.WithContext(ctx).Create(appCfgVer).Error; err != nil {
 		return nil, err
 	}
-
-	return appConfigVersion, nil
+	return appCfgVer, nil
 }
 
 // GetAppConfigVersion 获取应用配置版本
@@ -111,28 +132,6 @@ func (d *AppDao) UpdateAppConfigVersion(ctx context.Context, appConfigVersion *e
 	return d.db.WithContext(ctx).Save(appConfigVersion).Error
 }
 
-// GetPublishHistoriesWithPage 获取发布历史分页列表
-func (d *AppDao) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUID, page int, pageSize int) ([]*entity.AppConfigVersion, int64, error) {
-	var appConfigVersions []*entity.AppConfigVersion
-	var total int64
-
-	query := d.db.WithContext(ctx).Model(&entity.AppConfigVersion{}).
-		Where("app_id = ? AND config_type = ?", appID, "published")
-
-	// 获取总数
-	if err := query.Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	// 获取分页数据
-	offset := (page - 1) * pageSize
-	if err := query.Order("version DESC").Offset(offset).Limit(pageSize).Find(&appConfigVersions).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return appConfigVersions, total, nil
-}
-
 // GetMaxPublishedVersion 获取最大发布版本号
 func (d *AppDao) GetMaxPublishedVersion(ctx context.Context, appID uuid.UUID) (int, error) {
 	var maxVersion int
@@ -144,16 +143,7 @@ func (d *AppDao) GetMaxPublishedVersion(ctx context.Context, appID uuid.UUID) (i
 }
 
 // CreateAppConfig 创建应用配置
-func (d *AppDao) CreateAppConfig(ctx context.Context, appID uuid.UUID, config map[string]interface{}) (*entity.AppConfig, error) {
-	data, err := sonic.Marshal(&config)
-	if err != nil {
-		return nil, err
-	}
-	appConfig := &entity.AppConfig{
-		AppID:       appID,
-		ModelConfig: data,
-	}
-
+func (d *AppDao) CreateAppConfig(ctx context.Context, appConfig *entity.AppConfig) (*entity.AppConfig, error) {
 	if err := d.db.WithContext(ctx).Create(appConfig).Error; err != nil {
 		return nil, err
 	}
@@ -173,7 +163,7 @@ func (d *AppDao) GetConversation(ctx context.Context, conversationID uuid.UUID) 
 // CreateConversation 创建会话
 func (d *AppDao) CreateConversation(ctx context.Context, accountID, appID uuid.UUID) (*entity.Conversation, error) {
 	conversation := &entity.Conversation{
-		AccountID: accountID,
+		CreatedBy: accountID,
 		AppID:     appID,
 		Summary:   "",
 	}
@@ -188,25 +178,6 @@ func (d *AppDao) CreateConversation(ctx context.Context, accountID, appID uuid.U
 // UpdateConversation 更新会话
 func (d *AppDao) UpdateConversation(ctx context.Context, conversation *entity.Conversation) error {
 	return d.db.WithContext(ctx).Save(conversation).Error
-}
-
-// CreateMessage 创建消息
-func (d *AppDao) CreateMessage(ctx context.Context, appID, conversationID, createdBy uuid.UUID, invokeFrom, query string, imageUrls []string) (*entity.Message, error) {
-	message := &entity.Message{
-		AppID:          appID,
-		ConversationID: conversationID,
-		InvokeFrom:     invokeFrom,
-		CreatedBy:      createdBy,
-		Query:          query,
-		ImageUrls:      imageUrls,
-		Status:         "normal",
-	}
-
-	if err := d.db.WithContext(ctx).Create(message).Error; err != nil {
-		return nil, err
-	}
-
-	return message, nil
 }
 
 // UpdateMessage 更新消息
@@ -240,28 +211,6 @@ func (d *AppDao) GetDebugConversationMessagesWithPage(ctx context.Context, conve
 	}
 
 	return messages, total, nil
-}
-
-// CreateAgentThought 创建智能体思考过程
-func (d *AppDao) CreateAgentThought(ctx context.Context, messageID uuid.UUID, event, thought, observation, tool, toolInput, answer string, totalTokenCount int, totalPrice, latency float64) (*entity.AgentThought, error) {
-	agentThought := &entity.AgentThought{
-		MessageID:       messageID,
-		Event:           event,
-		Thought:         thought,
-		Observation:     observation,
-		Tool:            tool,
-		ToolInput:       toolInput,
-		Answer:          answer,
-		TotalTokenCount: totalTokenCount,
-		TotalPrice:      totalPrice,
-		Latency:         latency,
-	}
-
-	if err := d.db.WithContext(ctx).Create(agentThought).Error; err != nil {
-		return nil, err
-	}
-
-	return agentThought, nil
 }
 
 // GetAppDatasetJoins 获取应用关联的知识库
@@ -301,4 +250,75 @@ func (d *AppDao) GetRecentMessages(ctx context.Context, conversationID uuid.UUID
 	}
 
 	return messages, err
+}
+
+// GetPublishHistoriesWithPage 获取发布历史分页列表
+func (d *AppDao) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUID, pageReq req.GetPublishHistoriesWithPageReq) ([]*entity.AppConfigVersion, resp.Paginator, error) {
+	var histories []*entity.AppConfigVersion
+	var total int64
+
+	// 计算总数
+	err := d.db.WithContext(ctx).Model(&entity.AppConfigVersion{}).
+		Where("app_id = ? AND config_type = ?", appID, "published").
+		Count(&total).Error
+	if err != nil {
+		return nil, resp.Paginator{}, err
+	}
+
+	// 分页查询
+	offset := (pageReq.Page - 1) * pageReq.PageSize
+	err = d.db.WithContext(ctx).
+		Where("app_id = ? AND config_type = ?", appID, "published").
+		Order("version DESC").
+		Offset(offset).
+		Limit(pageReq.PageSize).
+		Find(&histories).Error
+	if err != nil {
+		return nil, resp.Paginator{}, err
+	}
+
+	paginator := resp.Paginator{
+		CurrentPage: pageReq.Page,
+		PageSize:    pageReq.PageSize,
+		TotalRecord: int(total),
+	}
+
+	return histories, paginator, nil
+}
+
+// GetApiTool 获取 api tool
+func (d *AppDao) GetApiTool(ctx context.Context, provider string, name string, accountID uuid.UUID) (*entity.ApiTool, error) {
+	var apiTool *entity.ApiTool
+	err := d.db.WithContext(ctx).Model(&entity.ApiTool{}).
+		Where("provider_id = ? AND name = ? AND account_id = ?", provider, name, accountID).
+		First(&apiTool).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return apiTool, nil
+}
+
+// GetWorkflows 获取已发布的 workflow
+func (d *AppDao) GetWorkflows(ctx context.Context, workflowIDs []uuid.UUID, accountID uuid.UUID, status consts.WorkflowStatus) ([]*entity.Workflow, error) {
+	var workflows []*entity.Workflow
+	if err := d.db.WithContext(ctx).Model(&entity.Workflow{}).Where("id IN (?) AND account_id = ? AND status = ?",
+		workflowIDs, accountID, status).
+		Find(&workflows).Error; err != nil {
+		return nil, err
+	}
+
+	return workflows, nil
+}
+
+// GetDatasets 获取知识库
+func (d *AppDao) GetDatasets(ctx context.Context, datasetIDs []uuid.UUID, accountID uuid.UUID) ([]*entity.Dataset, error) {
+	var datasets []*entity.Dataset
+	if err := d.db.WithContext(ctx).Model(&entity.Dataset{}).Where("id IN (?) AND account_id = ?",
+		datasetIDs, accountID).
+		Find(&datasets).Error; err != nil {
+		return nil, err
+	}
+
+	return datasets, nil
 }

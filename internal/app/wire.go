@@ -7,8 +7,17 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app/repository"
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/app/service"
+	"github.com/crazyfrankie/voidx/internal/app_config"
+	"github.com/crazyfrankie/voidx/internal/conversation"
+	"github.com/crazyfrankie/voidx/internal/core/agent"
 	llmcore "github.com/crazyfrankie/voidx/internal/core/llm"
 	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/memory"
+	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
+	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
+	"github.com/crazyfrankie/voidx/internal/llm"
+	"github.com/crazyfrankie/voidx/internal/retriever"
+	service2 "github.com/crazyfrankie/voidx/internal/upload/service"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/google/wire"
 	"gorm.io/gorm"
@@ -33,8 +42,11 @@ func InitModel(llmManager *llmcore.LanguageModelManager) entity.BaseLanguageMode
 	return model
 }
 
-func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService,
-	llmCore *llmcore.LanguageModelManager) *AppModule {
+func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory *memory.TokenBufferMemory,
+	llmCore *llmcore.LanguageModelManager, appConfig *app_config.AppConfigModule,
+	ossSvc *service2.OssService, retrieverSvc *retriever.Service, agentManager *agent.AgentQueueManager,
+	llmModule *llm.LLMModule, apiProvider *providers.ApiProviderManager, builtinProvider *builtin.BuiltinProviderManager,
+	convers *conversation.ConversationModule) *AppModule {
 	wire.Build(
 		InitModel,
 		dao.NewAppDao,
@@ -43,6 +55,9 @@ func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService,
 		handler.NewAppHandler,
 
 		wire.Struct(new(AppModule), "*"),
+		wire.FieldsOf(new(*app_config.AppConfigModule), "Service"),
+		wire.FieldsOf(new(*conversation.ConversationModule), "Service"),
+		wire.FieldsOf(new(*llm.LLMModule), "Service"),
 	)
 	return new(AppModule)
 }
