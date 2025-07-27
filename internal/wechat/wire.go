@@ -1,8 +1,12 @@
+//go:build wireinject
+
 package wechat
 
 import (
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation"
+	"github.com/crazyfrankie/voidx/internal/core/agent"
+	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/wechat/handler"
@@ -19,8 +23,9 @@ type WechatModule struct {
 	Handler *Handler
 }
 
-func InitWechatModule(db *gorm.DB, retrieval *retriever.RetrieverModule, appConfigSvc *app_config.AppConfigModule,
-	conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule) *WechatModule {
+func InitWechatModule(db *gorm.DB, wec *wechat.Wechat, retrieval *retriever.RetrieverModule, appConfigSvc *app_config.AppConfigModule,
+	conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule, agentManager *agent.AgentQueueManager,
+	tokenBufMem *memory.TokenBufferMemory) *WechatModule {
 	wire.Build(
 		dao.NewWechatDao,
 		repository.NewWechatRepository,

@@ -9,25 +9,28 @@ package wechat
 import (
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation"
+	"github.com/crazyfrankie/voidx/internal/core/agent"
+	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/wechat/handler"
 	"github.com/crazyfrankie/voidx/internal/wechat/repository"
 	"github.com/crazyfrankie/voidx/internal/wechat/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/wechat/service"
+	"github.com/silenceper/wechat/v2"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitWechatModule(db *gorm.DB, retrieval *retriever.RetrieverModule, appConfigSvc *app_config.AppConfigModule, conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule) *WechatModule {
+func InitWechatModule(db *gorm.DB, wec *wechat.Wechat, retrieval *retriever.RetrieverModule, appConfigSvc *app_config.AppConfigModule, conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule, agentManager *agent.AgentQueueManager, tokenBufMem *memory.TokenBufferMemory) *WechatModule {
 	wechatDao := dao.NewWechatDao(db)
 	wechatRepository := repository.NewWechatRepository(wechatDao)
 	retrievalService := retrieval.Service
 	appConfigService := appConfigSvc.Service
 	conversationService := conversationSvc.Service
 	llmService := llmSvc.Service
-	wechatService := service.NewWechatService(wechatRepository, retrievalService, appConfigService, conversationService, llmService)
+	wechatService := service.NewWechatService(wec, wechatRepository, retrievalService, appConfigService, conversationService, llmService, tokenBufMem, agentManager)
 	wechatHandler := handler.NewWechatHandler(wechatService)
 	wechatModule := &WechatModule{
 		Handler: wechatHandler,
