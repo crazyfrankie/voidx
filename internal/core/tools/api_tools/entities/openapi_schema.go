@@ -180,7 +180,7 @@ func (s *OpenAPISchema) validateAndProcessPaths(paths map[string]any) error {
 		// 7.处理parameters参数
 		var parameters []Parameter
 		if parametersInterface, exists := operation["parameters"]; exists {
-			parametersList, ok := parametersInterface.([]interface{})
+			parametersList, ok := parametersInterface.([]any)
 			if !ok {
 				return &ValidateError{Message: "parameters必须是列表或者为空"}
 			}

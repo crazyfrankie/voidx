@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,21 +34,41 @@ type ProviderEntity struct {
 }
 
 // ToolFunc represents a tool function signature
-type ToolFunc func(args map[string]interface{}) (interface{}, error)
+type ToolFunc func(ctx context.Context, input string) (string, error)
+
+type FuncTool struct {
+	name        string
+	description string
+	fn          ToolFunc // 实际执行的函数
+}
+
+func NewFuncTool(name string, description string, toolFunc ToolFunc) *FuncTool {
+	return &FuncTool{
+		name:        name,
+		description: description,
+		fn:          toolFunc,
+	}
+}
+
+func (t *FuncTool) Name() string        { return t.name }
+func (t *FuncTool) Description() string { return t.description }
+func (t *FuncTool) Call(ctx context.Context, input string) (string, error) {
+	return t.fn(ctx, input)
+}
 
 // toolRegistry holds all registered tool functions
-var toolRegistry = make(map[string]map[string]ToolFunc)
+var toolRegistry = make(map[string]map[string]*FuncTool)
 
 // RegisterTool registers a tool function for a specific provider
-func RegisterTool(providerName, toolName string, toolFunc ToolFunc) {
+func RegisterTool(providerName, toolName string, toolFunc *FuncTool) {
 	if toolRegistry[providerName] == nil {
-		toolRegistry[providerName] = make(map[string]ToolFunc)
+		toolRegistry[providerName] = make(map[string]*FuncTool)
 	}
 	toolRegistry[providerName][toolName] = toolFunc
 }
 
 // GetRegisteredTool retrieves a registered tool function
-func GetRegisteredTool(providerName, toolName string) (ToolFunc, bool) {
+func GetRegisteredTool(providerName, toolName string) (*FuncTool, bool) {
 	if providerTools, exists := toolRegistry[providerName]; exists {
 		if toolFunc, exists := providerTools[toolName]; exists {
 			return toolFunc, true
@@ -71,7 +92,7 @@ type Provider struct {
 	ToolEntityMap map[string]*ToolEntity `json:"tool_entity_map"`
 
 	// toolFuncMap maps tool names to their implementations
-	toolFuncMap map[string]ToolFunc
+	toolFuncMap map[string]*FuncTool
 }
 
 // NewProvider creates a new Provider instance
@@ -81,7 +102,7 @@ func NewProvider(name string, position int, providerEntity ProviderEntity) (*Pro
 		Position:       position,
 		ProviderEntity: providerEntity,
 		ToolEntityMap:  make(map[string]*ToolEntity),
-		toolFuncMap:    make(map[string]ToolFunc),
+		toolFuncMap:    make(map[string]*FuncTool),
 	}
 
 	if err := provider.initialize(); err != nil {
@@ -92,7 +113,7 @@ func NewProvider(name string, position int, providerEntity ProviderEntity) (*Pro
 }
 
 // GetTool returns a tool implementation by name
-func (p *Provider) GetTool(toolName string) interface{} {
+func (p *Provider) GetTool(toolName string) any {
 	return p.toolFuncMap[toolName]
 }
 

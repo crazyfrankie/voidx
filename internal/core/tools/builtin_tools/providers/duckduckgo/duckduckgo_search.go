@@ -1,6 +1,7 @@
 package duckduckgo
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,31 +32,26 @@ func NewDuckDuckGoSearchTool() *DuckDuckGoSearchTool {
 }
 
 // Run executes the DuckDuckGo search
-func (t *DuckDuckGoSearchTool) Run(args map[string]interface{}) (interface{}, error) {
-	query, ok := args["query"].(string)
-	if !ok {
-		return nil, fmt.Errorf("query parameter is required and must be a string")
-	}
-
+func (t *DuckDuckGoSearchTool) Run(ctx context.Context, query string) (string, error) {
 	// Use DuckDuckGo instant answer API
-	searchURL := fmt.Sprintf("https://api.duckduckgo.com/?q=%s&format=json&no_html=1&skip_disambig=1", 
+	searchURL := fmt.Sprintf("https://api.duckduckgo.com/?q=%s&format=json&no_html=1&skip_disambig=1",
 		url.QueryEscape(query))
 
 	resp, err := http.Get(searchURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make search request: %w", err)
+		return "", fmt.Errorf("failed to make search request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	// Parse the JSON response
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	var results []string
@@ -77,13 +73,13 @@ func (t *DuckDuckGoSearchTool) Run(args map[string]interface{}) (interface{}, er
 	}
 
 	// Check for related topics
-	if relatedTopics, ok := result["RelatedTopics"].([]interface{}); ok && len(relatedTopics) > 0 {
+	if relatedTopics, ok := result["RelatedTopics"].([]any); ok && len(relatedTopics) > 0 {
 		results = append(results, "相关主题:")
 		for i, topic := range relatedTopics {
 			if i >= 3 { // Limit to 3 related topics
 				break
 			}
-			if topicMap, ok := topic.(map[string]interface{}); ok {
+			if topicMap, ok := topic.(map[string]any); ok {
 				if text, ok := topicMap["Text"].(string); ok && text != "" {
 					if firstURL, ok := topicMap["FirstURL"].(string); ok && firstURL != "" {
 						results = append(results, fmt.Sprintf("  %d. %s - %s", i+1, text, firstURL))
@@ -106,7 +102,7 @@ func (t *DuckDuckGoSearchTool) Run(args map[string]interface{}) (interface{}, er
 }
 
 // DuckduckgoSearch is the exported function for dynamic loading
-func DuckduckgoSearch(args map[string]interface{}) (interface{}, error) {
+func DuckduckgoSearch(ctx context.Context, input string) (string, error) {
 	tool := NewDuckDuckGoSearchTool()
-	return tool.Run(args)
+	return tool.Run(ctx, input)
 }

@@ -1,12 +1,14 @@
 package wikipedia
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/bytedance/sonic"
 )
 
 // WikipediaSearchTool represents a tool for Wikipedia search
@@ -44,30 +46,25 @@ func NewWikipediaSearchTool() *WikipediaSearchTool {
 }
 
 // Run executes the Wikipedia search
-func (t *WikipediaSearchTool) Run(args map[string]interface{}) (interface{}, error) {
-	query, ok := args["query"].(string)
-	if !ok {
-		return nil, fmt.Errorf("query parameter is required and must be a string")
-	}
-
+func (t *WikipediaSearchTool) Run(ctx context.Context, query string) (string, error) {
 	// Step 1: Search for pages
 	searchURL := fmt.Sprintf("https://zh.wikipedia.org/w/api.php?action=query&list=search&srsearch=%s&format=json&srlimit=3",
 		url.QueryEscape(query))
 
 	resp, err := http.Get(searchURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to search Wikipedia: %w", err)
+		return "", fmt.Errorf("failed to search Wikipedia: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read search response: %w", err)
+		return "", fmt.Errorf("failed to read search response: %w", err)
 	}
 
 	var searchResp WikipediaSearchResponse
-	if err := json.Unmarshal(body, &searchResp); err != nil {
-		return nil, fmt.Errorf("failed to parse search response: %w", err)
+	if err := sonic.Unmarshal(body, &searchResp); err != nil {
+		return "", fmt.Errorf("failed to parse search response: %w", err)
 	}
 
 	if len(searchResp.Query.Search) == 0 {
@@ -81,23 +78,23 @@ func (t *WikipediaSearchTool) Run(args map[string]interface{}) (interface{}, err
 
 	resp, err = http.Get(pageURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get page content: %w", err)
+		return "", fmt.Errorf("failed to get page content: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err = io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read page response: %w", err)
+		return "", fmt.Errorf("failed to read page response: %w", err)
 	}
 
 	var pageResp WikipediaPageResponse
-	if err := json.Unmarshal(body, &pageResp); err != nil {
-		return nil, fmt.Errorf("failed to parse page response: %w", err)
+	if err := sonic.Unmarshal(body, &pageResp); err != nil {
+		return "", fmt.Errorf("failed to parse page response: %w", err)
 	}
 
 	// Format results
 	var results []string
-	
+
 	// Add main content
 	for _, page := range pageResp.Query.Pages {
 		if page.Extract != "" {
@@ -133,7 +130,7 @@ func (t *WikipediaSearchTool) Run(args map[string]interface{}) (interface{}, err
 }
 
 // WikipediaSearch is the exported function for dynamic loading
-func WikipediaSearch(args map[string]interface{}) (interface{}, error) {
+func WikipediaSearch(ctx context.Context, input string) (string, error) {
 	tool := NewWikipediaSearchTool()
-	return tool.Run(args)
+	return tool.Run(ctx, input)
 }

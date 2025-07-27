@@ -2,11 +2,13 @@ package dalle
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/bytedance/sonic"
 )
 
 // Dalle3Tool represents a tool for DALLE-3 image generation
@@ -45,14 +47,19 @@ func NewDalle3Tool() *Dalle3Tool {
 }
 
 // Run executes the DALLE-3 image generation
-func (t *Dalle3Tool) Run(args map[string]interface{}) (interface{}, error) {
+func (t *Dalle3Tool) Run(ctx context.Context, input string) (string, error) {
+	args := make(map[string]any)
+	if err := sonic.UnmarshalString(input, &args); err != nil {
+		return "", err
+	}
+
 	query, ok := args["query"].(string)
 	if !ok {
-		return nil, fmt.Errorf("query parameter is required and must be a string")
+		return "", fmt.Errorf("query parameter is required and must be a string")
 	}
 
 	if t.APIKey == "" {
-		return nil, fmt.Errorf("OPENAI_API_KEY environment variable is not set")
+		return "", fmt.Errorf("OPENAI_API_KEY environment variable is not set")
 	}
 
 	// Get optional parameters with defaults
@@ -76,15 +83,15 @@ func (t *Dalle3Tool) Run(args map[string]interface{}) (interface{}, error) {
 		ResponseFormat: "url",
 	}
 
-	jsonData, err := json.Marshal(reqBody)
+	jsonData, err := sonic.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Make HTTP request
 	req, err := http.NewRequest("POST", "https://api.openai.com/v1/images/generations", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+t.APIKey)
@@ -93,42 +100,47 @@ func (t *Dalle3Tool) Run(args map[string]interface{}) (interface{}, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return "", fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Parse response
 	var dalleResp Dalle3Response
-	if err := json.Unmarshal(body, &dalleResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+	if err := sonic.Unmarshal(body, &dalleResp); err != nil {
+		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	if len(dalleResp.Data) == 0 {
-		return nil, fmt.Errorf("no image generated")
+		return "", fmt.Errorf("no image generated")
 	}
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		"image_url":       dalleResp.Data[0].URL,
 		"revised_prompt":  dalleResp.Data[0].RevisedPrompt,
 		"original_prompt": query,
-		"size":           size,
-		"style":          style,
+		"size":            size,
+		"style":           style,
 	}
 
-	return result, nil
+	res, err := sonic.MarshalString(result)
+	if err != nil {
+		return "", err
+	}
+
+	return res, nil
 }
 
 // Dalle3 is the exported function for dynamic loading
-func Dalle3(args map[string]interface{}) (interface{}, error) {
+func Dalle3(ctx context.Context, input string) (string, error) {
 	tool := NewDalle3Tool()
-	return tool.Run(args)
+	return tool.Run(ctx, input)
 }

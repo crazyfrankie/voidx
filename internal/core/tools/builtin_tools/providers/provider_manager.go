@@ -62,7 +62,7 @@ func (m *BuiltinProviderManager) GetProviderEntities() []*entities.ProviderEntit
 }
 
 // GetTool returns a specific tool by provider name and tool name
-func (m *BuiltinProviderManager) GetTool(providerName, toolName string) interface{} {
+func (m *BuiltinProviderManager) GetTool(providerName, toolName string) any {
 	provider := m.GetProvider(providerName)
 	if provider == nil {
 		return nil

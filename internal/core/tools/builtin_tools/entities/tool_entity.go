@@ -32,7 +32,7 @@ type ToolParam struct {
 	Required bool `json:"required"`
 
 	// Default is the default value for the parameter
-	Default interface{} `json:"default,omitempty"`
+	Default any `json:"default,omitempty"`
 
 	// Min is the minimum value for number parameters
 	Min *float64 `json:"min,omitempty"`

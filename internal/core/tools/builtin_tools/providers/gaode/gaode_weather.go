@@ -1,12 +1,14 @@
 package gaode
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+
+	"github.com/bytedance/sonic"
 )
 
 // GaodeWeatherTool represents a tool for Gaode weather query
@@ -60,12 +62,7 @@ func NewGaodeWeatherTool() *GaodeWeatherTool {
 }
 
 // Run executes the Gaode weather query
-func (t *GaodeWeatherTool) Run(args map[string]interface{}) (interface{}, error) {
-	city, ok := args["city"].(string)
-	if !ok {
-		return nil, fmt.Errorf("city parameter is required and must be a string")
-	}
-
+func (t *GaodeWeatherTool) Run(ctx context.Context, city string) (string, error) {
 	if t.APIKey == "" {
 		return "高德开放平台API未配置", nil
 	}
@@ -86,7 +83,7 @@ func (t *GaodeWeatherTool) Run(args map[string]interface{}) (interface{}, error)
 	}
 
 	var cityResp CityResponse
-	if err := json.Unmarshal(body, &cityResp); err != nil {
+	if err := sonic.Unmarshal(body, &cityResp); err != nil {
 		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
 	}
 
@@ -112,7 +109,7 @@ func (t *GaodeWeatherTool) Run(args map[string]interface{}) (interface{}, error)
 	}
 
 	var weatherResp WeatherResponse
-	if err := json.Unmarshal(body, &weatherResp); err != nil {
+	if err := sonic.Unmarshal(body, &weatherResp); err != nil {
 		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
 	}
 
@@ -122,7 +119,7 @@ func (t *GaodeWeatherTool) Run(args map[string]interface{}) (interface{}, error)
 
 	// Format the weather information
 	forecast := weatherResp.Forecasts[0]
-	result := map[string]interface{}{
+	result := map[string]any{
 		"city":        forecast.City,
 		"province":    forecast.Province,
 		"report_time": forecast.ReportTime,
@@ -130,16 +127,16 @@ func (t *GaodeWeatherTool) Run(args map[string]interface{}) (interface{}, error)
 	}
 
 	// Convert to JSON string for consistency with Python version
-	jsonResult, err := json.Marshal(result)
+	resStr, err := sonic.MarshalString(result)
 	if err != nil {
 		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
 	}
 
-	return string(jsonResult), nil
+	return resStr, nil
 }
 
 // GaodeWeather is the exported function for dynamic loading
-func GaodeWeather(args map[string]interface{}) (interface{}, error) {
+func GaodeWeather(ctx context.Context, input string) (string, error) {
 	tool := NewGaodeWeatherTool()
-	return tool.Run(args)
+	return tool.Run(ctx, input)
 }

@@ -2,13 +2,16 @@ package providers
 
 import (
 	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
+
+	"github.com/bytedance/sonic"
+	"github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/entities"
 )
@@ -22,21 +25,13 @@ func NewApiProviderManager() *ApiProviderManager {
 }
 
 // ToolFunc API工具函数类型
-type ToolFunc func(args map[string]any) (string, error)
+type ToolFunc func(ctx context.Context, input string) (string, error)
 
 // ToolSchema 工具模式定义
 type ToolSchema struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	Parameters  map[string]any `json:"parameters"`
-}
-
-// Tool 工具接口
-type Tool interface {
-	GetName() string
-	GetDescription() string
-	GetSchema() *ToolSchema
-	Execute(args map[string]any) (string, error)
 }
 
 // ApiTool API工具实现
@@ -46,13 +41,13 @@ type ApiTool struct {
 	schema   *ToolSchema
 }
 
-// GetName 获取工具名称
-func (t *ApiTool) GetName() string {
+// Name 获取工具名称
+func (t *ApiTool) Name() string {
 	return fmt.Sprintf("%s_%s", t.entity.ID, t.entity.Name)
 }
 
-// GetDescription 获取工具描述
-func (t *ApiTool) GetDescription() string {
+// Description 获取工具描述
+func (t *ApiTool) Description() string {
 	return t.entity.Description
 }
 
@@ -61,13 +56,13 @@ func (t *ApiTool) GetSchema() *ToolSchema {
 	return t.schema
 }
 
-// Execute 执行工具
-func (t *ApiTool) Execute(args map[string]any) (string, error) {
-	return t.toolFunc(args)
+// Call 执行工具
+func (t *ApiTool) Call(ctx context.Context, input string) (string, error) {
+	return t.toolFunc(ctx, input)
 }
 
 // GetTool 根据传递的配置获取自定义API工具
-func (m *ApiProviderManager) GetTool(toolEntity *entities.ToolEntity) Tool {
+func (m *ApiProviderManager) GetTool(toolEntity *entities.ToolEntity) tools.Tool {
 	toolFunc := m.createToolFuncFromToolEntity(toolEntity)
 	schema := m.createSchemaFromParameters(toolEntity)
 
@@ -80,7 +75,7 @@ func (m *ApiProviderManager) GetTool(toolEntity *entities.ToolEntity) Tool {
 
 // createToolFuncFromToolEntity 根据传递的信息创建发起API请求的函数
 func (m *ApiProviderManager) createToolFuncFromToolEntity(toolEntity *entities.ToolEntity) ToolFunc {
-	return func(args map[string]any) (string, error) {
+	return func(ctx context.Context, input string) (string, error) {
 		// 1.定义变量存储来自path/query/header/cookie/request_body中的数据
 		parameters := map[entities.ParameterIn]map[string]any{
 			entities.ParameterInPath:        make(map[string]any),
@@ -101,6 +96,11 @@ func (m *ApiProviderManager) createToolFuncFromToolEntity(toolEntity *entities.T
 		headerMap := make(map[string]string)
 		for _, header := range toolEntity.Headers {
 			headerMap[header.Key] = header.Value
+		}
+
+		args := make(map[string]any)
+		if err := sonic.UnmarshalString(input, &args); err != nil {
+			return "", err
 		}
 
 		// 3.循环遍历传递的所有字段并校验
@@ -153,7 +153,7 @@ func (m *ApiProviderManager) makeHTTPRequest(
 	// 构建请求体
 	var requestBody io.Reader
 	if len(parameters[entities.ParameterInRequestBody]) > 0 {
-		jsonData, err := json.Marshal(parameters[entities.ParameterInRequestBody])
+		jsonData, err := sonic.Marshal(parameters[entities.ParameterInRequestBody])
 		if err != nil {
 			return "", fmt.Errorf("failed to marshal request body: %w", err)
 		}

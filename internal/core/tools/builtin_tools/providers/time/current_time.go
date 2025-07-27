@@ -1,6 +1,7 @@
 package time
 
 import (
+	"context"
 	"time"
 )
 
@@ -19,12 +20,12 @@ func NewCurrentTimeTool() *CurrentTimeTool {
 }
 
 // Run executes the current time tool
-func (t *CurrentTimeTool) Run(args map[string]interface{}) (interface{}, error) {
+func (t *CurrentTimeTool) Run(ctx context.Context, input string) (string, error) {
 	return time.Now().Format("2006-01-02 15:04:05 MST"), nil
 }
 
 // CurrentTime is the exported function for dynamic loading
-func CurrentTime(args map[string]interface{}) (interface{}, error) {
+func CurrentTime(ctx context.Context, input string) (string, error) {
 	tool := NewCurrentTimeTool()
-	return tool.Run(args)
+	return tool.Run(ctx, input)
 }

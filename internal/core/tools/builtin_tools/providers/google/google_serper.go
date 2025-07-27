@@ -2,6 +2,7 @@ package google
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,14 +46,9 @@ func NewGoogleSerperTool() *GoogleSerperTool {
 }
 
 // Run executes the Google Serper search
-func (t *GoogleSerperTool) Run(args map[string]interface{}) (interface{}, error) {
-	query, ok := args["query"].(string)
-	if !ok {
-		return nil, fmt.Errorf("query parameter is required and must be a string")
-	}
-
+func (t *GoogleSerperTool) Run(ctx context.Context, query string) (string, error) {
 	if t.APIKey == "" {
-		return nil, fmt.Errorf("SERPER_API_KEY environment variable is not set")
+		return "", fmt.Errorf("SERPER_API_KEY environment variable is not set")
 	}
 
 	// Prepare request
@@ -64,13 +60,13 @@ func (t *GoogleSerperTool) Run(args map[string]interface{}) (interface{}, error)
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
 	// Make HTTP request
 	req, err := http.NewRequest("POST", "https://google.serper.dev/search", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("X-API-KEY", t.APIKey)
@@ -79,31 +75,31 @@ func (t *GoogleSerperTool) Run(args map[string]interface{}) (interface{}, error)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		return "", fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Parse response
 	var serperResp SerperResponse
 	if err := json.Unmarshal(body, &serperResp); err != nil {
-		return nil, fmt.Errorf("failed to parse response: %w", err)
+		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
 	// Format results
-	var results []string
-	
+	var results string
+
 	// Add answer box if available
 	if serperResp.AnswerBox.Answer != "" {
-		results = append(results, fmt.Sprintf("答案: %s", serperResp.AnswerBox.Answer))
+		results += fmt.Sprintf("答案: %s", serperResp.AnswerBox.Answer)
 	}
 
 	// Add organic results
@@ -111,15 +107,15 @@ func (t *GoogleSerperTool) Run(args map[string]interface{}) (interface{}, error)
 		if i >= 5 { // Limit to top 5 results
 			break
 		}
-		results = append(results, fmt.Sprintf("%d. %s\n   链接: %s\n   摘要: %s", 
-			i+1, result.Title, result.Link, result.Snippet))
+		results += fmt.Sprintf("%d. %s\n   链接: %s\n   摘要: %s",
+			i+1, result.Title, result.Link, result.Snippet)
 	}
 
 	return results, nil
 }
 
 // GoogleSerper is the exported function for dynamic loading
-func GoogleSerper(args map[string]interface{}) (interface{}, error) {
+func GoogleSerper(ctx context.Context, input string) (string, error) {
 	tool := NewGoogleSerperTool()
-	return tool.Run(args)
+	return tool.Run(ctx, input)
 }
