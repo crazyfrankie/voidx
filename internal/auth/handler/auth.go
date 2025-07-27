@@ -10,6 +10,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/response"
+	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
 type AuthHandler struct {
@@ -42,9 +43,7 @@ func (h *AuthHandler) Login() gin.HandlerFunc {
 			return
 		}
 
-		c.SetSameSite(http.SameSiteLaxMode)
-		c.Header("x-access-token", tokens[0])
-		c.SetCookie("llmops_refresh", tokens[1], int(time.Hour*24), "/", "", false, true)
+		util.SetAuthorization(c, tokens[0], tokens[1])
 
 		response.Success(c)
 	}
@@ -57,6 +56,9 @@ func (h *AuthHandler) Logout() gin.HandlerFunc {
 			response.Error(c, err)
 			return
 		}
+
+		c.SetSameSite(http.SameSiteLaxMode)
+		c.SetCookie("llmops_refresh", "", int(time.Hour*24), "/", "", false, true)
 
 		response.Success(c)
 	}

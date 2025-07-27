@@ -4,13 +4,24 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"net/http"
+	"reflect"
+	"strings"
+	"time"
+
 	"github.com/bytedance/sonic"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
-	"strings"
 
 	"github.com/crazyfrankie/voidx/pkg/errno"
 )
+
+func SetAuthorization(c *gin.Context, access string, refresh string) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.Header("x-access-token", access)
+	c.SetCookie("llmops_refresh", refresh, int(time.Hour*24), "/", "", false, true)
+}
 
 func GetCurrentUserID(ctx context.Context) (uuid.UUID, error) {
 	userID, ok := ctx.Value("user_id").(uuid.UUID)
@@ -74,4 +85,95 @@ func MessageContentToChatMessage(mc llms.MessageContent) llms.ChatMessage {
 	default:
 		return llms.GenericChatMessage{Content: content, Role: string(mc.Role)}
 	}
+}
+
+func MessageContentToChatMessages(mc []llms.MessageContent) []llms.ChatMessage {
+	res := make([]llms.ChatMessage, 0, len(mc))
+	for _, m := range mc {
+		res = append(res, MessageContentToChatMessage(m))
+	}
+
+	return res
+}
+
+func GetValueType(value any) string {
+	valueType := reflect.TypeOf(value).Kind().String()
+
+	switch valueType {
+	case "string":
+		return "string"
+	case "bool":
+		return "boolean"
+	default:
+		return valueType
+	}
+}
+
+func Contains(slice any, value any) bool {
+	sliceVal := reflect.ValueOf(slice)
+	if sliceVal.Kind() != reflect.Slice {
+		return false // 不是切片，直接返回 false
+	}
+
+	targetVal := reflect.ValueOf(value)
+	for i := 0; i < sliceVal.Len(); i++ {
+		elem := sliceVal.Index(i)
+		if reflect.DeepEqual(elem.Interface(), targetVal.Interface()) {
+			return true
+		}
+	}
+	return false
+}
+
+func LessThan(a, b interface{}) bool {
+	aVal := reflect.ValueOf(a)
+	bVal := reflect.ValueOf(b)
+
+	switch aVal.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return aVal.Int() < bVal.Int()
+	case reflect.Float32, reflect.Float64:
+		return aVal.Float() < bVal.Float()
+	default:
+		return false
+	}
+}
+
+func GreaterThan(a, b interface{}) bool {
+	aVal := reflect.ValueOf(a)
+	bVal := reflect.ValueOf(b)
+
+	switch aVal.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return aVal.Int() > bVal.Int()
+	case reflect.Float32, reflect.Float64:
+		return aVal.Float() > bVal.Float()
+	default:
+		return false
+	}
+}
+
+// UniqueStrings 返回去重后的字符串切片
+func UniqueStrings(slice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range slice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
+}
+
+func UniqueUUID(slice []uuid.UUID) []uuid.UUID {
+	keys := make(map[uuid.UUID]bool)
+	list := []uuid.UUID{}
+	for _, entry := range slice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
