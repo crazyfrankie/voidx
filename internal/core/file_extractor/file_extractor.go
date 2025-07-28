@@ -9,45 +9,48 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/minio/minio-go/v7"
 	"github.com/tmc/langchaingo/documentloaders"
+	"github.com/tmc/langchaingo/schema"
+
+	"github.com/crazyfrankie/voidx/internal/models/entity"
+	"github.com/crazyfrankie/voidx/internal/upload"
 )
 
 // FileExtractor handles file extraction and conversion to LangChain documents
 type FileExtractor struct {
-	minioClient *minio.Client
+	uploadSvc *upload.Service
 }
 
 // NewFileExtractor creates a new FileExtractor instance
-func NewFileExtractor(minioClient *minio.Client) *FileExtractor {
+func NewFileExtractor(uploadSvc *upload.Service) *FileExtractor {
 	return &FileExtractor{
-		minioClient: minioClient,
+		uploadSvc: uploadSvc,
 	}
 }
 
 // Load loads a file from UploadFile record and returns LangChain documents or text
-//func (f *FileExtractor) Load(uploadFile *entity.UploadFile, returnText, isUnstructured bool) (interface{}, error) {
-//	// Create a temporary directory
-//	tempDir, err := os.MkdirTemp("", "file_extractor_*")
-//	if err != nil {
-//		return nil, fmt.Errorf("failed to create temp directory: %w", err)
-//	}
-//	defer os.RemoveAll(tempDir)
-//
-//	// Create temporary file path
-//	filePath := filepath.Join(tempDir, filepath.Base(uploadFile.Key))
-//
-//	// Download file from object storage
-//	if err := f.minioClient.DownloadFile(uploadFile.Key, filePath); err != nil {
-//		return nil, fmt.Errorf("failed to download file: %w", err)
-//	}
-//
-//	// Load file from path
-//	return LoadFromFile(filePath, returnText, isUnstructured)
-//}
+func (f *FileExtractor) Load(ctx context.Context, uploadFile *entity.UploadFile, returnText, isUnstructured bool) ([]schema.Document, error) {
+	// Create a temporary directory
+	tempDir, err := os.MkdirTemp("", "file_extractor_*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create temporary file path
+	filePath := filepath.Join(tempDir, filepath.Base(uploadFile.Key))
+
+	// Download file from object storage
+	if err := f.uploadSvc.DownloadFile(ctx, uploadFile.Key, filePath); err != nil {
+		return nil, fmt.Errorf("failed to download file: %w", err)
+	}
+
+	// Load file from path
+	return LoadFromFile(filePath, returnText, isUnstructured)
+}
 
 // LoadFromURL loads a file from URL and returns LangChain documents or text
-func LoadFromURL(url string, returnText bool) (interface{}, error) {
+func LoadFromURL(url string, returnText bool) (any, error) {
 	// Download file from URL
 	resp, err := http.Get(url)
 	if err != nil {
@@ -79,7 +82,7 @@ func LoadFromURL(url string, returnText bool) (interface{}, error) {
 }
 
 // LoadFromFile loads a file from local path and returns LangChain documents or text
-func LoadFromFile(filePath string, returnText, isUnstructured bool) (interface{}, error) {
+func LoadFromFile(filePath string, returnText, isUnstructured bool) ([]schema.Document, error) {
 	// Get file extension
 	extension := strings.ToLower(filepath.Ext(filePath))
 
@@ -87,26 +90,35 @@ func LoadFromFile(filePath string, returnText, isUnstructured bool) (interface{}
 	var loader documentloaders.Loader
 	var err error
 
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
 	switch extension {
 	//case ".xlsx", ".xls":
 	//	loader, err = documentloaders.NewExcel(filePath)
-	//case ".pdf":
-	//	loader = documentloaders.NewPDF(filePath)
-	//case ".md", ".markdown":
-	//	loader, err = documentloaders.NewText(filePath) // Use text loader for markdown
-	//case ".htm", ".html":
-	//	loader, err = documentloaders.NewHTML(filePath)
-	//case ".csv":
-	//	loader, err = documentloaders.NewCSV(filePath)
-	//case ".ppt", ".pptx":
-	//	loader, err = documentloaders.NewText(filePath) // Use text loader for PowerPoint
-	//case ".xml":
-	//	loader, err = documentloaders.NewText(filePath) // Use text loader for XML
-	//default:
-	//	loader, err = documentloaders.NewText(filePath)
+	case ".pdf":
+		finfo, err := file.Stat()
+		if err != nil {
+			return nil, err
+		}
+		loader = documentloaders.NewPDF(file, finfo.Size())
+	case ".md", ".markdown":
+		loader = documentloaders.NewText(file) // Use text loader for markdown
+	case ".htm", ".html":
+		loader = documentloaders.NewHTML(file)
+	case ".csv":
+		loader = documentloaders.NewCSV(file)
+	case ".ppt", ".pptx":
+		loader = documentloaders.NewText(file) // Use text loader for PowerPoint
+	case ".xml":
+		loader = documentloaders.NewText(file) // Use text loader for XML
+	default:
+		loader = documentloaders.NewText(file)
 	}
 
-	if err != nil {
+	if loader != nil {
 		return nil, fmt.Errorf("failed to create document loader: %w", err)
 	}
 
@@ -114,15 +126,6 @@ func LoadFromFile(filePath string, returnText, isUnstructured bool) (interface{}
 	docs, err := loader.Load(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("failed to load documents: %w", err)
-	}
-
-	// Return text or documents based on returnText parameter
-	if returnText {
-		var texts []string
-		for _, doc := range docs {
-			texts = append(texts, doc.PageContent)
-		}
-		return strings.Join(texts, "\n\n"), nil
 	}
 
 	return docs, nil
