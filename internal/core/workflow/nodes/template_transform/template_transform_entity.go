@@ -34,3 +34,18 @@ func NewTemplateTransformNodeData() *TemplateTransformNodeData {
 		Outputs:      outputs,
 	}
 }
+
+// GetInputs 实现NodeDataInterface接口
+func (t *TemplateTransformNodeData) GetInputs() []*entities.VariableEntity {
+	return t.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (t *TemplateTransformNodeData) GetOutputs() []*entities.VariableEntity {
+	return t.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (t *TemplateTransformNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return t.BaseNodeData
+}

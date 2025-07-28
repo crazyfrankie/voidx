@@ -77,7 +77,7 @@ func (p *Provider) loadModelEntities() error {
 			return fmt.Errorf("failed to read model file %s: %w", modelFile, err)
 		}
 
-		var modelConfig map[string]interface{}
+		var modelConfig map[string]any
 		if err := yaml.Unmarshal(modelData, &modelConfig); err != nil {
 			return fmt.Errorf("failed to unmarshal model file %s: %w", modelFile, err)
 		}
@@ -102,15 +102,15 @@ func (p *Provider) loadModelEntities() error {
 }
 
 // processParameters processes model parameters and applies templates
-func (p *Provider) processParameters(parametersInterface interface{}) ([]entity.ModelParameter, error) {
-	parametersSlice, ok := parametersInterface.([]interface{})
+func (p *Provider) processParameters(parametersInterface any) ([]entity.ModelParameter, error) {
+	parametersSlice, ok := parametersInterface.([]any)
 	if !ok {
 		return nil, fmt.Errorf("parameters must be a slice")
 	}
 
 	var parameters []entity.ModelParameter
 	for _, paramInterface := range parametersSlice {
-		paramMap, ok := paramInterface.(map[string]interface{})
+		paramMap, ok := paramInterface.(map[string]any)
 		if !ok {
 			return nil, fmt.Errorf("parameter must be a map")
 		}
@@ -145,7 +145,7 @@ func (p *Provider) processParameters(parametersInterface interface{}) ([]entity.
 }
 
 // overrideParameter overrides template parameter with specific values
-func (p *Provider) overrideParameter(param *entity.ModelParameter, overrides map[string]interface{}) error {
+func (p *Provider) overrideParameter(param *entity.ModelParameter, overrides map[string]any) error {
 	if name, exists := overrides["name"]; exists {
 		param.Name = name.(string)
 	}
@@ -180,7 +180,7 @@ func (p *Provider) overrideParameter(param *entity.ModelParameter, overrides map
 }
 
 // mapToParameter converts a map to ModelParameter
-func (p *Provider) mapToParameter(paramMap map[string]interface{}) (*entity.ModelParameter, error) {
+func (p *Provider) mapToParameter(paramMap map[string]any) (*entity.ModelParameter, error) {
 	param := &entity.ModelParameter{
 		Options: []entity.ModelParameterOption{},
 	}
@@ -223,10 +223,10 @@ func (p *Provider) mapToParameter(paramMap map[string]interface{}) (*entity.Mode
 }
 
 // configToModelEntity converts configuration map to ModelEntity
-func (p *Provider) configToModelEntity(config map[string]interface{}) (*entity.ModelEntity, error) {
+func (p *Provider) configToModelEntity(config map[string]any) (*entity.ModelEntity, error) {
 	entities := &entity.ModelEntity{
-		Attributes: make(map[string]interface{}),
-		Metadata:   make(map[string]interface{}),
+		Attributes: make(map[string]any),
+		Metadata:   make(map[string]any),
 	}
 
 	if model, exists := config["model"]; exists {
@@ -249,12 +249,12 @@ func (p *Provider) configToModelEntity(config map[string]interface{}) (*entity.M
 		}
 	}
 	if attributes, exists := config["attributes"]; exists {
-		if attr, ok := attributes.(map[string]interface{}); ok {
+		if attr, ok := attributes.(map[string]any); ok {
 			entities.Attributes = attr
 		}
 	}
 	if metadata, exists := config["metadata"]; exists {
-		if meta, ok := metadata.(map[string]interface{}); ok {
+		if meta, ok := metadata.(map[string]any); ok {
 			entities.Metadata = meta
 		}
 	}
@@ -264,7 +264,7 @@ func (p *Provider) configToModelEntity(config map[string]interface{}) (*entity.M
 		}
 	}
 	if features, exists := config["features"]; exists {
-		if featuresSlice, ok := features.([]interface{}); ok {
+		if featuresSlice, ok := features.([]any); ok {
 			for _, feature := range featuresSlice {
 				if featureStr, ok := feature.(string); ok {
 					entities.Features = append(entities.Features, entity.ModelFeature(featureStr))
@@ -304,7 +304,7 @@ func (p *Provider) GetModelEntities() []entity.ModelEntity {
 }
 
 // CreateModel creates a language model instance
-func (p *Provider) CreateModel(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+func (p *Provider) CreateModel(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 	entities, err := p.GetModelEntity(modelName)
 	if err != nil {
 		return nil, err

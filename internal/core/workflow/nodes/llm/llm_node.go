@@ -2,9 +2,10 @@ package llm
 
 import (
 	"fmt"
-	"github.com/bytedance/sonic"
 	"strings"
 	"time"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"

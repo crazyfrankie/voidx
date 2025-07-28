@@ -3,6 +3,9 @@ package file_extractor
 import (
 	"context"
 	"fmt"
+	"github.com/crazyfrankie/voidx/internal/models/entity"
+	"github.com/crazyfrankie/voidx/internal/upload"
+	"github.com/tmc/langchaingo/schema"
 	"io"
 	"net/http"
 	"os"
@@ -10,10 +13,6 @@ import (
 	"strings"
 
 	"github.com/tmc/langchaingo/documentloaders"
-	"github.com/tmc/langchaingo/schema"
-
-	"github.com/crazyfrankie/voidx/internal/models/entity"
-	"github.com/crazyfrankie/voidx/internal/upload"
 )
 
 // FileExtractor handles file extraction and conversion to LangChain documents

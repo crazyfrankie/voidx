@@ -42,7 +42,7 @@ func NewRetrieverFactory(db *gorm.DB, vectorStore vectorstores.VectorStore, embe
 
 // CreateRetriever 根据类型创建检索器
 func (f *RetrieverFactory) CreateRetriever(retrieverType RetrieverType, datasetIDs []uuid.UUID,
-	options map[string]any) (interface{}, error) {
+	options map[string]any) (any, error) {
 	switch retrieverType {
 	case RetrieverTypeFullText:
 		return f.createFullTextRetriever(f.db, datasetIDs, options), nil

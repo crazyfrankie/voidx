@@ -34,3 +34,18 @@ func NewCodeNodeData() *CodeNodeData {
 		Language:     CodeLanguageGo,
 	}
 }
+
+// GetInputs 实现NodeDataInterface接口
+func (c *CodeNodeData) GetInputs() []*entities.VariableEntity {
+	return c.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (c *CodeNodeData) GetOutputs() []*entities.VariableEntity {
+	return c.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (c *CodeNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return c.BaseNodeData
+}

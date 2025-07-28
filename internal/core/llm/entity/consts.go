@@ -70,7 +70,6 @@ var DefaultModelParameterTemplate = map[DefaultModelParameterName]ModelParameter
 	},
 }
 
-// floatPtr returns a pointer to a float64 value
 func floatPtr(f float64) *float64 {
 	return &f
 }

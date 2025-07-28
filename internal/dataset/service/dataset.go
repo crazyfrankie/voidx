@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
@@ -21,13 +22,15 @@ type DatasetService struct {
 	repo             *repository.DatasetRepo
 	retrieverService *retriever.Service
 	segmentService   *segment.Service
+	producer         *DatasetProducer
 }
 
-func NewDatasetService(repo *repository.DatasetRepo, retrieverSvc *retriever.Service, segmentService *segment.Service) *DatasetService {
+func NewDatasetService(repo *repository.DatasetRepo, retrieverSvc *retriever.Service, segmentService *segment.Service, producer *DatasetProducer) *DatasetService {
 	return &DatasetService{
 		repo:             repo,
 		retrieverService: retrieverSvc,
 		segmentService:   segmentService,
+		producer:         producer,
 	}
 }
 
@@ -149,6 +152,11 @@ func (s *DatasetService) DeleteDataset(ctx context.Context, datasetID uuid.UUID)
 	// 验证权限
 	if dataset.AccountID != userID {
 		return errno.ErrForbidden.AppendBizMessage("无权限删除该知识库")
+	}
+
+	// 发布异步删除任务
+	if err := s.producer.PublishDeleteDatasetTask(ctx, datasetID); err != nil {
+		return fmt.Errorf("failed to publish delete dataset task: %w", err)
 	}
 
 	return s.repo.DeleteDataset(ctx, datasetID)

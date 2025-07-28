@@ -86,3 +86,18 @@ func (h *HttpRequestNodeData) ValidateInputs() error {
 	}
 	return nil
 }
+
+// GetInputs 实现NodeDataInterface接口
+func (h *HttpRequestNodeData) GetInputs() []*entities.VariableEntity {
+	return h.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (h *HttpRequestNodeData) GetOutputs() []*entities.VariableEntity {
+	return h.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (h *HttpRequestNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return h.BaseNodeData
+}

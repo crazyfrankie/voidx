@@ -121,7 +121,7 @@ func (lmm *LanguageModelManager) GetModelFactoryByProviderAndModel(providerName 
 }
 
 // CreateModel creates a language model instance
-func (lmm *LanguageModelManager) CreateModel(providerName string, modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+func (lmm *LanguageModelManager) CreateModel(providerName string, modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 	pv, err := lmm.GetProvider(providerName)
 	if err != nil {
 		return nil, err
@@ -209,7 +209,7 @@ func (lmm *LanguageModelManager) GetModelsByFeature(feature entity.ModelFeature)
 }
 
 // ValidateModelConfig validates model configuration parameters
-func (lmm *LanguageModelManager) ValidateModelConfig(providerName string, modelName string, config map[string]interface{}) error {
+func (lmm *LanguageModelManager) ValidateModelConfig(providerName string, modelName string, config map[string]any) error {
 	modelEntity, err := lmm.GetModelEntity(providerName, modelName)
 	if err != nil {
 		return err
@@ -245,15 +245,15 @@ func (lmm *LanguageModelManager) ValidateModelConfig(providerName string, modelN
 }
 
 // validateParameter validates a single parameter value
-func (lmm *LanguageModelManager) validateParameter(param entity.ModelParameter, value interface{}) error {
+func (lmm *LanguageModelManager) validateParameter(param entity.ModelParameter, value any) error {
 	switch param.Type {
 	case entity.ParameterTypeFloat:
 		if floatVal, ok := value.(float64); ok {
 			if param.Min != nil && floatVal < *param.Min {
-				return fmt.Errorf("value %f is below minimum %f", floatVal, *param.Min)
+				return fmt.Errorf("value %f is below minimum %f", floatVal, param.Min)
 			}
 			if param.Max != nil && floatVal > *param.Max {
-				return fmt.Errorf("value %f is above maximum %f", floatVal, *param.Max)
+				return fmt.Errorf("value %f is above maximum %f", floatVal, param.Max)
 			}
 		} else {
 			return fmt.Errorf("expected float, got %T", value)
@@ -262,10 +262,10 @@ func (lmm *LanguageModelManager) validateParameter(param entity.ModelParameter, 
 		if intVal, ok := value.(int); ok {
 			floatVal := float64(intVal)
 			if param.Min != nil && floatVal < *param.Min {
-				return fmt.Errorf("value %d is below minimum %f", intVal, *param.Min)
+				return fmt.Errorf("value %d is below minimum %f", intVal, param.Min)
 			}
 			if param.Max != nil && floatVal > *param.Max {
-				return fmt.Errorf("value %d is above maximum %f", intVal, *param.Max)
+				return fmt.Errorf("value %d is above maximum %f", intVal, param.Max)
 			}
 		} else {
 			return fmt.Errorf("expected int, got %T", value)

@@ -20,3 +20,18 @@ func NewEndNodeData() *EndNodeData {
 		Outputs:      make([]*entities.VariableEntity, 0),
 	}
 }
+
+// GetInputs 实现NodeDataInterface接口
+func (e *EndNodeData) GetInputs() []*entities.VariableEntity {
+	return make([]*entities.VariableEntity, 0) // 结束节点没有输入
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (e *EndNodeData) GetOutputs() []*entities.VariableEntity {
+	return e.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (e *EndNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return e.BaseNodeData
+}

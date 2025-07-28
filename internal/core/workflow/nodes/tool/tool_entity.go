@@ -46,3 +46,18 @@ func NewToolNodeData() *ToolNodeData {
 		Outputs:      outputs,
 	}
 }
+
+// GetInputs 实现NodeDataInterface接口
+func (t *ToolNodeData) GetInputs() []*entities.VariableEntity {
+	return t.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (t *ToolNodeData) GetOutputs() []*entities.VariableEntity {
+	return t.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (t *ToolNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return t.BaseNodeData
+}

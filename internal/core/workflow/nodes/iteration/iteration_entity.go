@@ -2,6 +2,7 @@ package iteration
 
 import (
 	"fmt"
+
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 
 	"github.com/google/uuid"
@@ -94,4 +95,19 @@ func (i *IterationNodeData) ValidateInputs() error {
 	}
 
 	return nil
+}
+
+// GetInputs 实现NodeDataInterface接口
+func (i *IterationNodeData) GetInputs() []*entities.VariableEntity {
+	return i.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (i *IterationNodeData) GetOutputs() []*entities.VariableEntity {
+	return i.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (i *IterationNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return i.BaseNodeData
 }

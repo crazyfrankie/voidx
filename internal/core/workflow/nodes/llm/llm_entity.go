@@ -29,3 +29,18 @@ func NewLLMNodeData() *LLMNodeData {
 		Temperature:  0.7,
 	}
 }
+
+// GetInputs 实现NodeDataInterface接口
+func (l *LLMNodeData) GetInputs() []*entities.VariableEntity {
+	return l.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (l *LLMNodeData) GetOutputs() []*entities.VariableEntity {
+	return l.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (l *LLMNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return l.BaseNodeData
+}

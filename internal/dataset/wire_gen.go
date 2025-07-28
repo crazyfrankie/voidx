@@ -24,7 +24,8 @@ func InitDatasetHandler(db *gorm.DB, retrieverModule *retriever.RetrieverModule,
 	datasetRepo := repository.NewDatasetRepo(datasetDao)
 	retrievalService := retrieverModule.Service
 	segmentService := segmentModule.Service
-	datasetService := service.NewDatasetService(datasetRepo, retrievalService, segmentService)
+	datasetProducer := InitProducer()
+	datasetService := service.NewDatasetService(datasetRepo, retrievalService, segmentService, datasetProducer)
 	datasetHandler := handler.NewDatasetHandler(datasetService)
 	dataSetModule := &DataSetModule{
 		Handler: datasetHandler,
@@ -45,3 +46,12 @@ type DataSetModule struct {
 }
 
 var DatasetSet = wire.NewSet(dao.NewDatasetDao, repository.NewDatasetRepo, service.NewDatasetService, handler.NewDatasetHandler)
+
+func InitProducer() *service.DatasetProducer {
+	producer, err := service.NewDatasetProducer([]string{})
+	if err != nil {
+		panic(err)
+	}
+
+	return producer
+}

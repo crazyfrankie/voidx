@@ -19,7 +19,7 @@ import (
 func GetOpenAIModelFactory(modelType entity.ModelType) (entity.ModelFactory, error) {
 	switch modelType {
 	case entity.ModelTypeChat:
-		return func(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+		return func(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 			options := []openai.Option{
 				openai.WithModel(modelName),
 			}
@@ -36,10 +36,10 @@ func GetOpenAIModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 				return nil, err
 			}
 
-			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]interface{})), nil
+			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]any)), nil
 		}, nil
 	case entity.ModelTypeCompletion:
-		return func(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+		return func(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 			options := []openai.Option{
 				openai.WithModel(modelName),
 			}
@@ -49,7 +49,7 @@ func GetOpenAIModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 				return nil, err
 			}
 
-			return entity.NewBaseLLM(completion.Model, []entity.ModelFeature{}, make(map[string]interface{})), nil
+			return entity.NewBaseLLM(completion.Model, []entity.ModelFeature{}, make(map[string]any)), nil
 		}, nil
 	default:
 		return nil, entity.NotFoundError(fmt.Sprintf("unsupported model type: %s", modelType))
@@ -60,7 +60,7 @@ func GetOpenAIModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 func GetMoonshotModelFactory(modelType entity.ModelType) (entity.ModelFactory, error) {
 	switch modelType {
 	case entity.ModelTypeChat:
-		return func(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+		return func(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 			options := []openai.Option{
 				openai.WithModel(modelName),
 			}
@@ -77,7 +77,7 @@ func GetMoonshotModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 				return nil, err
 			}
 
-			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]interface{})), nil
+			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]any)), nil
 		}, nil
 	default:
 		return nil, entity.NotFoundError(fmt.Sprintf("unsupported model type: %s", modelType))
@@ -88,7 +88,7 @@ func GetMoonshotModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 func GetDeepSeekModelFactory(modelType entity.ModelType) (entity.ModelFactory, error) {
 	switch modelType {
 	case entity.ModelTypeChat:
-		return func(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+		return func(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 			options := []openai.Option{
 				openai.WithModel(modelName),
 			}
@@ -105,7 +105,7 @@ func GetDeepSeekModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 				return nil, err
 			}
 
-			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]interface{})), nil
+			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]any)), nil
 		}, nil
 	default:
 		return nil, entity.NotFoundError(fmt.Sprintf("unsupported model type: %s", modelType))
@@ -116,7 +116,7 @@ func GetDeepSeekModelFactory(modelType entity.ModelType) (entity.ModelFactory, e
 func GetTongyiModelFactory(modelType entity.ModelType) (entity.ModelFactory, error) {
 	switch modelType {
 	case entity.ModelTypeChat:
-		return func(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+		return func(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 			options := []openai.Option{
 				openai.WithModel(modelName),
 			}
@@ -133,7 +133,7 @@ func GetTongyiModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 				return nil, err
 			}
 
-			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]interface{})), nil
+			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]any)), nil
 		}, nil
 	default:
 		return nil, entity.NotFoundError(fmt.Sprintf("unsupported model type: %s", modelType))
@@ -144,7 +144,7 @@ func GetTongyiModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 func GetOllamaModelFactory(modelType entity.ModelType) (entity.ModelFactory, error) {
 	switch modelType {
 	case entity.ModelTypeChat:
-		return func(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+		return func(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 			options := []ollama.Option{
 				ollama.WithModel(modelName),
 			}
@@ -161,7 +161,7 @@ func GetOllamaModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 				return nil, err
 			}
 
-			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]interface{})), nil
+			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]any)), nil
 		}, nil
 	default:
 		return nil, entity.NotFoundError(fmt.Sprintf("unsupported model type: %s", modelType))
@@ -172,7 +172,7 @@ func GetOllamaModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 func GetWenxinModelFactory(modelType entity.ModelType) (entity.ModelFactory, error) {
 	switch modelType {
 	case entity.ModelTypeChat:
-		return func(modelName string, config map[string]interface{}) (entity.BaseLanguageModel, error) {
+		return func(modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
 			options := []openai.Option{
 				openai.WithModel(modelName),
 			}
@@ -182,7 +182,7 @@ func GetWenxinModelFactory(modelType entity.ModelType) (entity.ModelFactory, err
 				return nil, err
 			}
 
-			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]interface{})), nil
+			return entity.NewBaseLLM(chat.Model, []entity.ModelFeature{}, make(map[string]any)), nil
 		}, nil
 	default:
 		return nil, entity.NotFoundError(fmt.Sprintf("unsupported model type: %s", modelType))

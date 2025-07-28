@@ -536,7 +536,7 @@ func (r *ReACTAgent) executeTools(toolCalls []llms.ToolCall, taskID uuid.UUID) [
 			Event:       event,
 			Observation: result,
 			Tool:        toolName,
-			ToolInput:   toolCall.FunctionCall.Arguments,
+			ToolInput:   map[string]any{"args": toolCall.FunctionCall.Arguments},
 			Latency:     time.Since(startTime).Seconds(),
 		})
 

@@ -82,3 +82,18 @@ func (d *DatasetRetrievalNodeData) ValidateInputs() error {
 
 	return nil
 }
+
+// GetInputs 实现NodeDataInterface接口
+func (d *DatasetRetrievalNodeData) GetInputs() []*entities.VariableEntity {
+	return d.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (d *DatasetRetrievalNodeData) GetOutputs() []*entities.VariableEntity {
+	return d.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (d *DatasetRetrievalNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return d.BaseNodeData
+}

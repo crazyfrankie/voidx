@@ -29,9 +29,19 @@ var DatasetSet = wire.NewSet(
 	handler.NewDatasetHandler,
 )
 
+func InitProducer() *service.DatasetProducer {
+	producer, err := service.NewDatasetProducer([]string{})
+	if err != nil {
+		panic(err)
+	}
+
+	return producer
+}
+
 func InitDatasetHandler(db *gorm.DB,
 	retrieverModule *retriever.RetrieverModule, segmentModule *segment.SegmentModule) *DataSetModule {
 	wire.Build(
+		InitProducer,
 		DatasetSet,
 
 		wire.Struct(new(DataSetModule), "*"),

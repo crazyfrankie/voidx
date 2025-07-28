@@ -2,6 +2,7 @@ package question_classifier
 
 import (
 	"fmt"
+
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 )
 
@@ -70,4 +71,19 @@ func (q *QuestionClassifierNodeData) ValidateInputs() error {
 	}
 
 	return nil
+}
+
+// GetInputs 实现NodeDataInterface接口
+func (q *QuestionClassifierNodeData) GetInputs() []*entities.VariableEntity {
+	return q.Inputs
+}
+
+// GetOutputs 实现NodeDataInterface接口
+func (q *QuestionClassifierNodeData) GetOutputs() []*entities.VariableEntity {
+	return q.Outputs
+}
+
+// GetBaseNodeData 实现NodeDataInterface接口
+func (q *QuestionClassifierNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return q.BaseNodeData
 }

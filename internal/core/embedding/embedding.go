@@ -52,13 +52,13 @@ func (s *EmbeddingService) GetEmbedded(ctx context.Context, query string) ([]flo
 	return res, nil
 }
 
-func (s *EmbeddingService) CalculateTokenCount(query string) (int, error) {
+func (s *EmbeddingService) CalculateTokenCount(query string) int {
 	encoding, err := tiktoken.EncodingForModel("gpt-3.5")
 	if err != nil {
-		return -1, err
+		return -1
 	}
 
-	return len(encoding.EncodeOrdinary(query)), nil
+	return len(encoding.EncodeOrdinary(query))
 }
 
 func cacheKey(query string) string {
