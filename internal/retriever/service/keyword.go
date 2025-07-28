@@ -103,7 +103,7 @@ func (s *KeywordService) AddKeywords(ctx context.Context, datasetID uuid.UUID, s
 }
 
 // RemoveSegmentIDs 从知识库的关键词表中移除指定的片段ID
-func (s *KeywordService) RemoveSegmentIDs(ctx context.Context, datasetID uuid.UUID, segmentIDs []string) error {
+func (s *KeywordService) RemoveSegmentIDs(ctx context.Context, datasetID uuid.UUID, segmentIDs []uuid.UUID) error {
 	// 获取锁
 	lockKey := getLockKey(datasetID)
 	lock := s.repo.AcquireLock(ctx, lockKey)
@@ -121,7 +121,7 @@ func (s *KeywordService) RemoveSegmentIDs(ctx context.Context, datasetID uuid.UU
 	// 创建segmentID集合，用于快速查找
 	segmentIDSet := make(map[string]struct{}, len(segmentIDs))
 	for _, id := range segmentIDs {
-		segmentIDSet[id] = struct{}{}
+		segmentIDSet[id.String()] = struct{}{}
 	}
 
 	// 从每个关键词的片段ID列表中移除指定的片段ID

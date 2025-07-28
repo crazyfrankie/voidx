@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"log"
 	"regexp"
 	"strings"
@@ -19,7 +20,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	"github.com/crazyfrankie/voidx/internal/index/repository"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
-	"github.com/crazyfrankie/voidx/internal/process_rule/service"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/pkg/consts"
@@ -29,9 +29,9 @@ import (
 
 type IndexingService struct {
 	repo                  *repository.IndexingRepo
-	redisClient           *redis.Client
+	redisClient           redis.Cmdable
 	fileExtractor         *file_extractor.FileExtractor
-	processRuleService    *service.ProcessRuleService
+	processRuleService    *process_rule.Service
 	embeddingsService     *embedding.EmbeddingService
 	jiebaService          *retrievers.JiebaService
 	keywordTableService   *retriever.KeyWordService
@@ -40,9 +40,9 @@ type IndexingService struct {
 
 func NewIndexingService(
 	repo *repository.IndexingRepo,
-	redisClient *redis.Client,
+	redisClient redis.Cmdable,
 	fileExtractor *file_extractor.FileExtractor,
-	processRuleService *service.ProcessRuleService,
+	processRuleService *process_rule.Service,
 	embeddingsService *embedding.EmbeddingService,
 	jiebaService *retrievers.JiebaService,
 	keywordTableService *retriever.KeyWordService,
@@ -425,7 +425,7 @@ func (s *IndexingService) indexing(ctx context.Context, document *entity.Documen
 		// 2. 逐条更新文档片段的关键词
 		segmentID, _ := uuid.Parse(lcSegment.Metadata["segment_id"].(string))
 		now := time.Now().UnixMilli()
-		keywordsJSON, _ := json.Marshal(keywords)
+		keywordsJSON, _ := sonic.Marshal(keywords)
 
 		err := s.repo.UpdateSegment(ctx, segmentID, map[string]any{
 			"keywords":              string(keywordsJSON),
@@ -468,7 +468,7 @@ func (s *IndexingService) indexing(ctx context.Context, document *entity.Documen
 		}
 
 		// 6. 更新关键词表
-		updatedKeywordTableJSON, _ := json.Marshal(keywordTable)
+		updatedKeywordTableJSON, _ := sonic.Marshal(keywordTable)
 		err = s.repo.UpdateKeywordTable(ctx, keywordTableRecord.ID, map[string]any{
 			"keyword_table": string(updatedKeywordTableJSON),
 		})

@@ -2,12 +2,13 @@ package duckduckgo
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/bytedance/sonic"
 )
 
 // DuckDuckGoSearchTool represents a tool for DuckDuckGo search
@@ -50,7 +51,7 @@ func (t *DuckDuckGoSearchTool) Run(ctx context.Context, query string) (string, e
 
 	// Parse the JSON response
 	var result map[string]any
-	if err := json.Unmarshal(body, &result); err != nil {
+	if err := sonic.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 

@@ -8,11 +8,31 @@ package ioc
 
 import (
 	"github.com/crazyfrankie/voidx/internal/account"
+	"github.com/crazyfrankie/voidx/internal/ai"
+	"github.com/crazyfrankie/voidx/internal/analysis"
+	"github.com/crazyfrankie/voidx/internal/api_key"
+	"github.com/crazyfrankie/voidx/internal/apitool"
 	"github.com/crazyfrankie/voidx/internal/app"
+	"github.com/crazyfrankie/voidx/internal/app_config"
+	"github.com/crazyfrankie/voidx/internal/assistant_agent"
+	"github.com/crazyfrankie/voidx/internal/audio"
 	"github.com/crazyfrankie/voidx/internal/auth"
+	"github.com/crazyfrankie/voidx/internal/builtin_app"
+	"github.com/crazyfrankie/voidx/internal/builtin_tools"
+	"github.com/crazyfrankie/voidx/internal/conversation"
+	"github.com/crazyfrankie/voidx/internal/dataset"
+	"github.com/crazyfrankie/voidx/internal/document"
 	"github.com/crazyfrankie/voidx/internal/llm"
+	"github.com/crazyfrankie/voidx/internal/oauth"
+	"github.com/crazyfrankie/voidx/internal/openapi"
+	"github.com/crazyfrankie/voidx/internal/platform"
+	"github.com/crazyfrankie/voidx/internal/retriever"
+	"github.com/crazyfrankie/voidx/internal/segment"
 	"github.com/crazyfrankie/voidx/internal/upload"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
+	"github.com/crazyfrankie/voidx/internal/webapp"
+	"github.com/crazyfrankie/voidx/internal/wechat"
+	"github.com/crazyfrankie/voidx/internal/workflow"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 )
@@ -24,25 +44,75 @@ func InitEngine() *gin.Engine {
 	tokenService := InitJWT(cmdable)
 	v := InitMiddlewares(tokenService)
 	db := InitDB()
+	accountModule := account.InitAccountModule(db)
+	accountHandler := accountModule.Handler
+	conversationModule := conversation.InitConversationModule(db)
+	aiModule := ai.InitAIModule(db, conversationModule)
+	aiHandler := aiModule.Handler
 	openAI := InitEmbedding()
 	store := InitVectorStore(openAI)
 	vecStoreService := vecstore.NewVecStoreService(store)
+	tokenBufferMemory := InitTokenBufMem(db)
 	languageModelManager := InitLLMCore()
-	appModule := app.InitAppModule(db, vecStoreService, languageModelManager)
-	appHandler := appModule.Handler
-	authModule := auth.InitAuthModule(db, cmdable, tokenService)
-	authHandler := authModule.Handler
-	accountModule := account.InitAccountModule(db)
-	accountHandler := accountModule.Handler
-	llmModule := llm.InitLLMModule(languageModelManager)
-	llmHandler := llmModule.Handler
+	builtinProviderManager := InitBuiltinToolsManager()
+	apiProviderManager := InitApiToolsManager()
+	appConfigModule := app_config.InitAppConfigModule(db, languageModelManager, builtinProviderManager, apiProviderManager)
 	client := InitMinIO()
 	uploadModule := upload.InitUploadModule(db, client)
+	embeddingService := InitEmbeddingService(cmdable, openAI)
+	jiebaService := InitJiebaService()
+	retrieverModule := retriever.InitRetrieverModule(db, cmdable, store, embeddingService, jiebaService)
+	agentQueueManager := InitAgentManager(cmdable)
+	llmModule := llm.InitLLMModule(languageModelManager)
+	appModule := app.InitAppModule(db, vecStoreService, tokenBufferMemory, languageModelManager, appConfigModule, uploadModule, retrieverModule, agentQueueManager, llmModule, apiProviderManager, builtinProviderManager, conversationModule)
+	analysisModule := analysis.InitAnalysisModule(db, cmdable, appModule)
+	analysisHandler := analysisModule.Handler
+	apiKeyModule := api_key.InitApiKeyModule(db)
+	apiKeyHandler := apiKeyModule.Handler
+	apiToolModule := apitool.InitApiToolHandler(db)
+	apiToolHandler := apiToolModule.Handler
+	appHandler := appModule.Handler
+	assistantModule := assistant_agent.InitAssistantModule(db, conversationModule)
+	assistantAgentHandler := assistantModule.Handler
+	audioModule := audio.InitAudioModule(db)
+	audioHandler := audioModule.Handler
+	authModule := auth.InitAuthModule(db, cmdable, tokenService)
+	authHandler := authModule.Handler
+	builtinAppManager := InitBuiltinAppManager()
+	builtinModule := builtin_app.InitBuiltinAppModule(db, builtinAppManager)
+	builtinAppHandler := builtinModule.Handler
+	builtinCategoryManager := InitBuiltinToolsCategories()
+	builtinToolsModule := builtin_tools.InitBuiltinToolsModule(builtinCategoryManager, builtinProviderManager)
+	builtinToolsHandler := builtinToolsModule.Handler
+	conversationHandler := conversationModule.Handler
+	segmentModule := segment.InitSegmentModule(db, embeddingService, jiebaService, vecStoreService, retrieverModule)
+	dataSetModule := dataset.InitDatasetHandler(db, retrieverModule, segmentModule)
+	datasetHandler := dataSetModule.Handler
+	documentModule := document.InitDocumentModule(db)
+	documentHandler := documentModule.Handler
+	llmHandler := llmModule.Handler
+	oAuthModule := oauth.InitOAuthModule(db, tokenService)
+	oAuthHandler := oAuthModule.Handler
+	openAPIModule := openapi.InitOpenAIModule(db, conversationModule, retrieverModule, llmModule, appConfigModule, appModule, agentQueueManager, tokenBufferMemory)
+	openAPIHandler := openAPIModule.Handler
+	platformModule := platform.InitPlatformModule(db)
+	platformHandler := platformModule.Handler
+	segmentHandler := segmentModule.Handler
 	uploadFileHandler := uploadModule.Handler
-	engine := InitWeb(v, appHandler, authHandler, accountHandler, llmHandler, uploadFileHandler)
+	webAppModule := webapp.InitWebAppModule(db, tokenBufferMemory, appConfigModule, conversationModule, llmModule, agentQueueManager, retrieverModule)
+	webAppHandler := webAppModule.Handler
+	wechatWechat := InitWechat()
+	wechatModule := wechat.InitWechatModule(db, wechatWechat, retrieverModule, appConfigModule, conversationModule, llmModule, agentQueueManager, tokenBufferMemory)
+	wechatHandler := wechatModule.Handler
+	workflowModule := workflow.InitWorkflowModule(db, builtinProviderManager)
+	workflowHandler := workflowModule.Handler
+	engine := InitWeb(v, accountHandler, aiHandler, analysisHandler, apiKeyHandler, apiToolHandler, appHandler, assistantAgentHandler, audioHandler, authHandler, builtinAppHandler, builtinToolsHandler, conversationHandler, datasetHandler, documentHandler, llmHandler, oAuthHandler, openAPIHandler, platformHandler, segmentHandler, uploadFileHandler, webAppHandler, wechatHandler, workflowHandler)
 	return engine
 }
 
 // wire.go:
 
-var BaseSet = wire.NewSet(InitCache, InitDB, InitLLMCore, InitJWT, InitEmbedding, InitVectorStore, InitMinIO)
+var baseSet = wire.NewSet(InitCache, InitDB, InitJWT, InitEmbedding, InitVectorStore, InitMinIO, InitWechat)
+
+var coreSet = wire.NewSet(InitAgentManager, InitBuiltinAppManager, InitBuiltinToolsCategories,
+	InitEmbeddingService, InitFileExtractor, InitJiebaService, InitLLMCore, InitTokenBufMem, InitApiToolsManager, InitBuiltinToolsManager)

@@ -14,6 +14,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/wechat/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/wechat/service"
 	"github.com/google/wire"
+	"github.com/silenceper/wechat/v2"
 	"gorm.io/gorm"
 )
 

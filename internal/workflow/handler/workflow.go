@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
@@ -293,7 +293,7 @@ func (h *WorkflowHandler) DebugWorkflow() gin.HandlerFunc {
 					return false
 				}
 
-				eventData, _ := json.Marshal(event)
+				eventData, _ := sonic.Marshal(event)
 				fmt.Fprintf(w, "event: workflow\ndata: %s\n\n", string(eventData))
 
 				// 刷新缓冲区

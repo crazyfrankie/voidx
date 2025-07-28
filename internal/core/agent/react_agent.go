@@ -2,12 +2,12 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/tools"
@@ -368,7 +368,7 @@ func (r *ReACTAgent) toolsNodeReACT(state *entities.AgentState) error {
 			"name": aiMsg.ToolCalls[0].FunctionCall.Name,
 			"args": aiMsg.ToolCalls[0].FunctionCall.Arguments,
 		}
-		jsonBytes, _ := json.Marshal(toolCallJSON)
+		jsonBytes, _ := sonic.Marshal(toolCallJSON)
 		aiMessage := llms.AIChatMessage{Content: fmt.Sprintf("```json\n%s\n```", string(jsonBytes))}
 		state.Messages = append(state.Messages, aiMessage)
 	}
@@ -451,7 +451,7 @@ func (r *ReACTAgent) parseToolCallFromContent(content string) ([]llms.ToolCall, 
 
 	var toolCallData map[string]any
 	jsonContent := strings.TrimSpace(matches[1])
-	if err := json.Unmarshal([]byte(jsonContent), &toolCallData); err != nil {
+	if err := sonic.Unmarshal([]byte(jsonContent), &toolCallData); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 
@@ -465,7 +465,7 @@ func (r *ReACTAgent) parseToolCallFromContent(content string) ([]llms.ToolCall, 
 		args = make(map[string]any)
 	}
 
-	argsJSON, _ := json.Marshal(args)
+	argsJSON, _ := sonic.Marshal(args)
 
 	toolCall := llms.ToolCall{
 		ID:   uuid.New().String(),

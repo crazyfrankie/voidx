@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-
 	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	langchaintool "github.com/tmc/langchaingo/tools"
@@ -13,7 +12,6 @@ import (
 	apitools "github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
 	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
 	"github.com/crazyfrankie/voidx/internal/core/workflow"
-	workflowentities "github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/pkg/consts"
@@ -302,12 +300,12 @@ func (s *AppConfigService) GetLangchainToolsByWorkflowIDs(ctx context.Context, w
 		}
 
 		// 2. 创建工作流工具
-		workflowTool, err := workflow.NewWorkflow(&workflowentities.WorkflowConfig{
-			AccountID:   workflowRecord.AccountID,
-			Name:        workflowRecord.Name,
-			Description: workflowRecord.Description,
-			Nodes:       workflowRecord.Graph["node"].([]*workflowentities.BaseNodeData),
-			Edges:       workflowRecord.Graph["edge"].([]*workflowentities.BaseEdgeData),
+		workflowTool, err := workflow.NewWorkflow(map[string]any{
+			"account_id":  workflowRecord.AccountID,
+			"name":        workflowRecord.Name,
+			"description": workflowRecord.Description,
+			"nodes":       workflowRecord.Graph["node"],
+			"edges":       workflowRecord.Graph["edge"],
 		})
 		if workflowTool != nil {
 			workflows = append(workflows, workflowTool)

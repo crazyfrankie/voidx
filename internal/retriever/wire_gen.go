@@ -13,20 +13,19 @@ import (
 	"github.com/crazyfrankie/voidx/internal/retriever/repository/cache"
 	"github.com/crazyfrankie/voidx/internal/retriever/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/retriever/service"
+	"github.com/crazyfrankie/voidx/pkg/langchainx/milvus"
 	"github.com/redis/go-redis/v9"
-	"github.com/tmc/langchaingo/vectorstores/milvus"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
 // InitRetrieverModule 初始化检索模块
-func InitRetrieverModule(db *gorm.DB, cmd redis.Cmdable, vectorStore *milvus.Store, embedding2 *embedding.EmbeddingService) *RetrieverModule {
+func InitRetrieverModule(db *gorm.DB, cmd redis.Cmdable, vectorStore *milvus.Store, embedding2 *embedding.EmbeddingService, jiebaService *retrievers.JiebaService) *RetrieverModule {
 	keywordDao := dao.NewKeywordDao(db)
 	keyWordCache := cache.NewKeyWordCache(cmd)
 	keywordRepository := repository.NewKeywordRepository(keywordDao, keyWordCache)
 	keywordService := service.NewKeywordService(keywordRepository)
-	jiebaService := initJiebaService()
 	retrieverFactory := initRetrieverFactory(db, vectorStore, embedding2, jiebaService)
 	retrievalService := service.NewRetrievalService(retrieverFactory)
 	retrieverModule := &RetrieverModule{
@@ -45,22 +44,6 @@ type Service = service.RetrievalService
 type RetrieverModule struct {
 	KeyWord *KeyWordService
 	Service *Service
-}
-
-// initJiebaService 初始化Jieba服务
-func initJiebaService() *retrievers.JiebaService {
-
-	stopwords := []string{
-		"的", "了", "和", "是", "在", "我", "有", "不", "这", "也",
-		"就", "都", "而", "要", "把", "但", "可以", "你", "会", "对",
-		"能", "他", "说", "着", "那", "如果", "只", "因为", "所以", "还",
-		"a", "an", "the", "and", "or", "but", "if", "of", "to", "in",
-		"for", "with", "on", "at", "by", "from", "up", "about", "into", "over",
-		"after", "beneath", "under", "above",
-	}
-
-	stopwordSet := retrievers.LoadStopwords(stopwords)
-	return retrievers.NewJiebaService(stopwordSet)
 }
 
 // initRetrieverFactory 初始化检索器工厂

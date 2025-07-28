@@ -5,10 +5,10 @@ import (
 
 	"github.com/milvus-io/milvus-sdk-go/v2/client"
 	"github.com/milvus-io/milvus-sdk-go/v2/entity"
-	"github.com/tmc/langchaingo/vectorstores/milvus"
 
 	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/pkg/langchainx/embeddings"
+	"github.com/crazyfrankie/voidx/pkg/langchainx/milvus"
 )
 
 func InitVectorStore(embedder *embeddings.OpenAI) *milvus.Store {

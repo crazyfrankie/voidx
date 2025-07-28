@@ -9,11 +9,11 @@ package segment
 import (
 	"github.com/crazyfrankie/voidx/internal/core/embedding"
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
-	"github.com/crazyfrankie/voidx/internal/retriever/service"
+	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment/handler"
 	"github.com/crazyfrankie/voidx/internal/segment/repository"
 	"github.com/crazyfrankie/voidx/internal/segment/repository/dao"
-	service2 "github.com/crazyfrankie/voidx/internal/segment/service"
+	"github.com/crazyfrankie/voidx/internal/segment/service"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/google/wire"
 	"gorm.io/gorm"
@@ -21,10 +21,11 @@ import (
 
 // Injectors from wire.go:
 
-func InitSegmentModule(db *gorm.DB, embeddings *embedding.EmbeddingService, jiebaSvc *retrievers.JiebaService, vecSvc *vecstore.VecStoreService, keywordSvc *service.KeywordService) *SegmentModule {
+func InitSegmentModule(db *gorm.DB, embeddings *embedding.EmbeddingService, jiebaSvc *retrievers.JiebaService, vecSvc *vecstore.VecStoreService, keywordSvc *retriever.RetrieverModule) *SegmentModule {
 	segmentDao := dao.NewSegmentDao(db)
 	segmentRepo := repository.NewSegmentRepo(segmentDao)
-	segmentService := service2.NewSegmentService(segmentRepo, embeddings, jiebaSvc, vecSvc, keywordSvc)
+	keywordService := keywordSvc.KeyWord
+	segmentService := service.NewSegmentService(segmentRepo, embeddings, jiebaSvc, vecSvc, keywordService)
 	segmentHandler := handler.NewSegmentHandler(segmentService)
 	segmentModule := &SegmentModule{
 		Handler: segmentHandler,
@@ -37,11 +38,11 @@ func InitSegmentModule(db *gorm.DB, embeddings *embedding.EmbeddingService, jieb
 
 type Handler = handler.SegmentHandler
 
-type Service = service2.SegmentService
+type Service = service.SegmentService
 
 type SegmentModule struct {
 	Handler *Handler
 	Service *Service
 }
 
-var SegmentSet = wire.NewSet(dao.NewSegmentDao, repository.NewSegmentRepo, service2.NewSegmentService, handler.NewSegmentHandler)
+var SegmentSet = wire.NewSet(dao.NewSegmentDao, repository.NewSegmentRepo, service.NewSegmentService, handler.NewSegmentHandler)

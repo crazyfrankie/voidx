@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/models/entity"
@@ -37,5 +38,5 @@ func (r *OAuthRepo) CreateAccountOAuth(ctx context.Context, accountOAuth *entity
 }
 
 func (r *OAuthRepo) UpdateAccountInfo(ctx context.Context, accountID uuid.UUID, account *entity.Account, accountOAuth *entity.AccountOAuth) error {
-	
+	return r.dao.UpdateAccountInfo(ctx, accountID, account, accountOAuth)
 }

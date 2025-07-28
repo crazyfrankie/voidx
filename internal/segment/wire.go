@@ -35,11 +35,12 @@ var SegmentSet = wire.NewSet(
 func InitSegmentModule(db *gorm.DB, embeddings *embedding.EmbeddingService,
 	jiebaSvc *retrievers.JiebaService,
 	vecSvc *vecstore.VecStoreService,
-	keywordSvc *retriever.KeyWordService) *SegmentModule {
+	keywordSvc *retriever.RetrieverModule) *SegmentModule {
 	wire.Build(
 		SegmentSet,
 
 		wire.Struct(new(SegmentModule), "*"),
+		wire.FieldsOf(new(*retriever.RetrieverModule), "KeyWord"),
 	)
 	return new(SegmentModule)
 }

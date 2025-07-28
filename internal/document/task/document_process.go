@@ -2,10 +2,10 @@ package task
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/IBM/sarama"
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 )
 
@@ -85,7 +85,7 @@ func (p *DocumentProducer) PublishDeleteDocumentTask(ctx context.Context, datase
 
 // publishTask 发布任务到Kafka
 func (p *DocumentProducer) publishTask(ctx context.Context, topic string, task DocumentTask) error {
-	data, err := json.Marshal(task)
+	data, err := sonic.Marshal(task)
 	if err != nil {
 		return fmt.Errorf("failed to marshal task: %w", err)
 	}

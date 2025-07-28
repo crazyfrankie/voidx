@@ -41,10 +41,7 @@ func (s *SegmentService) CreateSegment(ctx context.Context, datasetID, documentI
 	}
 
 	// 1.校验上传内容的token长度总数，不能超过1000
-	tokenCount, err := s.embeddingSvc.CalculateTokenCount(createReq.Content)
-	if err != nil {
-		return nil, err
-	}
+	tokenCount := s.embeddingSvc.CalculateTokenCount(createReq.Content)
 	if tokenCount > 1000 {
 		return nil, errno.ErrValidate.AppendBizMessage("片段内容的长度不能超过1000 token")
 	}

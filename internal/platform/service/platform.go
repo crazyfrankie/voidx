@@ -59,7 +59,7 @@ func (s *PlatformService) GetWechatConfig(ctx context.Context, appID, userID uui
 		WechatAppID:     wechatConfig.WechatAppID,
 		WechatAppSecret: wechatConfig.WechatAppSecret,
 		WechatToken:     wechatConfig.WechatToken,
-		Status:          wechatConfig.Status,
+		Status:          string(wechatConfig.Status),
 		Utime:           wechatConfig.Utime,
 		Ctime:           wechatConfig.Ctime,
 	}, nil
@@ -119,7 +119,7 @@ func (s *PlatformService) getOrCreateWechatConfig(ctx context.Context, appID uui
 		WechatAppID:     "",
 		WechatAppSecret: "",
 		WechatToken:     "",
-		Status:          string(consts.WechatConfigStatusUnconfigured),
+		Status:          consts.WechatConfigStatusUnconfigured,
 	}
 
 	err = s.repo.CreateWechatConfig(ctx, newConfig)

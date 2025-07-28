@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/audio/service"
@@ -109,7 +109,7 @@ func (h *AudioHandler) MessageToAudio() gin.HandlerFunc {
 					return false
 				}
 
-				eventData, _ := json.Marshal(event)
+				eventData, _ := sonic.Marshal(event)
 				fmt.Fprintf(w, "event: tts_message\ndata: %s\n\n", string(eventData))
 
 				// 刷新缓冲区

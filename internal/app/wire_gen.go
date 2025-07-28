@@ -10,7 +10,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app/handler"
 	"github.com/crazyfrankie/voidx/internal/app/repository"
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
-	service3 "github.com/crazyfrankie/voidx/internal/app/service"
+	"github.com/crazyfrankie/voidx/internal/app/service"
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
@@ -20,22 +20,24 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
 	providers2 "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
 	llm2 "github.com/crazyfrankie/voidx/internal/llm"
-	service2 "github.com/crazyfrankie/voidx/internal/retriever/service"
-	"github.com/crazyfrankie/voidx/internal/upload/service"
+	"github.com/crazyfrankie/voidx/internal/retriever"
+	"github.com/crazyfrankie/voidx/internal/upload"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory2 *memory.TokenBufferMemory, llmCore *llm.LanguageModelManager, appConfig *app_config.AppConfigModule, ossSvc *service.OssService, retrieverSvc *service2.RetrievalService, agentManager *agent.AgentQueueManager, llmModule *llm2.LLMModule, apiProvider *providers.ApiProviderManager, builtinProvider *providers2.BuiltinProviderManager, convers *conversation.ConversationModule) *AppModule {
+func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory2 *memory.TokenBufferMemory, llmCore *llm.LanguageModelManager, appConfig *app_config.AppConfigModule, ossSvc *upload.UploadModule, retrieverSvc *retriever.RetrieverModule, agentManager *agent.AgentQueueManager, llmModule *llm2.LLMModule, apiProvider *providers.ApiProviderManager, builtinProvider *providers2.BuiltinProviderManager, convers *conversation.ConversationModule) *AppModule {
 	appDao := dao.NewAppDao(db)
 	appRepo := repository.NewAppRepo(appDao)
 	appConfigService := appConfig.Service
 	conversationService := convers.Service
+	retrievalService := retrieverSvc.Service
+	ossService := ossSvc.Service
 	baseLanguageModel := InitModel(llmCore)
 	llmService := llmModule.Service
-	appService := service3.NewAppService(appRepo, vecStore, appConfigService, conversationService, retrieverSvc, ossSvc, apiProvider, builtinProvider, agentManager, baseLanguageModel, llmService, memory2, llmCore)
+	appService := service.NewAppService(appRepo, vecStore, appConfigService, conversationService, retrievalService, ossService, apiProvider, builtinProvider, agentManager, baseLanguageModel, llmService, memory2, llmCore)
 	appHandler := handler.NewAppHandler(appService, appConfigService)
 	appModule := &AppModule{
 		Handler: appHandler,
@@ -48,7 +50,7 @@ func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory2 *mem
 
 type Handler = handler.AppHandler
 
-type Service = service3.AppService
+type Service = service.AppService
 
 type AppModule struct {
 	Handler *Handler

@@ -3,11 +3,12 @@ package google
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/bytedance/sonic"
 )
 
 // GoogleSerperTool represents a tool for Google Serper search
@@ -58,7 +59,7 @@ func (t *GoogleSerperTool) Run(ctx context.Context, query string) (string, error
 		HL: "zh-cn",
 	}
 
-	jsonData, err := json.Marshal(reqBody)
+	jsonData, err := sonic.Marshal(reqBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
@@ -90,7 +91,7 @@ func (t *GoogleSerperTool) Run(ctx context.Context, query string) (string, error
 
 	// Parse response
 	var serperResp SerperResponse
-	if err := json.Unmarshal(body, &serperResp); err != nil {
+	if err := sonic.Unmarshal(body, &serperResp); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 

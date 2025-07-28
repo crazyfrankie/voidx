@@ -2,10 +2,10 @@ package consumer
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 
 	"github.com/IBM/sarama"
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/document/task"
@@ -101,7 +101,7 @@ func (h *documentConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroup
 // handleMessage 处理消息
 func (h *documentConsumerGroupHandler) handleMessage(message *sarama.ConsumerMessage) error {
 	var documentTask task.DocumentTask
-	if err := json.Unmarshal(message.Value, &documentTask); err != nil {
+	if err := sonic.Unmarshal(message.Value, &documentTask); err != nil {
 		log.Printf("Failed to unmarshal document task: %v", err)
 		return err
 	}

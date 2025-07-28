@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -60,4 +61,17 @@ func (d *OAuthDao) CreateAccount(ctx context.Context, account *entity.Account) (
 
 func (d *OAuthDao) CreateAccountOAuth(ctx context.Context, auth *entity.AccountOAuth) error {
 	return d.db.WithContext(ctx).Model(&entity.AccountOAuth{}).Create(auth).Error
+}
+
+func (d *OAuthDao) UpdateAccountInfo(ctx context.Context, accountID uuid.UUID, account *entity.Account, accountOAuth *entity.AccountOAuth) error {
+	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&entity.Account{}).Where("id = ?", accountID).Save(account).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&entity.AccountOAuth{}).Where("account_id = ?", accountID).Save(accountOAuth).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

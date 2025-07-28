@@ -7,7 +7,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
-	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/retriever"
@@ -38,7 +37,6 @@ func InitWebAppModule(db *gorm.DB, tokenBufMem *memory.TokenBufferMemory,
 	conversationModule *conversation.ConversationModule,
 	llmModule *llm.LLMModule,
 	agentManager *agent.AgentQueueManager,
-	llmManager llmentity.BaseLanguageModel,
 	retrievalModule *retriever.RetrieverModule,
 ) *WebAppModule {
 	wire.Build(

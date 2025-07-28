@@ -2,8 +2,7 @@ package dao
 
 import (
 	"context"
-	
-	"github.com/bytedance/sonic"
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
@@ -78,10 +77,7 @@ func (d *AudioDao) GetAppConfig(ctx context.Context, appID uuid.UUID, isDraft bo
 
 	// 解析TextToSpeech配置
 	if len(appConfig.TextToSpeech) > 0 {
-		var ttsConfig map[string]any
-		if err := sonic.Unmarshal(appConfig.TextToSpeech, &ttsConfig); err == nil {
-			config["text_to_speech"] = ttsConfig
-		}
+		config["text_to_speech"] = appConfig.TextToSpeech
 	}
 
 	return config, nil

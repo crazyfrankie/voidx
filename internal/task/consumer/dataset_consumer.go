@@ -2,10 +2,10 @@ package consumer
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 
 	"github.com/IBM/sarama"
+	"github.com/bytedance/sonic"
 
 	datasetService "github.com/crazyfrankie/voidx/internal/dataset/service"
 	"github.com/crazyfrankie/voidx/internal/index/service"
@@ -100,7 +100,7 @@ func (h *datasetConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupS
 // handleMessage 处理消息
 func (h *datasetConsumerGroupHandler) handleMessage(message *sarama.ConsumerMessage) error {
 	var datasetTask datasetService.DatasetTask
-	if err := json.Unmarshal(message.Value, &datasetTask); err != nil {
+	if err := sonic.Unmarshal(message.Value, &datasetTask); err != nil {
 		log.Printf("Failed to unmarshal dataset task: %v", err)
 		return err
 	}

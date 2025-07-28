@@ -2,9 +2,9 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/crazyfrankie/voidx/internal/models/resp"
@@ -28,7 +28,7 @@ func (c *AnalysisCache) GetAppAnalysis(ctx context.Context, cacheKey string) (*r
 	}
 
 	var analysis resp.AppAnalysisResp
-	if err := json.Unmarshal([]byte(data), &analysis); err != nil {
+	if err := sonic.Unmarshal([]byte(data), &analysis); err != nil {
 		return nil, err
 	}
 
@@ -37,7 +37,7 @@ func (c *AnalysisCache) GetAppAnalysis(ctx context.Context, cacheKey string) (*r
 
 // SetAppAnalysis 将应用分析数据存储到缓存
 func (c *AnalysisCache) SetAppAnalysis(ctx context.Context, cacheKey string, analysis *resp.AppAnalysisResp) error {
-	data, err := json.Marshal(analysis)
+	data, err := sonic.Marshal(analysis)
 	if err != nil {
 		return err
 	}
