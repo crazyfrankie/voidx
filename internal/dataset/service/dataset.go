@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/crazyfrankie/voidx/pkg/consts"
 	"sync"
 
 	"github.com/google/uuid"
@@ -13,7 +14,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment"
-	"github.com/crazyfrankie/voidx/pkg/consts"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
@@ -44,6 +44,7 @@ func (s *DatasetService) CreateDataset(ctx context.Context, createReq req.Create
 		AccountID:   userID,
 		Name:        createReq.Name,
 		Description: createReq.Description,
+		Icon:        createReq.Icon,
 	}
 
 	return s.repo.CreateDataset(ctx, dataset)
@@ -184,7 +185,11 @@ func (s *DatasetService) Hit(ctx context.Context, datasetID uuid.UUID, hitReq re
 		Query:          hitReq.Query,
 		K:              hitReq.K,
 		ScoreThreshold: hitReq.Score,
-		RetrieverType:  string(consts.RetrievalStrategySemantic),
+	}
+	if hitReq.RetrievalStrategy != "" {
+		searchReq.RetrieverType = hitReq.RetrievalStrategy
+	} else {
+		searchReq.RetrieverType = string(consts.RetrievalStrategySemantic)
 	}
 
 	searchResults, err := s.retrieverService.SearchInDatasets(ctx, userID, searchReq)

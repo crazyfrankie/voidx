@@ -54,7 +54,7 @@ func (s *ConversationService) GetConversationMessagesWithPage(ctx context.Contex
 	// 计算分页信息
 	totalPages := (int(total) + pageReq.PageSize - 1) / pageReq.PageSize
 	paginator := resp.Paginator{
-		CurrentPage: pageReq.Page,
+		CurrentPage: pageReq.CurrentPage,
 		PageSize:    pageReq.PageSize,
 		TotalPage:   totalPages,
 		TotalRecord: int(total),
@@ -167,6 +167,8 @@ func (s *ConversationService) UpdateConversationIsPinned(ctx context.Context, co
 
 	return s.repo.UpdateConversationIsPinned(ctx, conversationID, isPinned)
 }
+
+// These functions for other module call
 
 func (s *ConversationService) CreateConversation(ctx context.Context, accountID uuid.UUID, createReq req.CreateConversationReq) (*entity.Conversation, error) {
 	// 创建会话实体
@@ -382,8 +384,6 @@ func (s *ConversationService) GetConversationByID(ctx context.Context, conversat
 	return s.repo.GetConversationByID(ctx, conversationID)
 }
 
-// These functions for other module call
-
 func (s *ConversationService) RawCreateMessage(ctx context.Context, msg *entity.Message) (*entity.Message, error) {
 	err := s.repo.CreateMessage(ctx, msg)
 	if err != nil {
@@ -407,4 +407,8 @@ func (s *ConversationService) RawCreateConversation(ctx context.Context, userID 
 
 func (s *ConversationService) UpdateConversationSummary(ctx context.Context, conversationID uuid.UUID, summary string) error {
 	return s.repo.UpdateConversationSummary(ctx, conversationID, summary)
+}
+
+func (s *ConversationService) GetConversationAgentThoughts(ctx context.Context, conversationID uuid.UUID) ([]entity.AgentThought, error) {
+	return s.repo.GetConversationAgentThoughts(ctx, conversationID)
 }

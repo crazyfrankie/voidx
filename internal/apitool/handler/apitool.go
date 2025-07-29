@@ -22,14 +22,10 @@ func (h *ApiToolHandler) RegisterRoute(r *gin.RouterGroup) {
 	toolGroup := r.Group("api-tools")
 	{
 		toolGroup.GET("", h.GetApiToolProvidersWithPage())
+		toolGroup.POST("validate-openapi-schema", h.ValidateOpenApiSchema())
 		toolGroup.GET("/:provider_id", h.GetApiToolProvider())
 		toolGroup.PUT("/:provider_id", h.UpdateApiToolProvider())
 		toolGroup.DELETE("/:provider_id", h.DeleteApiToolProvider())
-		//  bp.add_url_rule(
-		//            "/api-tools/validate-openapi-schema",
-		//            methods=["POST"],
-		//            view_func=self.api_tool_handler.validate_openapi_schema,
-		//        )
 		toolGroup.POST("", h.CreateApiTool())
 		toolGroup.GET("/:provider_id/tools/:tool_name", h.GetApiTool())
 	}
@@ -151,5 +147,23 @@ func (h *ApiToolHandler) GetApiTool() gin.HandlerFunc {
 		}
 
 		response.SuccessWithData(c, tool)
+	}
+}
+
+func (h *ApiToolHandler) ValidateOpenApiSchema() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var validateReq req.ValidateOpenApiSchemaReq
+		if err := c.ShouldBind(&validateReq); err != nil {
+			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			return
+		}
+
+		err := h.svc.ValidateOpenapiSchema(c.Request.Context(), validateReq.OpenApiSchema)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		response.Success(c)
 	}
 }

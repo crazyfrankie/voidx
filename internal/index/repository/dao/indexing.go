@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -30,7 +31,7 @@ func (d *IndexingDao) GetDocumentByID(ctx context.Context, documentID uuid.UUID)
 	var document entity.Document
 	err := d.db.WithContext(ctx).Where("id = ?", documentID).First(&document).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err

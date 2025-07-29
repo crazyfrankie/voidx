@@ -24,10 +24,10 @@ func (h *DocumentHandler) RegisterRoute(r *gin.RouterGroup) {
 		documentGroup.POST("", h.CreateDocument())
 		documentGroup.GET("", h.GetDocumentsWithPage())
 		documentGroup.GET("/:document_id", h.GetDocument())
-		documentGroup.PUT("/:document_id", h.UpdateDocument())
+		documentGroup.PUT("/:document_id/name", h.UpdateDocument())
 		documentGroup.DELETE("/:document_id", h.DeleteDocument())
 		documentGroup.PUT("/:document_id/enabled", h.UpdateDocumentEnabled())
-		documentGroup.POST("/:document_id/processing", h.ProcessDocument())
+		documentGroup.GET("/batch/:batch", h.GetDocumentStatus())
 	}
 }
 
@@ -205,7 +205,7 @@ func (h *DocumentHandler) UpdateDocumentEnabled() gin.HandlerFunc {
 	}
 }
 
-func (h *DocumentHandler) ProcessDocument() gin.HandlerFunc {
+func (h *DocumentHandler) GetDocumentStatus() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
@@ -214,19 +214,14 @@ func (h *DocumentHandler) ProcessDocument() gin.HandlerFunc {
 			return
 		}
 
-		documentIDStr := c.Param("document_id")
-		documentID, err := uuid.Parse(documentIDStr)
-		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
-			return
-		}
+		batch := c.Param("batch")
 
-		err = h.svc.ProcessDocument(c.Request.Context(), datasetID, documentID)
+		res, err := h.svc.GetDocumentsStatus(c.Request.Context(), datasetID, batch)
 		if err != nil {
 			response.Error(c, err)
 			return
 		}
 
-		response.Success(c)
+		response.SuccessWithData(c, res)
 	}
 }

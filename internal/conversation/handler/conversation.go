@@ -6,6 +6,7 @@ import (
 
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
+	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/response"
 )
@@ -51,8 +52,42 @@ func (h *ConversationHandler) GetConversationMessagesWithPage() gin.HandlerFunc 
 			return
 		}
 
+		res := make([]resp.GetConversationMessagePageResp, 0, len(messages))
+		for _, message := range messages {
+			dbAgentThoughts, err := h.svc.GetConversationAgentThoughts(c.Request.Context(), conversationID)
+			if err != nil {
+				continue
+			}
+			agentThoughts := make([]resp.GetConversationMessagePageAgentThought, 0, len(dbAgentThoughts))
+			for _, at := range dbAgentThoughts {
+				agentThoughts = append(agentThoughts, resp.GetConversationMessagePageAgentThought{
+					ID:          at.ID,
+					Position:    at.Position,
+					Event:       at.Event,
+					Thought:     at.Thought,
+					Observation: at.Observation,
+					Tool:        at.Tool,
+					ToolInput:   at.ToolInput,
+					Latency:     int(at.Latency),
+					Ctime:       at.Ctime,
+				})
+			}
+			res = append(res, resp.GetConversationMessagePageResp{
+				ID:              message.ID,
+				ConversationID:  message.ConversationID,
+				Query:           message.Query,
+				ImageUrls:       message.ImageUrls,
+				Answer:          message.Answer,
+				Latency:         message.Latency,
+				TotalTokenCount: message.TotalTokenCount,
+				AgentThoughts:   agentThoughts,
+				Ctime:           message.Ctime,
+			})
+
+		}
+
 		response.SuccessWithData(c, gin.H{
-			"list":      messages,
+			"list":      res,
 			"paginator": paginator,
 		})
 	}

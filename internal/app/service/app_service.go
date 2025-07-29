@@ -1056,9 +1056,9 @@ func (s *AppService) GetDebugConversationMessagesWithPage(ctx context.Context, a
 
 	// 3. 执行分页并查询数据
 	messages, paginator, err := s.conversationService.GetConversationMessagesWithPage(ctx, app.DebugConversationID, req.GetConversationMessagesWithPageReq{
-		Page:     getReq.Page,
-		PageSize: getReq.PageSize,
-		Ctime:    getReq.Ctime,
+		CurrentPage: getReq.CurrentPage,
+		PageSize:    getReq.PageSize,
+		Ctime:       getReq.Ctime,
 	})
 	if err != nil {
 		return nil, resp.Paginator{}, err

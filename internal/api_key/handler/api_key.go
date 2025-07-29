@@ -24,9 +24,9 @@ func (h *ApiKeyHandler) RegisterRoute(r *gin.RouterGroup) {
 	{
 		apiKeyGroup.POST("", h.CreateApiKey())
 		apiKeyGroup.GET("", h.GetApiKeysWithPage())
-		apiKeyGroup.PUT(":api_key_id", h.UpdateApiKey())
-		apiKeyGroup.PUT(":api_key_id/active", h.UpdateApiKeyIsActive())
-		apiKeyGroup.DELETE(":api_key_id", h.DeleteApiKey())
+		apiKeyGroup.PUT("/:api_key_id", h.UpdateApiKey())
+		apiKeyGroup.PUT("/:api_key_id/active", h.UpdateApiKeyIsActive())
+		apiKeyGroup.DELETE("/:api_key_id", h.DeleteApiKey())
 	}
 }
 
@@ -65,8 +65,8 @@ func (h *ApiKeyHandler) GetApiKeysWithPage() gin.HandlerFunc {
 		}
 
 		// 设置默认值
-		if pageReq.Page == 0 {
-			pageReq.Page = 1
+		if pageReq.CurrentPage == 0 {
+			pageReq.CurrentPage = 1
 		}
 		if pageReq.PageSize == 0 {
 			pageReq.PageSize = 20

@@ -27,8 +27,8 @@ func NewAudioHandler(svc *service.AudioService) *AudioHandler {
 func (h *AudioHandler) RegisterRoute(r *gin.RouterGroup) {
 	audioGroup := r.Group("audio")
 	{
-		audioGroup.POST("speech-to-text", h.AudioToText())
-		audioGroup.POST("text-to-speech/:message_id", h.MessageToAudio())
+		audioGroup.POST("audio-to-text", h.AudioToText())
+		audioGroup.POST("text-to-audio", h.MessageToAudio())
 	}
 }
 

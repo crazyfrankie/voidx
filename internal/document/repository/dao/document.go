@@ -46,18 +46,13 @@ func (d *DocumentDao) GetDocumentsByDatasetID(
 		query = query.Where("name ILIKE ?", "%"+pageReq.SearchWord+"%")
 	}
 
-	// 添加状态过滤
-	if pageReq.Status != "" {
-		query = query.Where("indexing_status = ?", pageReq.Status)
-	}
-
 	// 计算总数
 	if err := query.Model(&entity.Document{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// 分页查询
-	offset := (pageReq.Page - 1) * pageReq.PageSize
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
 	err := query.Order("position ASC, ctime DESC").
 		Offset(offset).
 		Limit(pageReq.PageSize).

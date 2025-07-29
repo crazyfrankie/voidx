@@ -24,3 +24,7 @@ type CreateApiToolReq struct {
 	Icon          string          `json:"icon"`
 	Headers       []entity.Header `json:"headers"`
 }
+
+type ValidateOpenApiSchemaReq struct {
+	OpenApiSchema string `json:"openapi_schema"`
+}

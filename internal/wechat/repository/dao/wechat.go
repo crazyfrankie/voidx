@@ -22,7 +22,7 @@ func NewWechatDao(db *gorm.DB) *WechatDao {
 
 func (d *WechatDao) GetApp(ctx context.Context, appID uuid.UUID) (*entity.App, error) {
 	var app entity.App
-	err := d.db.WithContext(ctx).Preload("WechatConfig").First(&app, "id = ?", appID).Error
+	err := d.db.WithContext(ctx).First(&app, "id = ?", appID).Error
 	if err != nil {
 		return nil, err
 	}

@@ -90,7 +90,7 @@ func (s *PlatformService) UpdateWechatConfig(ctx context.Context, appID, userID 
 	}
 
 	// 4. 根据应用的发布状态修正状态数据
-	if app.Status == "draft" && status == consts.WechatConfigStatusConfigured {
+	if app.Status == consts.AppStatusDraft && status == consts.WechatConfigStatusConfigured {
 		status = consts.WechatConfigStatusUnconfigured
 	}
 

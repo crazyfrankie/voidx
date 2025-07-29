@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"fmt"
-	"github.com/crazyfrankie/voidx/pkg/consts"
 	"sync"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/crazyfrankie/voidx/internal/core/agent/entities"
+	"github.com/crazyfrankie/voidx/pkg/consts"
 )
 
 // AgentQueueManager manages the agent's event queue

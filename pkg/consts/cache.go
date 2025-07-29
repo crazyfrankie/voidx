@@ -8,11 +8,11 @@ const LockExpireTime = 600
 // 缓存锁键名模板
 const (
 	// LockDocumentUpdateEnabled 更新文档启用状态缓存锁
-	LockDocumentUpdateEnabled = "lock:document:update:enabled_{document_id}"
+	LockDocumentUpdateEnabled = "lock:document:update:enabled_{%s}"
 
 	// LockKeywordTableUpdateKeywordTable 更新关键词表缓存锁
-	LockKeywordTableUpdateKeywordTable = "lock:keyword_table:update:keyword_table_{dataset_id}"
+	LockKeywordTableUpdateKeywordTable = "lock:keyword_table:update:keyword_table_{%s}"
 
 	// LockSegmentUpdateEnabled 更新片段启用状态缓存锁
-	LockSegmentUpdateEnabled = "lock:segment:update:enabled_{segment_id}"
+	LockSegmentUpdateEnabled = "lock:segment:update:enabled_{%s}"
 )

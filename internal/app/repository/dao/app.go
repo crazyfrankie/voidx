@@ -266,7 +266,7 @@ func (d *AppDao) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUI
 	}
 
 	// 分页查询
-	offset := (pageReq.Page - 1) * pageReq.PageSize
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
 	err = d.db.WithContext(ctx).
 		Where("app_id = ? AND config_type = ?", appID, "published").
 		Order("version DESC").
@@ -278,9 +278,10 @@ func (d *AppDao) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUI
 	}
 
 	paginator := resp.Paginator{
-		CurrentPage: pageReq.Page,
+		CurrentPage: pageReq.CurrentPage,
 		PageSize:    pageReq.PageSize,
 		TotalRecord: int(total),
+		TotalPage:   (int(total) + pageReq.PageSize - 1) / pageReq.PageSize,
 	}
 
 	return histories, paginator, nil

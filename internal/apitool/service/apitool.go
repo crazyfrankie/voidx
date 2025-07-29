@@ -276,6 +276,15 @@ func (s *ApiToolService) GetApiTool(ctx context.Context, providerID uuid.UUID, t
 	}, nil
 }
 
+func (s *ApiToolService) ValidateOpenapiSchema(ctx context.Context, openapiSchema string) error {
+	_, err := s.parseOpenAPISchema(openapiSchema)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *ApiToolService) parseOpenAPISchema(openapiSchema string) (*toolsentity.OpenAPISchema, error) {
 	// 1. 解析JSON字符串
 	var data map[string]any

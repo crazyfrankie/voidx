@@ -59,7 +59,7 @@ func (d *ApiKeyDao) GetApiKeysByAccountID(ctx context.Context, accountID uuid.UU
 
 	// 分页查询
 	var apiKeys []entity.ApiKey
-	offset := (pageReq.Page - 1) * pageReq.PageSize
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
 	err := query.Order("ctime DESC").Offset(offset).Limit(pageReq.PageSize).Find(&apiKeys).Error
 	if err != nil {
 		return nil, 0, err

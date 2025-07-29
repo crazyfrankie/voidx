@@ -425,8 +425,8 @@ func (s *WebAppService) GetConversationMessages(ctx context.Context, token, conv
 
 	// 使用ConversationService获取消息列表
 	msgReq := req.GetConversationMessagesWithPageReq{
-		Page:     pageReq.Page,
-		PageSize: pageReq.PageSize,
+		CurrentPage: pageReq.Page,
+		PageSize:    pageReq.PageSize,
 	}
 	messages, paginator, err := s.conversationSvc.GetConversationMessagesWithPage(ctx, convID, msgReq)
 	if err != nil {
@@ -447,7 +447,6 @@ func (s *WebAppService) GetConversationMessages(ctx context.Context, token, conv
 			Answer:         msg.Answer,
 			Status:         string(msg.Status),
 			Ctime:          msg.Ctime,
-			Utime:          msg.Utime,
 		}
 	}
 

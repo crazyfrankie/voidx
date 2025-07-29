@@ -66,23 +66,14 @@ func (d *SegmentDao) GetSegmentsByDocumentID(
 		query = query.Where("content ILIKE ? OR keywords::text ILIKE ?",
 			"%"+pageReq.SearchWord+"%", "%"+pageReq.SearchWord+"%")
 	}
-
-	// 添加状态过滤
-	if pageReq.Status != "" {
-		if pageReq.Status == "enabled" {
-			query = query.Where("enabled_status = ?", true)
-		} else if pageReq.Status == "disabled" {
-			query = query.Where("enabled_status = ?", false)
-		}
-	}
-
+	
 	// 计算总数
 	if err := query.Model(&entity.Segment{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 
 	// 分页查询
-	offset := (pageReq.Page - 1) * pageReq.PageSize
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
 	err := query.Order("ctime DESC").
 		Offset(offset).
 		Limit(pageReq.PageSize).

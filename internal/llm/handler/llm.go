@@ -1,8 +1,10 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
+	"net/http"
 
+	"github.com/gin-gonic/gin"
+	
 	"github.com/crazyfrankie/voidx/internal/llm/service"
 	"github.com/crazyfrankie/voidx/pkg/response"
 )
@@ -18,9 +20,10 @@ func NewLLMHandler(llmService *service.LLMService) *LLMHandler {
 }
 
 func (h *LLMHandler) RegisterRoute(r *gin.RouterGroup) {
-	llmGroup := r.Group("llms")
+	llmGroup := r.Group("language-models")
 	{
 		llmGroup.GET("", h.GetProviders())
+		llmGroup.GET("/:provider/icon", h.GetProviderIcon())
 		llmGroup.GET("/:provider/:model", h.GetModelEntity())
 	}
 }
@@ -51,5 +54,22 @@ func (h *LLMHandler) GetModelEntity() gin.HandlerFunc {
 		}
 
 		response.SuccessWithData(c, entity)
+	}
+}
+
+// GetProviderIcon 获取模型提供商图标
+func (h *LLMHandler) GetProviderIcon() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		providerName := c.Param("provider")
+
+		iconData, mimeType, err := h.llmService.GetProviderIcon(c.Request.Context(), providerName)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		c.Header("Content-Type", mimeType)
+		c.Header("Cache-Control", "public, max-age=86400")
+		c.Data(http.StatusOK, mimeType, iconData)
 	}
 }

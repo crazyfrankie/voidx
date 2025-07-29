@@ -77,3 +77,7 @@ func (r *ConversationRepo) GetConversationsByAccountID(
 func (r *ConversationRepo) CreateAgentThought(ctx context.Context, agentThought *entity.AgentThought) error {
 	return r.dao.CreateAgentThought(ctx, agentThought)
 }
+
+func (r *ConversationRepo) GetConversationAgentThoughts(ctx context.Context, conversationID uuid.UUID) ([]entity.AgentThought, error) {
+	return r.dao.GetConversationAgentThoughts(ctx, conversationID)
+}

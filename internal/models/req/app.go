@@ -48,8 +48,8 @@ type FallbackHistoryToDraftReq struct {
 
 // GetPublishHistoriesWithPageReq 获取发布历史分页列表请求
 type GetPublishHistoriesWithPageReq struct {
-	Page     int `form:"page" binding:"required,min=1"`
-	PageSize int `form:"pageSize" binding:"required,min=1,max=100"`
+	CurrentPage int `form:"current_page" binding:"required,min=1"`
+	PageSize    int `form:"pageSize" binding:"required,min=1,max=100"`
 }
 
 // UpdateDebugConversationSummaryReq 更新调试会话长期记忆请求
@@ -65,16 +65,16 @@ type DebugChatReq struct {
 
 // GetDebugConversationMessagesWithPageReq 获取调试会话消息分页列表请求
 type GetDebugConversationMessagesWithPageReq struct {
-	Page     int   `form:"page" binding:"required,min=1"`
-	PageSize int   `form:"page_size" binding:"required,min=1,max=100"`
-	Ctime    int64 `form:"ctime"` // 时间戳，用于游标分页
+	CurrentPage int   `form:"current_page" binding:"required,min=1"`
+	PageSize    int   `form:"page_size" binding:"required,min=1,max=100"`
+	Ctime       int64 `form:"ctime"` // 时间戳，用于游标分页
 }
 
 // GetConversationMessagesWithPageReq 获取会话消息分页列表请求
 type GetConversationMessagesWithPageReq struct {
-	Page     int   `form:"page" binding:"required,min=1"`
-	PageSize int   `form:"page_size" binding:"required,min=1,max=100"`
-	Ctime    int64 `form:"ctime"` // 时间戳，用于游标分页
+	CurrentPage int   `form:"current_page" binding:"required,min=1"`
+	PageSize    int   `form:"page_size" binding:"required,min=1,max=100"`
+	Ctime       int64 `form:"ctime"` // 时间戳，用于游标分页
 }
 
 // UpdateConversationNameReq 更新会话名称请求

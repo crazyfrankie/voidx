@@ -6,8 +6,7 @@ import "github.com/google/uuid"
 type CreateDatasetReq struct {
 	Name        string `json:"name" binding:"required,max=100"`
 	Description string `json:"description" binding:"max=500"`
-	Permission  string `json:"permission" binding:"required,oneof=only_me all_team_members"`
-	IndexStruct string `json:"index_struct" binding:"required,oneof=high_quality economy"`
+	Icon        string `json:"icon"`
 }
 
 // UpdateDatasetReq 更新知识库请求
@@ -26,12 +25,12 @@ type GetDatasetsWithPageReq struct {
 
 // HitReq 检索测试请求
 type HitReq struct {
-	Query            string  `json:"query" binding:"required,max=2000"`
-	RetrievalModel   string  `json:"retrieval_model" binding:"required,oneof=semantic full_text hybrid"`
-	K                int     `json:"k" binding:"required,min=1,max=20"`
-	Score            float32 `json:"score" binding:"required,min=0,max=1"`
-	RerankingModel   string  `json:"reranking_model"`
-	RerankingEnabled bool    `json:"reranking_enabled"`
+	Query             string  `json:"query" binding:"required,max=2000"`
+	RetrievalStrategy string  `json:"retrieval_strategy" binding:"required,oneof=semantic full_text hybrid"`
+	K                 int     `json:"k" binding:"required,min=1,max=20"`
+	Score             float32 `json:"score" binding:"required,min=0,max=1"`
+	RerankingModel    string  `json:"reranking_model"`
+	RerankingEnabled  bool    `json:"reranking_enabled"`
 }
 
 // CreateDocumentsReq 创建文档请求
@@ -43,18 +42,14 @@ type CreateDocumentsReq struct {
 
 // UpdateDocumentReq 更新文档请求
 type UpdateDocumentReq struct {
-	Name           string         `json:"name" binding:"omitempty,max=255"`
-	Text           string         `json:"text"`
-	ProcessingRule map[string]any `json:"processing_rule"`
-	Enabled        *bool          `json:"enabled"`
+	Name string `json:"name" binding:"omitempty,max=255"`
 }
 
 // GetDocumentsWithPageReq 获取文档分页列表请求
 type GetDocumentsWithPageReq struct {
-	Page       int    `form:"page" binding:"required,min=1"`
-	PageSize   int    `form:"page_size" binding:"required,min=1,max=100"`
-	SearchWord string `form:"search_word"`
-	Status     string `form:"status"`
+	CurrentPage int    `form:"current_page" binding:"required,min=1"`
+	PageSize    int    `form:"page_size" binding:"required,min=1,max=100"`
+	SearchWord  string `form:"search_word"`
 }
 
 // CreateSegmentReq 创建片段请求
@@ -72,8 +67,7 @@ type UpdateSegmentReq struct {
 
 // GetSegmentsWithPageReq 获取片段分页列表请求
 type GetSegmentsWithPageReq struct {
-	Page       int    `form:"page" binding:"required,min=1"`
-	PageSize   int    `form:"page_size" binding:"required,min=1,max=100"`
-	SearchWord string `form:"search_word"`
-	Status     string `form:"status"`
+	CurrentPage int    `form:"current_page" binding:"required,min=1"`
+	PageSize    int    `form:"page_size" binding:"required,min=1,max=100"`
+	SearchWord  string `form:"search_word,omitempty"`
 }

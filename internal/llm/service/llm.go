@@ -3,6 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"github.com/crazyfrankie/voidx/pkg/errno"
+	"mime"
+	"os"
+	"path/filepath"
 
 	"github.com/crazyfrankie/voidx/internal/core/llm"
 	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
@@ -39,57 +43,6 @@ func (s *LLMService) GetProviders(ctx context.Context) ([]*resp.ProviderResp, er
 	return providerResps, nil
 }
 
-// GetModels 获取指定提供商的模型列表
-func (s *LLMService) GetModels(ctx context.Context, providerName string) ([]*resp.ModelResp, error) {
-	provider, err := s.llmCore.GetProvider(providerName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get provider %s: %w", providerName, err)
-	}
-
-	models := provider.GetModelEntities()
-	modelResps := make([]*resp.ModelResp, 0, len(models))
-
-	for _, model := range models {
-		modelResps = append(modelResps, &resp.ModelResp{
-			ModelName:       model.ModelName,
-			Label:           model.Label,
-			ModelType:       string(model.ModelType),
-			Features:        convertFeatures(model.Features),
-			ContextWindow:   model.ContextWindow,
-			MaxOutputTokens: model.MaxOutputTokens,
-			Parameters:      convertParameters(model.Parameters),
-			Metadata:        model.Metadata,
-		})
-	}
-
-	return modelResps, nil
-}
-
-// GetModelsByType 根据模型类型获取模型列表
-func (s *LLMService) GetModelsByType(ctx context.Context, modelType string) (map[string][]*resp.ModelResp, error) {
-	models := s.llmCore.GetModelsByType(entity.ModelType(modelType))
-
-	result := make(map[string][]*resp.ModelResp)
-	for providerName, modelList := range models {
-		modelResps := make([]*resp.ModelResp, 0, len(modelList))
-		for _, model := range modelList {
-			modelResps = append(modelResps, &resp.ModelResp{
-				ModelName:       model.ModelName,
-				Label:           model.Label,
-				ModelType:       string(model.ModelType),
-				Features:        convertFeatures(model.Features),
-				ContextWindow:   model.ContextWindow,
-				MaxOutputTokens: model.MaxOutputTokens,
-				Parameters:      convertParameters(model.Parameters),
-				Metadata:        model.Metadata,
-			})
-		}
-		result[providerName] = modelResps
-	}
-
-	return result, nil
-}
-
 // GetModelEntity 获取模型实体信息
 func (s *LLMService) GetModelEntity(ctx context.Context, provider, modelName string) (*resp.ModelEntityResp, error) {
 	en, err := s.llmCore.GetModelEntity(provider, modelName)
@@ -110,8 +63,60 @@ func (s *LLMService) GetModelEntity(ctx context.Context, provider, modelName str
 	}, nil
 }
 
-// ProcessAndValidateModelConfig 处理并验证模型配置
-func (s *LLMService) ProcessAndValidateModelConfig(modelConfig map[string]any) (map[string]any, error) {
+// GetProviderIcon 获取模型提供商图标
+func (s *LLMService) GetProviderIcon(ctx context.Context, providerName string) ([]byte, string, error) {
+	provider, err := s.llmCore.GetProvider(providerName)
+	if err != nil {
+		return nil, "", errno.ErrNotFound.AppendBizMessage("该服务提供者不存在")
+	}
+	
+	rootPath, err := os.Getwd()
+	if err != nil {
+		return nil, "", err
+	}
+
+	providerPath := filepath.Join(
+		rootPath,
+		"internal", "core", "llm", "models", providerName,
+	)
+
+	iconPath := filepath.Join(providerPath, "_asset", provider.ProviderEntity.Icon)
+
+	if _, err := os.Stat(iconPath); os.IsNotExist(err) {
+		return nil, "", errno.ErrNotFound.AppendBizMessage("该工具提供者_asset下未提供图标")
+	}
+
+	mimetype := mime.TypeByExtension(filepath.Ext(iconPath))
+	if mimetype == "" {
+		mimetype = "application/octet-stream"
+	}
+
+	byteData, err := os.ReadFile(iconPath)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return byteData, mimetype, nil
+}
+
+// LoadLanguageModel 从模型配置加载语言模型
+func (s *LLMService) LoadLanguageModel(modelConfig map[string]any) (entity.BaseLanguageModel, error) {
+	// 验证并处理模型配置
+	validConfig, err := s.processAndValidateModelConfig(modelConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate model config: %w", err)
+	}
+
+	providerName := validConfig["provider"].(string)
+	modelName := validConfig["model"].(string)
+	parameters := validConfig["parameters"].(map[string]any)
+
+	// 创建模型实例
+	return s.llmCore.CreateModel(providerName, modelName, parameters)
+}
+
+// processAndValidateModelConfig 处理并验证模型配置
+func (s *LLMService) processAndValidateModelConfig(modelConfig map[string]any) (map[string]any, error) {
 	// 检查模型配置格式
 	if modelConfig == nil {
 		return s.getDefaultModelConfig(), nil
@@ -184,22 +189,6 @@ func (s *LLMService) ProcessAndValidateModelConfig(modelConfig map[string]any) (
 		"model":      modelName,
 		"parameters": parameters,
 	}, nil
-}
-
-// LoadLanguageModel 从模型配置加载语言模型
-func (s *LLMService) LoadLanguageModel(modelConfig map[string]any) (entity.BaseLanguageModel, error) {
-	// 验证并处理模型配置
-	validConfig, err := s.ProcessAndValidateModelConfig(modelConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate model config: %w", err)
-	}
-
-	providerName := validConfig["provider"].(string)
-	modelName := validConfig["model"].(string)
-	parameters := validConfig["parameters"].(map[string]any)
-
-	// 创建模型实例
-	return s.llmCore.CreateModel(providerName, modelName, parameters)
 }
 
 // validateParameterType 验证参数类型

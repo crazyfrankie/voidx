@@ -3,6 +3,7 @@ package middlewares
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,11 +29,10 @@ func (h *AuthnHandler) IgnorePath(path string) *AuthnHandler {
 
 func (h *AuthnHandler) Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if _, ok := h.ignore[c.Request.URL.Path]; ok {
+		if _, ok := h.ignore[c.Request.URL.Path]; ok || strings.Contains(c.Request.URL.Path, "icon") {
 			c.Next()
 			return
 		}
-
 		access, err := h.token.GetAccessToken(c)
 		if err != nil {
 			response.Abort(c, errno.ErrUnauthorized)

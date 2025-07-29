@@ -26,8 +26,7 @@ func (d *AnalysisDao) GetMessagesByTimeRange(ctx context.Context, appID uuid.UUI
 	startTimestamp := startAt.UnixMilli()
 	endTimestamp := endAt.UnixMilli()
 
-	err := d.db.WithContext(ctx).
-		Preload("AgentThoughts").
+	err := d.db.WithContext(ctx).Model(&entity.Message{}).
 		Where("app_id = ? AND ctime >= ? AND ctime < ? AND answer != ?",
 			appID, startTimestamp, endTimestamp, "").
 		Find(&messages).Error

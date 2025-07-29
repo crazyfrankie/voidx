@@ -3,13 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"github.com/bytedance/sonic"
-	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"log"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	milvusentity "github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/redis/go-redis/v9"
@@ -20,6 +19,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	"github.com/crazyfrankie/voidx/internal/index/repository"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
+	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/pkg/consts"
@@ -74,7 +74,7 @@ func (s *IndexingService) BuildDocuments(ctx context.Context, documentIDs []uuid
 			log.Printf("构建文档发生错误, 文档ID: %s, 错误信息: %v", document.ID, err)
 
 			// 更新文档状态为错误
-			now := time.Now().UnixMilli()
+			now := time.Now()
 			s.repo.UpdateDocument(ctx, document.ID, map[string]any{
 				"status":     consts.DocumentStatusError,
 				"error":      err.Error(),

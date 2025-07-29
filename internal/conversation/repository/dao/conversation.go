@@ -27,11 +27,7 @@ func (d *ConversationDao) GetConversationByID(ctx context.Context, id uuid.UUID)
 	return &conversation, nil
 }
 
-func (d *ConversationDao) GetMessagesByConversationID(
-	ctx context.Context,
-	conversationID uuid.UUID,
-	pageReq req.GetConversationMessagesWithPageReq,
-) ([]entity.Message, int64, error) {
+func (d *ConversationDao) GetMessagesByConversationID(ctx context.Context, conversationID uuid.UUID, pageReq req.GetConversationMessagesWithPageReq) ([]entity.Message, int64, error) {
 	var messages []entity.Message
 	var total int64
 
@@ -47,10 +43,8 @@ func (d *ConversationDao) GetMessagesByConversationID(
 		return nil, 0, err
 	}
 
-	// 分页查询，预加载AgentThoughts
-	offset := (pageReq.Page - 1) * pageReq.PageSize
-	err := query.Preload("AgentThoughts").
-		Order("ctime DESC").
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
+	err := query.Order("ctime DESC").
 		Offset(offset).
 		Limit(pageReq.PageSize).
 		Find(&messages).Error
@@ -75,6 +69,10 @@ func (d *ConversationDao) DeleteConversation(ctx context.Context, id uuid.UUID) 
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 删除相关的消息和AgentThoughts
 		if err := tx.Where("conversation_id = ?", id).Delete(&entity.Message{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("conversation_id = ?", id).Delete(&entity.AgentThought{}).Error; err != nil {
 			return err
 		}
 
@@ -159,4 +157,15 @@ func (d *ConversationDao) GetConversationsByAccountID(
 
 func (d *ConversationDao) CreateAgentThought(ctx context.Context, agentThought *entity.AgentThought) error {
 	return d.db.WithContext(ctx).Create(agentThought).Error
+}
+
+func (d *ConversationDao) GetConversationAgentThoughts(ctx context.Context, conversationID uuid.UUID) ([]entity.AgentThought, error) {
+	var agentThoughts []entity.AgentThought
+	if err := d.db.WithContext(ctx).Model(&entity.AgentThought{}).
+		Where("conversation_id = ?", conversationID).
+		Find(&agentThoughts).Error; err != nil {
+		return nil, err
+	}
+
+	return agentThoughts, nil
 }

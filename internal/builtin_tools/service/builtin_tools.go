@@ -96,7 +96,7 @@ func (s *BuiltinToolsService) GetProviderIcon(ctx context.Context, providerName 
 		return nil, "", errno.ErrNotFound.AppendBizMessage(fmt.Sprintf("该工具提供者 %s 不存在", providerName))
 	}
 
-	rootPath, err := filepath.Abs(filepath.Join("..", ".."))
+	rootPath, err := os.Getwd()
 	if err != nil {
 		return nil, "", err
 	}

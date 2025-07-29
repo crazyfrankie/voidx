@@ -195,7 +195,7 @@ func (s *DocumentService) GetDocumentsStatus(ctx context.Context, datasetID uuid
 		}
 
 		if uploadFile != nil {
-			status.Size = int64(uploadFile.Size)
+			status.Size = uploadFile.Size
 			status.Extension = uploadFile.Extension
 			status.MimeType = uploadFile.MimeType
 		}
@@ -241,7 +241,7 @@ func (s *DocumentService) GetDocumentsWithPage(ctx context.Context, datasetID uu
 	// 计算分页信息
 	totalPages := (int(total) + pageReq.PageSize - 1) / pageReq.PageSize
 	paginator := resp.Paginator{
-		CurrentPage: pageReq.Page,
+		CurrentPage: pageReq.CurrentPage,
 		PageSize:    pageReq.PageSize,
 		TotalPage:   totalPages,
 		TotalRecord: int(total),
@@ -309,17 +309,6 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, datasetID, documen
 	updates := make(map[string]any)
 	if updateReq.Name != "" {
 		updates["name"] = updateReq.Name
-	}
-	if updateReq.Enabled != nil {
-		updates["enabled"] = *updateReq.Enabled
-		if !*updateReq.Enabled {
-			now := time.Now().UnixMilli()
-			updates["disabled_at"] = &now
-			updates["disabled_by"] = &userID
-		} else {
-			updates["disabled_at"] = nil
-			updates["disabled_by"] = nil
-		}
 	}
 
 	return s.repo.UpdateDocument(ctx, documentID, updates)
@@ -400,63 +389,6 @@ func (s *DocumentService) UpdateDocumentEnabled(ctx context.Context, datasetID, 
 	}
 
 	return s.repo.UpdateDocument(ctx, documentID, updates)
-}
-
-func (s *DocumentService) ProcessDocument(ctx context.Context, datasetID, documentID uuid.UUID) error {
-	userID, err := util.GetCurrentUserID(ctx)
-	if err != nil {
-		return err
-	}
-
-	// 验证权限
-	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
-	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("知识库不存在")
-	}
-
-	if dataset.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限操作该知识库")
-	}
-
-	document, err := s.repo.GetDocumentByID(ctx, documentID)
-	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("文档不存在")
-	}
-
-	if document.DatasetID != datasetID {
-		return errno.ErrValidate.AppendBizMessage("文档不属于该知识库")
-	}
-
-	// 检查文档状态
-	if document.Status == "indexing" || document.Status == "parsing" {
-		return errno.ErrValidate.AppendBizMessage("文档正在处理中")
-	}
-
-	// 更新文档状态为处理中
-	now := time.Now().UnixMilli()
-	updates := map[string]any{
-		"status":                "parsing",
-		"processing_started_at": &now,
-		"error":                 "",
-	}
-
-	err = s.repo.UpdateDocument(ctx, documentID, updates)
-	if err != nil {
-		return err
-	}
-
-	// 启动异步处理任务
-	err = s.taskProducer.PublishBuildDocumentTask(ctx, documentID)
-	if err != nil {
-		// 如果发送任务失败，回滚文档状态
-		s.repo.UpdateDocument(ctx, documentID, map[string]any{
-			"status": "error",
-			"error":  fmt.Sprintf("Failed to start processing: %v", err),
-		})
-		return fmt.Errorf("failed to start document processing: %w", err)
-	}
-
-	return nil
 }
 
 func (s *DocumentService) buildDocumentResp(ctx context.Context, doc *entity.Document) (*resp.DocumentResp, error) {
