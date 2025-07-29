@@ -56,7 +56,6 @@ func (d *AssistantAgentDao) GetMessagesByConversationID(
 	createdAtBefore int64,
 ) ([]entity.Message, int64, error) {
 	query := d.db.WithContext(ctx).
-		Preload("AgentThoughts").
 		Where("conversation_id = ? AND status IN ? AND answer != ?",
 			conversationID, []string{"normal", "stop"}, "")
 

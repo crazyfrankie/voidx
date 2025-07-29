@@ -19,20 +19,19 @@ func NewApiToolHandler(svc *service.ApiToolService) *ApiToolHandler {
 }
 
 func (h *ApiToolHandler) RegisterRoute(r *gin.RouterGroup) {
-	// API工具提供商路由
-	providerGroup := r.Group("api-tool-providers")
-	{
-		providerGroup.GET("", h.GetApiToolProvidersWithPage())
-		providerGroup.GET("/:provider_id", h.GetApiToolProvider())
-		providerGroup.PUT("/:provider_id", h.UpdateApiToolProvider())
-		providerGroup.DELETE("/:provider_id", h.DeleteApiToolProvider())
-	}
-
-	// API工具路由
 	toolGroup := r.Group("api-tools")
 	{
+		toolGroup.GET("", h.GetApiToolProvidersWithPage())
+		toolGroup.GET("/:provider_id", h.GetApiToolProvider())
+		toolGroup.PUT("/:provider_id", h.UpdateApiToolProvider())
+		toolGroup.DELETE("/:provider_id", h.DeleteApiToolProvider())
+		//  bp.add_url_rule(
+		//            "/api-tools/validate-openapi-schema",
+		//            methods=["POST"],
+		//            view_func=self.api_tool_handler.validate_openapi_schema,
+		//        )
 		toolGroup.POST("", h.CreateApiTool())
-		toolGroup.GET("/:tool_id", h.GetApiTool())
+		toolGroup.GET("/:provider_id/tools/:tool_name", h.GetApiTool())
 	}
 }
 
@@ -137,14 +136,15 @@ func (h *ApiToolHandler) DeleteApiToolProvider() gin.HandlerFunc {
 
 func (h *ApiToolHandler) GetApiTool() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		toolIDStr := c.Param("tool_id")
-		toolID, err := uuid.Parse(toolIDStr)
+		providerIdStr := c.Param("provider_id")
+		toolName := c.Param("tool_name")
+		providerId, err := uuid.Parse(providerIdStr)
 		if err != nil {
 			response.Error(c, errno.ErrValidate.AppendBizMessage("工具ID格式错误"))
 			return
 		}
 
-		tool, err := h.svc.GetApiTool(c.Request.Context(), toolID)
+		tool, err := h.svc.GetApiTool(c.Request.Context(), providerId, toolName)
 		if err != nil {
 			response.Error(c, err)
 			return

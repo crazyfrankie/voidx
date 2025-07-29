@@ -40,9 +40,9 @@ func (d *ApiToolDao) GetApiToolProviderByName(ctx context.Context, userID uuid.U
 	return &provider, nil
 }
 
-func (d *ApiToolDao) GetApiToolProvidersByAccountID(ctx context.Context, accountID uuid.UUID, pageReq req.GetApiToolProvidersWithPageReq) ([]entity.ApiToolProvider, error) {
+func (d *ApiToolDao) GetApiToolProvidersByAccountID(ctx context.Context, accountID uuid.UUID, pageReq req.GetApiToolProvidersWithPageReq) ([]entity.ApiToolProvider, int64, error) {
 	var providers []entity.ApiToolProvider
-
+	var total int64
 	query := d.db.WithContext(ctx).Where("account_id = ?", accountID)
 
 	// 添加搜索条件
@@ -50,18 +50,22 @@ func (d *ApiToolDao) GetApiToolProvidersByAccountID(ctx context.Context, account
 		query = query.Where("name ILIKE ?", "%"+pageReq.SearchWord+"%")
 	}
 
+	if err := query.Model(&entity.ApiToolProvider{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
 	// 分页查询
-	offset := (pageReq.Page - 1) * pageReq.PageSize
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
 	err := query.Order("ctime DESC").
 		Offset(offset).
 		Limit(pageReq.PageSize).
 		Find(&providers).Error
 
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
-	return providers, nil
+	return providers, total, nil
 }
 
 func (d *ApiToolDao) UpdateApiToolProvider(ctx context.Context, id uuid.UUID, updates map[string]any) error {
@@ -94,11 +98,20 @@ func (d *ApiToolDao) CreateApiTool(ctx context.Context, tool *entity.ApiTool) er
 	return d.db.WithContext(ctx).Create(tool).Error
 }
 
-func (d *ApiToolDao) GetApiToolByID(ctx context.Context, id uuid.UUID) (*entity.ApiTool, error) {
+func (d *ApiToolDao) GetApiToolByProviderID(ctx context.Context, providerID uuid.UUID, toolName string) (*entity.ApiTool, error) {
 	var tool entity.ApiTool
-	err := d.db.WithContext(ctx).Where("id = ?", id).First(&tool).Error
+	err := d.db.WithContext(ctx).Where("provider_id = ? AND name = ?", providerID, toolName).First(&tool).Error
 	if err != nil {
 		return nil, err
 	}
 	return &tool, nil
+}
+
+func (d *ApiToolDao) GetApiTools(ctx context.Context, providerID uuid.UUID) ([]entity.ApiTool, error) {
+	var tools []entity.ApiTool
+	err := d.db.WithContext(ctx).Where("provider_id = ?", providerID).Find(&tools).Error
+	if err != nil {
+		return nil, err
+	}
+	return tools, nil
 }

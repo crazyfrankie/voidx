@@ -332,7 +332,7 @@ func (s *OpenAPIService) processStreamChatAsync(
 		UserID:               endUser.TenantID,
 		InvokeFrom:           consts.InvokeFromServiceAPI,
 		PresetPrompt:         appConfig.PresetPrompt,
-		EnableLongTermMemory: false, // 根据appConfig.LongTermMemory配置
+		EnableLongTermMemory: appConfig.LongTermMemory["enabled"].(bool),
 		Tools:                tools,
 	}
 

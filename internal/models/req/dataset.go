@@ -19,9 +19,9 @@ type UpdateDatasetReq struct {
 
 // GetDatasetsWithPageReq 获取知识库分页列表请求
 type GetDatasetsWithPageReq struct {
-	Page       int    `form:"page" binding:"required,min=1"`
-	PageSize   int    `form:"page_size" binding:"required,min=1,max=100"`
-	SearchWord string `form:"search_word"`
+	CurrentPage int    `form:"current_page" binding:"required,min=1"`
+	PageSize    int    `form:"page_size" binding:"required,min=1,max=100"`
+	SearchWord  string `form:"search_word"`
 }
 
 // HitReq 检索测试请求

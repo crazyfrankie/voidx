@@ -30,7 +30,7 @@ func (r *ApiToolRepo) GetApiToolProviderByName(ctx context.Context, userID uuid.
 	return r.dao.GetApiToolProviderByName(ctx, userID, name)
 }
 
-func (r *ApiToolRepo) GetApiToolProvidersByAccountID(ctx context.Context, accountID uuid.UUID, pageReq req.GetApiToolProvidersWithPageReq) ([]entity.ApiToolProvider, error) {
+func (r *ApiToolRepo) GetApiToolProvidersByAccountID(ctx context.Context, accountID uuid.UUID, pageReq req.GetApiToolProvidersWithPageReq) ([]entity.ApiToolProvider, int64, error) {
 	return r.dao.GetApiToolProvidersByAccountID(ctx, accountID, pageReq)
 }
 
@@ -51,6 +51,10 @@ func (r *ApiToolRepo) CreateApiTool(ctx context.Context, tool *entity.ApiTool) e
 	return r.dao.CreateApiTool(ctx, tool)
 }
 
-func (r *ApiToolRepo) GetApiToolByID(ctx context.Context, id uuid.UUID) (*entity.ApiTool, error) {
-	return r.dao.GetApiToolByID(ctx, id)
+func (r *ApiToolRepo) GetApiToolByProviderID(ctx context.Context, providerID uuid.UUID, toolName string) (*entity.ApiTool, error) {
+	return r.dao.GetApiToolByProviderID(ctx, providerID, toolName)
+}
+
+func (r *ApiToolRepo) GetApiTools(ctx context.Context, providerID uuid.UUID) ([]entity.ApiTool, error) {
+	return r.dao.GetApiTools(ctx, providerID)
 }

@@ -26,7 +26,7 @@ func (d *BuiltinDao) AddBuiltinApp(ctx context.Context, builtinApp *entities.Bui
 
 		draftAppConfig := &entity.AppConfigVersion{
 			AppID:                app.ID,
-			ModelConfig:          builtinApp.LanguageModelConfig,
+			ModelConfig:          builtinApp.ModelConfig,
 			ConfigType:           consts.AppConfigTypeDraft,
 			DialogRound:          builtinApp.DialogRound,
 			PresetPrompt:         builtinApp.PresetPrompt,

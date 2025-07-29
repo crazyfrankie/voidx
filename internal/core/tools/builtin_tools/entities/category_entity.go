@@ -8,13 +8,13 @@ import (
 // CategoryEntity represents a tool category
 type CategoryEntity struct {
 	// Category is the unique identifier for the category
-	Category string `json:"category"`
+	Category string `yaml:"category" json:"category"`
 
 	// Name is the display name of the category
-	Name string `json:"name"`
+	Name string `yaml:"name" json:"name"`
 
 	// Icon is the name of the category's icon file
-	Icon string `json:"icon"`
+	Icon string `yaml:"icon" json:"icon"`
 }
 
 // Validate checks if the CategoryEntity is valid

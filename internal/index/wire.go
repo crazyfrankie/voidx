@@ -24,14 +24,16 @@ type IndexModule struct {
 }
 
 func InitIndexModule(db *gorm.DB, cmd redis.Cmdable, fileExtractor *file_extractor.FileExtractor,
-	embeddingsSvc *embedding.EmbeddingService, jiebaService *retrievers.JiebaService, processRuleService *process_rule.Service,
-	keywordSvc *retriever.KeyWordService, vectorDatabaseService *vecstore.VecStoreService) *IndexModule {
+	embeddingsSvc *embedding.EmbeddingService, jiebaService *retrievers.JiebaService, processRuleService *process_rule.ProcessRuleModule,
+	keywordSvc *retriever.RetrieverModule, vectorDatabaseService *vecstore.VecStoreService) *IndexModule {
 	wire.Build(
 		dao.NewIndexingDao,
 		repository.NewIndexingRepo,
 		service.NewIndexingService,
 
 		wire.Struct(new(IndexModule), "*"),
+		wire.FieldsOf(new(*retriever.RetrieverModule), "Keyword"),
+		wire.FieldsOf(new(*process_rule.ProcessRuleModule), "Service"),
 	)
 	return new(IndexModule)
 }

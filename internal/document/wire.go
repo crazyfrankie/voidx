@@ -4,6 +4,7 @@
 package document
 
 import (
+	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/document/task"
 	"github.com/google/wire"
 	"gorm.io/gorm"
@@ -28,7 +29,7 @@ var DocumentSet = wire.NewSet(
 )
 
 func InitProducer() *task.DocumentProducer {
-	producer, err := task.NewDocumentProducer([]string{})
+	producer, err := task.NewDocumentProducer(conf.GetConf().Kafka.Brokers)
 	if err != nil {
 		panic(err)
 	}

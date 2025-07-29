@@ -2,22 +2,22 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
 	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/oklog/run"
 
 	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/ioc"
 )
 
 func main() {
+	g := &run.Group{}
+
 	prefix := "conf"
 	envFile := filepath.Join(prefix, ".env")
 
@@ -26,31 +26,34 @@ func main() {
 		panic(err)
 	}
 
-	engine := ioc.InitEngine()
+	application := ioc.InitApplication()
 
 	srv := &http.Server{
 		Addr:    conf.GetConf().Server,
-		Handler: engine,
+		Handler: application.Server,
 	}
 
-	log.Printf("Server is running at http://localhost%s", conf.GetConf().Server)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("failed start server: %v", err)
+	g.Add(func() error {
+		log.Printf("Server is running at http://localhost%s\n", conf.GetConf().Server)
+		return srv.ListenAndServe()
+	}, func(err error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("failed to shutdown main server: %v", err)
 		}
-	}()
+	})
 
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	<-quit
-	log.Println("Shutting down server...")
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second*5)
-	defer shutdownCancel()
-
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("failed to shutdown main server: %v", err)
+	consumerManager := application.Consumer
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := consumerManager.Start(ctx); err != nil {
+		cancel()
+		panic(err)
 	}
-	log.Println("Server exited gracefully")
+
+	g.Add(run.SignalHandler(context.Background(), syscall.SIGINT, syscall.SIGTERM))
+
+	if err := g.Run(); err != nil {
+		log.Printf("program interrupted, err:%s", err)
+	}
 }

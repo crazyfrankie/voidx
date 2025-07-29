@@ -35,13 +35,18 @@ type ApiToolProvider struct {
 }
 
 type GetApiToolProvidersWithPageResp struct {
-	ID          uuid.UUID `json:"id"`
-	Name        string    `json:"name"`
-	Icon        string    `json:"icon"`
-	Description string    `json:"description"`
-	Headers     []any     `json:"headers"`
-	Tools       []ApiTool `json:"tools"`
-	Ctime       int64     `json:"ctime"`
+	List      []GetApiToolProvidersWithPage `json:"list"`
+	Paginator Paginator                     `json:"paginator"`
+}
+
+type GetApiToolProvidersWithPage struct {
+	ID          uuid.UUID       `json:"id"`
+	Name        string          `json:"name"`
+	Icon        string          `json:"icon"`
+	Description string          `json:"description"`
+	Headers     []entity.Header `json:"headers"`
+	Tools       []ApiTool       `json:"tools"`
+	Ctime       int64           `json:"ctime"`
 }
 
 type ApiTool struct {

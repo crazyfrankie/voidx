@@ -34,22 +34,24 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 		}
 
 		access, err := h.token.GetAccessToken(c)
-		if err == nil {
-			if claims, err := h.token.ParseToken(access); err == nil {
-				c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_id", claims.UID))
-				c.Next()
-				return
-			}
+		if err != nil {
+			response.Abort(c, errno.ErrUnauthorized)
+			return
+		}
+		if claims, err := h.token.ParseToken(access); err == nil {
+			c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_id", claims.UID))
+			c.Next()
+			return
 		}
 
 		refresh, err := c.Cookie("llmops_refresh")
 		if err != nil {
-			response.Error(c, errno.ErrUnauthorized)
+			response.Abort(c, errno.ErrUnauthorized)
 			return
 		}
 		tokens, uid, err := h.token.TryRefresh(refresh, c.Request.UserAgent())
 		if err != nil {
-			response.Error(c, errno.ErrUnauthorized)
+			response.Abort(c, errno.ErrUnauthorized)
 			return
 		}
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_id", uid))

@@ -5,8 +5,8 @@ import (
 	"log"
 	"sync"
 
-	appService "github.com/crazyfrankie/voidx/internal/app/service"
-	"github.com/crazyfrankie/voidx/internal/index/service"
+	"github.com/crazyfrankie/voidx/internal/app"
+	"github.com/crazyfrankie/voidx/internal/index"
 	"github.com/crazyfrankie/voidx/internal/task/consumer"
 )
 
@@ -19,7 +19,7 @@ type TaskManager struct {
 }
 
 // NewTaskManager 创建任务管理器
-func NewTaskManager(brokers []string, indexingService *service.IndexingService, appService *appService.AppService) (*TaskManager, error) {
+func NewTaskManager(brokers []string, indexingService *index.Service, appService *app.Service) (*TaskManager, error) {
 	// 创建文档消费者
 	documentConsumer, err := consumer.NewDocumentConsumer(brokers, "document-consumer-group", indexingService)
 	if err != nil {

@@ -25,7 +25,7 @@ func (h *AuthHandler) RegisterRoute(r *gin.RouterGroup) {
 	authGroup := r.Group("auth")
 	{
 		authGroup.POST("login", h.Login())
-		authGroup.GET("logout", h.Logout())
+		authGroup.POST("logout", h.Logout())
 	}
 }
 

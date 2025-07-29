@@ -7,6 +7,7 @@
 package assistant_agent
 
 import (
+	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/handler"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/repository"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/repository/dao"
@@ -43,7 +44,7 @@ type AssistantModule struct {
 var ProviderSet = wire.NewSet(dao.NewAssistantAgentDao, repository.NewAssistantAgentRepo, service.NewAssistantAgentService, handler.NewAssistantAgentHandler)
 
 func InitProducer() *task.AppProducer {
-	producer, err := task.NewAppProducer([]string{})
+	producer, err := task.NewAppProducer(conf.GetConf().Kafka.Brokers)
 	if err != nil {
 		panic(err)
 	}

@@ -7,6 +7,7 @@
 package document
 
 import (
+	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/document/handler"
 	"github.com/crazyfrankie/voidx/internal/document/repository"
 	"github.com/crazyfrankie/voidx/internal/document/repository/dao"
@@ -41,7 +42,7 @@ type DocumentModule struct {
 var DocumentSet = wire.NewSet(dao.NewDocumentDao, repository.NewDocumentRepo, service.NewDocumentService, handler.NewDocumentHandler)
 
 func InitProducer() *task.DocumentProducer {
-	producer, err := task.NewDocumentProducer([]string{})
+	producer, err := task.NewDocumentProducer(conf.GetConf().Kafka.Brokers)
 	if err != nil {
 		panic(err)
 	}

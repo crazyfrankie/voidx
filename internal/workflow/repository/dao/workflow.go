@@ -71,7 +71,7 @@ func (d *WorkflowDao) GetWorkflowsByAccountID(ctx context.Context, accountID uui
 
 	// 分页查询
 	var workflows []entity.Workflow
-	offset := (pageReq.Page - 1) * pageReq.PageSize
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
 	err := query.Order("ctime DESC").Offset(offset).Limit(pageReq.PageSize).Find(&workflows).Error
 	if err != nil {
 		return nil, 0, err

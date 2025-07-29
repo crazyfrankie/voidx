@@ -196,7 +196,7 @@ func (s *WorkflowService) GetWorkflowsWithPage(ctx context.Context, userID uuid.
 	// 计算分页信息
 	totalPages := (int(total) + pageReq.PageSize - 1) / pageReq.PageSize
 	paginator := resp.Paginator{
-		CurrentPage: pageReq.Page,
+		CurrentPage: pageReq.CurrentPage,
 		PageSize:    pageReq.PageSize,
 		TotalPage:   totalPages,
 		TotalRecord: int(total),

@@ -12,9 +12,9 @@ type UpdateApiToolProviderReq struct {
 
 // GetApiToolProvidersWithPageReq 获取API工具提供商分页列表请求
 type GetApiToolProvidersWithPageReq struct {
-	Page       int    `form:"page" binding:"required,min=1"`
-	PageSize   int    `form:"page_size" binding:"required,min=1,max=100"`
-	SearchWord string `form:"search_word"`
+	CurrentPage int    `form:"current_page" binding:"required,min=1"`
+	PageSize    int    `form:"page_size" binding:"required,min=1,max=100"`
+	SearchWord  string `form:"search_word"`
 }
 
 // CreateApiToolReq 创建API工具请求

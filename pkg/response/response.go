@@ -30,6 +30,21 @@ func Error(c *gin.Context, err error) {
 	})
 }
 
+func Abort(c *gin.Context, err error) {
+	if bizErr, ok := gerrors.FromBizStatusError(err); ok {
+		c.AbortWithStatusJSON(http.StatusOK, Response{
+			Code:    bizErr.BizStatusCode(),
+			Message: bizErr.BizMessage(),
+		})
+		return
+	}
+
+	c.AbortWithStatusJSON(http.StatusOK, Response{
+		Code:    errno.ErrInternalServer.BizStatusCode(),
+		Message: errno.ErrInternalServer.BizMessage(),
+	})
+}
+
 func Success(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{
 		Code:    errno.Success.BizStatusCode(),

@@ -52,7 +52,7 @@ func (d *DatasetDao) GetDatasetsByAccountID(
 	}
 
 	// 分页查询
-	offset := (pageReq.Page - 1) * pageReq.PageSize
+	offset := (pageReq.CurrentPage - 1) * pageReq.PageSize
 	err := query.Order("ctime DESC").
 		Offset(offset).
 		Limit(pageReq.PageSize).

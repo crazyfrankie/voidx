@@ -46,7 +46,7 @@ type AppConfig struct {
 type AppConfigVersion struct {
 	ID                   uuid.UUID            `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AppID                uuid.UUID            `gorm:"type:uuid;not null;index:app_config_version_app_id_idx" json:"app_id"`
-	ModelConfig          map[string]any       `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"model_config"`
+	ModelConfig          map[string]any       `gorm:"serializer:json;type:jsonb;not null;default:'{}'::jsonb" json:"model_config"`
 	DialogRound          int                  `gorm:"not null;default:0" json:"dialog_round"`
 	PresetPrompt         string               `gorm:"type:text;not null;default:''" json:"preset_prompt"`
 	Tools                []map[string]any     `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"tools"`

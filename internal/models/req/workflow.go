@@ -18,10 +18,10 @@ type UpdateWorkflowReq struct {
 
 // GetWorkflowsWithPageReq 获取工作流分页列表数据请求
 type GetWorkflowsWithPageReq struct {
-	Page       int    `form:"page" binding:"min=1"`
-	PageSize   int    `form:"page_size" binding:"min=1,max=100"`
-	Status     string `form:"status"`
-	SearchWord string `form:"search_word"`
+	CurrentPage int    `form:"current_page" binding:"min=1"`
+	PageSize    int    `form:"page_size" binding:"min=1,max=100"`
+	Status      string `form:"status"`
+	SearchWord  string `form:"search_word"`
 }
 
 // UpdateDraftGraphReq 更新工作流草稿图配置请求

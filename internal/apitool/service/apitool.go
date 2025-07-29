@@ -32,19 +32,46 @@ func (s *ApiToolService) GetApiToolProvidersWithPage(ctx context.Context, pageRe
 		return resp.GetApiToolProvidersWithPageResp{}, err
 	}
 
-	_, err = s.repo.GetApiToolProvidersByAccountID(ctx, userID, pageReq)
+	providers, total, err := s.repo.GetApiToolProvidersByAccountID(ctx, userID, pageReq)
 	if err != nil {
 		return resp.GetApiToolProvidersWithPageResp{}, err
 	}
 
+	list := make([]resp.GetApiToolProvidersWithPage, 0, len(providers))
+	for _, provider := range providers {
+		apiTools, err := s.repo.GetApiTools(ctx, provider.ID)
+		if err != nil {
+			continue
+		}
+		tools := make([]resp.ApiTool, 0, len(apiTools))
+		for _, tool := range tools {
+			tools = append(tools, resp.ApiTool{
+				ID:          tool.ID,
+				Name:        tool.Name,
+				Description: tool.Description,
+				Inputs:      tool.Inputs,
+			})
+		}
+		list = append(list, resp.GetApiToolProvidersWithPage{
+			ID:          provider.ID,
+			Name:        provider.Name,
+			Icon:        provider.Icon,
+			Description: provider.Description,
+			Headers:     provider.Headers,
+			Tools:       tools,
+			Ctime:       provider.Ctime,
+		})
+	}
+
+	totalPages := (int(total) + pageReq.PageSize - 1) / pageReq.PageSize
 	return resp.GetApiToolProvidersWithPageResp{
-		ID:          uuid.UUID{},
-		Name:        "",
-		Icon:        "",
-		Description: "",
-		Headers:     nil,
-		Tools:       nil,
-		Ctime:       0,
+		List: list,
+		Paginator: resp.Paginator{
+			CurrentPage: pageReq.CurrentPage,
+			PageSize:    pageReq.PageSize,
+			TotalPage:   totalPages,
+			TotalRecord: int(total),
+		},
 	}, nil
 }
 
@@ -214,13 +241,13 @@ func (s *ApiToolService) CreateApiTool(ctx context.Context, createReq req.Create
 	return nil
 }
 
-func (s *ApiToolService) GetApiTool(ctx context.Context, toolID uuid.UUID) (*resp.ApiToolResp, error) {
+func (s *ApiToolService) GetApiTool(ctx context.Context, providerID uuid.UUID, toolName string) (*resp.ApiToolResp, error) {
 	userID, err := util.GetCurrentUserID(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	tool, err := s.repo.GetApiToolByID(ctx, toolID)
+	tool, err := s.repo.GetApiToolByProviderID(ctx, providerID, toolName)
 	if err != nil {
 		return nil, errno.ErrNotFound.AppendBizMessage("API工具不存在")
 	}

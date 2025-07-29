@@ -48,8 +48,12 @@ func (s *BuiltinToolsService) GetBuiltinTools(ctx context.Context) []map[string]
 				"description": tool.Description,
 				"inputs":      s.getToolInputs(tool),
 			}
-			providerInfo["tools"] = append(providerInfo["tools"].([]map[string]any), toolInfo)
+			var tools []map[string]any
+			tools = append(tools, toolInfo)
+			providerInfo["tools"] = tools
 		}
+
+		builtinTools = append(builtinTools, providerInfo)
 	}
 
 	return builtinTools

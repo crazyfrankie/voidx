@@ -1,64 +1,60 @@
 package entities
 
-import (
-	"time"
-)
-
 // BuiltinAppEntity represents a built-in application configuration
 type BuiltinAppEntity struct {
 	// ID represents the unique identifier of the built-in app
-	ID string `json:"id"`
+	ID string `yaml:"id" json:"id"`
 
 	// Category represents the category of the built-in app
-	Category string `json:"category"`
+	Category string `yaml:"category" json:"category"`
 
 	// Name represents the name of the built-in app
-	Name string `json:"name"`
+	Name string `yaml:"name" json:"name"`
 
 	// Icon represents the icon URL or identifier
-	Icon string `json:"icon"`
+	Icon string `yaml:"icon" json:"icon"`
 
 	// Description provides a detailed description of the app
-	Description string `json:"description"`
+	Description string `yaml:"description" json:"description"`
 
-	// LanguageModelConfig contains LLM-specific configurations
-	LanguageModelConfig map[string]any `json:"language_model_config"`
+	// ModelConfig contains LLM-specific configurations
+	ModelConfig map[string]any `yaml:"model_config" json:"model_config"`
 
 	// DialogRound represents the maximum number of conversation turns
-	DialogRound int `json:"dialog_round"`
+	DialogRound int `yaml:"dialog_round" json:"dialog_round"`
 
 	// PresetPrompt contains the initial system prompt
-	PresetPrompt string `json:"preset_prompt"`
+	PresetPrompt string `yaml:"preset_prompt" json:"preset_prompt"`
 
 	// Tools contains the list of available tools and their configurations
-	Tools []map[string]any `json:"tools"`
+	Tools []map[string]any `yaml:"tools" json:"tools"`
 
 	// RetrievalConfig contains configurations for knowledge retrieval
-	RetrievalConfig map[string]any `json:"retrieval_config"`
+	RetrievalConfig map[string]any `yaml:"retrieval_config" json:"retrieval_config"`
 
 	// LongTermMemory contains configurations for persistent memory
-	LongTermMemory map[string]any `json:"long_term_memory"`
+	LongTermMemory map[string]any `yaml:"long_term_memory" json:"long_term_memory"`
 
 	// OpeningStatement is the initial message shown to users
-	OpeningStatement string `json:"opening_statement"`
+	OpeningStatement string `yaml:"opening_statement" json:"opening_statement"`
 
 	// OpeningQuestions contains suggested initial questions
-	OpeningQuestions []string `json:"opening_questions"`
+	OpeningQuestions []string `yaml:"opening_questions" json:"opening_questions"`
 
 	// SpeechToText contains speech recognition configurations
-	SpeechToText map[string]any `json:"speech_to_text"`
+	SpeechToText map[string]any `yaml:"speech_to_text" json:"speech_to_text"`
 
 	// TextToSpeech contains text-to-speech configurations
-	TextToSpeech map[string]any `json:"text_to_speech"`
+	TextToSpeech map[string]any `yaml:"text_to_speech" json:"text_to_speech"`
 
 	// SuggestedAfterAnswer contains follow-up suggestion configurations
-	SuggestedAfterAnswer map[string]any `json:"suggested_after_answer"`
+	SuggestedAfterAnswer map[string]any `yaml:"suggested_after_answer" json:"suggested_after_answer"`
 
 	// ReviewConfig contains content review configurations
-	ReviewConfig map[string]any `json:"review_config"`
+	ReviewConfig map[string]any `yaml:"review_config" json:"review_config"`
 
 	// CreatedAt represents the creation timestamp
-	CreatedAt time.Time `json:"created_at"`
+	Ctime int64 `yaml:"ctime" json:"ctime"`
 }
 
 // DefaultAppConfig provides default configuration values

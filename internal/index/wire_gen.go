@@ -12,9 +12,9 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	"github.com/crazyfrankie/voidx/internal/index/repository"
 	"github.com/crazyfrankie/voidx/internal/index/repository/dao"
-	service3 "github.com/crazyfrankie/voidx/internal/index/service"
-	"github.com/crazyfrankie/voidx/internal/process_rule/service"
-	service2 "github.com/crazyfrankie/voidx/internal/retriever/service"
+	"github.com/crazyfrankie/voidx/internal/index/service"
+	"github.com/crazyfrankie/voidx/internal/process_rule"
+	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -22,10 +22,12 @@ import (
 
 // Injectors from wire.go:
 
-func InitIndexModule(db *gorm.DB, cmd redis.Cmdable, fileExtractor *file_extractor.FileExtractor, embeddingsSvc *embedding.EmbeddingService, jiebaService *retrievers.JiebaService, processRuleService *service.ProcessRuleService, keywordSvc *service2.KeywordService, vectorDatabaseService *vecstore.VecStoreService) *IndexModule {
+func InitIndexModule(db *gorm.DB, cmd redis.Cmdable, fileExtractor *file_extractor.FileExtractor, embeddingsSvc *embedding.EmbeddingService, jiebaService *retrievers.JiebaService, processRuleService *process_rule.ProcessRuleModule, keywordSvc *retriever.RetrieverModule, vectorDatabaseService *vecstore.VecStoreService) *IndexModule {
 	indexingDao := dao.NewIndexingDao(db)
 	indexingRepo := repository.NewIndexingRepo(indexingDao)
-	indexingService := service3.NewIndexingService(indexingRepo, cmd, fileExtractor, processRuleService, embeddingsSvc, jiebaService, keywordSvc, vectorDatabaseService)
+	serviceProcessRuleService := processRuleService.Service
+	keywordService := keywordSvc.KeyWord
+	indexingService := service.NewIndexingService(indexingRepo, cmd, fileExtractor, serviceProcessRuleService, embeddingsSvc, jiebaService, keywordService, vectorDatabaseService)
 	indexModule := &IndexModule{
 		Service: indexingService,
 	}
@@ -34,7 +36,7 @@ func InitIndexModule(db *gorm.DB, cmd redis.Cmdable, fileExtractor *file_extract
 
 // wire.go:
 
-type Service = service3.IndexingService
+type Service = service.IndexingService
 
 type IndexModule struct {
 	Service *Service

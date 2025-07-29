@@ -122,7 +122,7 @@ func (s *AssistantAgentService) GetMessagesWithPage(ctx context.Context, userID 
 	messages, total, err := s.repo.GetMessagesByConversationID(
 		ctx,
 		conversation.ID,
-		pageReq.Page,
+		pageReq.CurrentPage,
 		pageReq.PageSize,
 		pageReq.Ctime,
 	)
@@ -133,7 +133,7 @@ func (s *AssistantAgentService) GetMessagesWithPage(ctx context.Context, userID 
 	// 计算分页信息
 	totalPages := (int(total) + pageReq.PageSize - 1) / pageReq.PageSize
 	paginator := resp.Paginator{
-		CurrentPage: pageReq.Page,
+		CurrentPage: pageReq.CurrentPage,
 		PageSize:    pageReq.PageSize,
 		TotalPage:   totalPages,
 		TotalRecord: int(total),

@@ -22,12 +22,15 @@ import (
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/dataset"
 	"github.com/crazyfrankie/voidx/internal/document"
+	"github.com/crazyfrankie/voidx/internal/index"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/oauth"
 	"github.com/crazyfrankie/voidx/internal/openapi"
 	"github.com/crazyfrankie/voidx/internal/platform"
+	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment"
+	"github.com/crazyfrankie/voidx/internal/task"
 	"github.com/crazyfrankie/voidx/internal/upload"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/internal/webapp"
@@ -39,7 +42,7 @@ import (
 
 // Injectors from wire.go:
 
-func InitEngine() *gin.Engine {
+func InitApplication() *Application {
 	cmdable := InitCache()
 	tokenService := InitJWT(cmdable)
 	v := InitMiddlewares(tokenService)
@@ -107,7 +110,18 @@ func InitEngine() *gin.Engine {
 	workflowModule := workflow.InitWorkflowModule(db, builtinProviderManager)
 	workflowHandler := workflowModule.Handler
 	engine := InitWeb(v, accountHandler, aiHandler, analysisHandler, apiKeyHandler, apiToolHandler, appHandler, assistantAgentHandler, audioHandler, authHandler, builtinAppHandler, builtinToolsHandler, conversationHandler, datasetHandler, documentHandler, llmHandler, oAuthHandler, openAPIHandler, platformHandler, segmentHandler, uploadFileHandler, webAppHandler, wechatHandler, workflowHandler)
-	return engine
+	ossService := uploadModule.Service
+	fileExtractor := InitFileExtractor(ossService)
+	processRuleModule := process_rule.InitProcessRuleModule(db)
+	indexModule := index.InitIndexModule(db, cmdable, fileExtractor, embeddingService, jiebaService, processRuleModule, retrieverModule, vecStoreService)
+	indexingService := indexModule.Service
+	appService := appModule.Service
+	taskManager := InitTask(indexingService, appService)
+	application := &Application{
+		Server:   engine,
+		Consumer: taskManager,
+	}
+	return application
 }
 
 // wire.go:
@@ -116,3 +130,8 @@ var baseSet = wire.NewSet(InitCache, InitDB, InitJWT, InitEmbedding, InitVectorS
 
 var coreSet = wire.NewSet(InitAgentManager, InitBuiltinAppManager, InitBuiltinToolsCategories,
 	InitEmbeddingService, InitFileExtractor, InitJiebaService, InitLLMCore, InitTokenBufMem, InitApiToolsManager, InitBuiltinToolsManager)
+
+type Application struct {
+	Server   *gin.Engine
+	Consumer *task.TaskManager
+}

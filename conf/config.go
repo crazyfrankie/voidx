@@ -26,6 +26,7 @@ type Config struct {
 	MinIO   MinIO   `yaml:"minio"`
 	JWT     JWT     `yaml:"jwt"`
 	Milvus  Milvus  `yaml:"milvus"`
+	Kafka   Kafka   `yaml:"kafka"`
 }
 
 type Postgre struct {
@@ -54,6 +55,10 @@ type Milvus struct {
 	Addr           string `yaml:"addr"`
 	DBName         string `yaml:"dbName"`
 	CollectionName string `yaml:"collectionName"`
+}
+
+type Kafka struct {
+	Brokers []string `yaml:"brokers"`
 }
 
 func GetConf() *Config {

@@ -2,7 +2,7 @@ package handler
 
 import (
 	"io"
-	
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/upload/service"
@@ -97,6 +97,6 @@ func (h *UploadFileHandler) UploadImage() gin.HandlerFunc {
 			return
 		}
 
-		response.SuccessWithData(c, res)
+		response.SuccessWithData(c, gin.H{"image_url": res.URL})
 	}
 }

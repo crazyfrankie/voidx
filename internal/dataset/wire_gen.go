@@ -7,6 +7,7 @@
 package dataset
 
 import (
+	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/dataset/handler"
 	"github.com/crazyfrankie/voidx/internal/dataset/repository"
 	"github.com/crazyfrankie/voidx/internal/dataset/repository/dao"
@@ -48,7 +49,7 @@ type DataSetModule struct {
 var DatasetSet = wire.NewSet(dao.NewDatasetDao, repository.NewDatasetRepo, service.NewDatasetService, handler.NewDatasetHandler)
 
 func InitProducer() *service.DatasetProducer {
-	producer, err := service.NewDatasetProducer([]string{})
+	producer, err := service.NewDatasetProducer(conf.GetConf().Kafka.Brokers)
 	if err != nil {
 		panic(err)
 	}

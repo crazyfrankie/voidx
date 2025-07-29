@@ -18,12 +18,15 @@ import (
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/dataset"
 	"github.com/crazyfrankie/voidx/internal/document"
+	"github.com/crazyfrankie/voidx/internal/index"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/oauth"
 	"github.com/crazyfrankie/voidx/internal/openapi"
 	"github.com/crazyfrankie/voidx/internal/platform"
+	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment"
+	"github.com/crazyfrankie/voidx/internal/task"
 	"github.com/crazyfrankie/voidx/internal/upload"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/internal/webapp"
@@ -37,7 +40,12 @@ var baseSet = wire.NewSet(InitCache, InitDB, InitJWT, InitEmbedding, InitVectorS
 var coreSet = wire.NewSet(InitAgentManager, InitBuiltinAppManager, InitBuiltinToolsCategories,
 	InitEmbeddingService, InitFileExtractor, InitJiebaService, InitLLMCore, InitTokenBufMem, InitApiToolsManager, InitBuiltinToolsManager)
 
-func InitEngine() *gin.Engine {
+type Application struct {
+	Server   *gin.Engine
+	Consumer *task.TaskManager
+}
+
+func InitApplication() *Application {
 	wire.Build(
 		baseSet,
 		coreSet,
@@ -57,19 +65,21 @@ func InitEngine() *gin.Engine {
 		conversation.InitConversationModule,
 		dataset.InitDatasetHandler,
 		document.InitDocumentModule,
+		index.InitIndexModule,
 		llm.InitLLMModule,
 		oauth.InitOAuthModule,
 		openapi.InitOpenAIModule,
 		platform.InitPlatformModule,
+		process_rule.InitProcessRuleModule,
 		retriever.InitRetrieverModule,
 		segment.InitSegmentModule,
-		//task.NewTaskManager,
 		upload.InitUploadModule,
 		vecstore.NewVecStoreService,
 		webapp.InitWebAppModule,
 		wechat.InitWechatModule,
 		workflow.InitWorkflowModule,
 
+		InitTask,
 		InitMiddlewares,
 		InitWeb,
 
@@ -79,6 +89,7 @@ func InitEngine() *gin.Engine {
 		wire.FieldsOf(new(*api_key.ApiKeyModule), "Handler"),
 		wire.FieldsOf(new(*apitool.ApiToolModule), "Handler"),
 		wire.FieldsOf(new(*app.AppModule), "Handler"),
+		wire.FieldsOf(new(*app.AppModule), "Service"),
 		wire.FieldsOf(new(*assistant_agent.AssistantModule), "Handler"),
 		wire.FieldsOf(new(*audio.AudioModule), "Handler"),
 		wire.FieldsOf(new(*auth.AuthModule), "Handler"),
@@ -87,16 +98,20 @@ func InitEngine() *gin.Engine {
 		wire.FieldsOf(new(*conversation.ConversationModule), "Handler"),
 		wire.FieldsOf(new(*dataset.DataSetModule), "Handler"),
 		wire.FieldsOf(new(*document.DocumentModule), "Handler"),
+		wire.FieldsOf(new(*index.IndexModule), "Service"),
 		wire.FieldsOf(new(*llm.LLMModule), "Handler"),
 		wire.FieldsOf(new(*oauth.OAuthModule), "Handler"),
 		wire.FieldsOf(new(*openapi.OpenAPIModule), "Handler"),
 		wire.FieldsOf(new(*platform.PlatformModule), "Handler"),
 		wire.FieldsOf(new(*segment.SegmentModule), "Handler"),
 		wire.FieldsOf(new(*upload.UploadModule), "Handler"),
+		wire.FieldsOf(new(*upload.UploadModule), "Service"),
 		wire.FieldsOf(new(*webapp.WebAppModule), "Handler"),
 		wire.FieldsOf(new(*wechat.WechatModule), "Handler"),
 		wire.FieldsOf(new(*workflow.WorkflowModule), "Handler"),
+
+		wire.Struct(new(Application), "*"),
 	)
 
-	return new(gin.Engine)
+	return new(Application)
 }

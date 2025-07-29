@@ -12,25 +12,25 @@ import (
 // ProviderEntity represents a service provider configuration
 type ProviderEntity struct {
 	// Name is the provider's name
-	Name string `json:"name"`
+	Name string `yaml:"name" json:"name"`
 
 	// Label is the provider's display label
-	Label string `json:"label"`
+	Label string `yaml:"label" json:"label"`
 
 	// Description is the provider's description
-	Description string `json:"description"`
+	Description string `yaml:"description" json:"description"`
 
 	// Icon is the provider's icon URL
-	Icon string `json:"icon"`
+	Icon string `yaml:"icon" json:"icon"`
 
 	// Background is the icon's background color
-	Background string `json:"background"`
+	Background string `yaml:"background" json:"background"`
 
 	// Category is the provider's category
-	Category string `json:"category"`
+	Category string `yaml:"category" json:"category"`
 
 	// Ctime is the provider's creation timestamp
-	Ctime int64 `json:"ctime"`
+	Ctime int64 `yaml:"ctime" json:"ctime"`
 }
 
 // ToolFunc represents a tool function signature

@@ -40,7 +40,7 @@ func (h *AppHandler) RegisterRoute(r *gin.RouterGroup) {
 		appGroup.POST("/:app_id/unpublish", h.UnpublishApp())           //
 		appGroup.POST("/:app_id/summary", h.UpdateAppSummary())
 		appGroup.GET("/:app_id/published-config", h.GetPublishedConfig())
-		appGroup.POST("/:appID/conversation", h.DebugChat())
+		appGroup.POST("/:app_id/conversations", h.DebugChat())
 	}
 }
 
@@ -392,7 +392,7 @@ func (h *AppHandler) GetPublishedConfig() gin.HandlerFunc {
 // DebugChat 发起调试对话
 func (h *AppHandler) DebugChat() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		appIDStr := c.Param("appID")
+		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
 			response.Error(c, errno.ErrValidate.AppendBizMessage("应用ID格式不正确"))

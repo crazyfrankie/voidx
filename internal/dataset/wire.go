@@ -4,6 +4,7 @@
 package dataset
 
 import (
+	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment"
 	"github.com/google/wire"
@@ -30,7 +31,7 @@ var DatasetSet = wire.NewSet(
 )
 
 func InitProducer() *service.DatasetProducer {
-	producer, err := service.NewDatasetProducer([]string{})
+	producer, err := service.NewDatasetProducer(conf.GetConf().Kafka.Brokers)
 	if err != nil {
 		panic(err)
 	}

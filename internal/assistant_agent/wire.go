@@ -4,6 +4,7 @@
 package assistant_agent
 
 import (
+	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/task"
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/google/wire"
@@ -29,7 +30,7 @@ var ProviderSet = wire.NewSet(
 )
 
 func InitProducer() *task.AppProducer {
-	producer, err := task.NewAppProducer([]string{})
+	producer, err := task.NewAppProducer(conf.GetConf().Kafka.Brokers)
 	if err != nil {
 		panic(err)
 	}

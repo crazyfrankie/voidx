@@ -1,7 +1,6 @@
 package ioc
 
 import (
-	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/file_extractor"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
+	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	apitools "github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
 	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/categories"
 	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"

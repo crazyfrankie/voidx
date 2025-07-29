@@ -75,8 +75,8 @@ func (h *WorkflowHandler) GetWorkflowsWithPage() gin.HandlerFunc {
 		}
 
 		// 设置默认值
-		if pageReq.Page == 0 {
-			pageReq.Page = 1
+		if pageReq.CurrentPage == 0 {
+			pageReq.CurrentPage = 1
 		}
 		if pageReq.PageSize == 0 {
 			pageReq.PageSize = 20
