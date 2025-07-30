@@ -39,7 +39,7 @@ func (h *AppHandler) RegisterRoute(r *gin.RouterGroup) {
 		appGroup.GET("/:app_id/summary", h.GetDebugAppSummary())
 		appGroup.PUT("/:app_id/summary", h.UpdateDebugAppSummary())
 		appGroup.POST("/:app_id/conversation", h.DebugChat())
-		appGroup.POST("/:app_id/conversation/tasks/:task_id/stop")
+		appGroup.POST("/:app_id/conversation/tasks/:task_id/stop", h.StopDebugChat())
 		appGroup.GET("/:app_id/conversation/messages", h.GetDebugConversationWithPage())
 		appGroup.DELETE("/:app_id/debug-conversation")
 		appGroup.POST("/:app_id/publish", h.PublishApp())
@@ -455,10 +455,36 @@ func (h *AppHandler) GetDebugAppSummary() gin.HandlerFunc {
 	}
 }
 
-// TODO
+// StopDebugChat 停止某次应用的调试会话
 func (h *AppHandler) StopDebugChat() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		appIDStr := c.Param("app_id")
+		appID, err := uuid.Parse(appIDStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
 
+		taskIdStr := c.Param("task_id")
+		taskID, err := uuid.Parse(taskIdStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		userID, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		err = h.appService.StopDebugChat(c.Request.Context(), appID, taskID, userID)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		response.Success(c)
 	}
 }
 
