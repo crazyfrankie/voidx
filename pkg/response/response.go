@@ -26,7 +26,7 @@ func Error(c *gin.Context, err error) {
 
 	c.JSON(http.StatusOK, Response{
 		Code:    errno.ErrInternalServer.BizStatusCode(),
-		Message: errno.ErrInternalServer.AppendBizMessage(err.Error()).BizMessage(),
+		Message: errno.ErrInternalServer.AppendBizMessage(err).BizMessage(),
 	})
 }
 
@@ -41,7 +41,7 @@ func Abort(c *gin.Context, err error) {
 
 	c.AbortWithStatusJSON(http.StatusOK, Response{
 		Code:    errno.ErrInternalServer.BizStatusCode(),
-		Message: errno.ErrInternalServer.BizMessage(),
+		Message: errno.ErrInternalServer.AppendBizMessage(err).BizMessage(),
 	})
 }
 

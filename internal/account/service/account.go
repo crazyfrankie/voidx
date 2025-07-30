@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -27,7 +28,7 @@ func (s *AccountService) GetAccountByID(ctx context.Context) (resp.Account, erro
 
 	account, err := s.repo.GetAccountByID(ctx, id)
 	if err != nil {
-		return resp.Account{}, errno.ErrNotFound.AppendBizMessage("用户标识错误")
+		return resp.Account{}, errno.ErrNotFound.AppendBizMessage(errors.New("用户标识错误"))
 	}
 
 	return resp.Account{

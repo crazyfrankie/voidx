@@ -251,7 +251,7 @@ func (d *DatasetDao) GetHitCount(ctx context.Context, datasetID uuid.UUID) (int,
 // GetRelatedAppCount 获取该知识库关联的应用数
 func (d *DatasetDao) GetRelatedAppCount(ctx context.Context, datasetID uuid.UUID) (int, error) {
 	var count int64
-	err := d.db.WithContext(ctx).Model(&entity.AppDatasetJoin{}).
+	err := d.db.WithContext(ctx).Model(&entity.App{}).
 		Where("dataset_id = ?", datasetID).
 		Count(&count).Error
 	return int(count), err

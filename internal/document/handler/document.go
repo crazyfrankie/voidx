@@ -36,13 +36,13 @@ func (h *DocumentHandler) CreateDocument() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var createReq req.CreateDocumentsReq
 		if err := c.ShouldBind(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -64,13 +64,13 @@ func (h *DocumentHandler) GetDocumentsWithPage() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var pageReq req.GetDocumentsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -92,14 +92,14 @@ func (h *DocumentHandler) GetDocument() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -118,20 +118,20 @@ func (h *DocumentHandler) UpdateDocument() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateDocumentReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -150,14 +150,14 @@ func (h *DocumentHandler) DeleteDocument() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -176,14 +176,14 @@ func (h *DocumentHandler) UpdateDocumentEnabled() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -191,7 +191,7 @@ func (h *DocumentHandler) UpdateDocumentEnabled() gin.HandlerFunc {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.ShouldBind(&enabledReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -210,7 +210,7 @@ func (h *DocumentHandler) GetDocumentStatus() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

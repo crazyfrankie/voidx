@@ -36,13 +36,13 @@ func (h *ConversationHandler) GetConversationMessagesWithPage() gin.HandlerFunc 
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("会话ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var pageReq req.GetConversationMessagesWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -98,7 +98,7 @@ func (h *ConversationHandler) DeleteConversation() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("会话ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -117,14 +117,14 @@ func (h *ConversationHandler) DeleteMessage() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("会话ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		messageIDStr := c.Param("message_id")
 		messageID, err := uuid.Parse(messageIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("消息ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -143,7 +143,7 @@ func (h *ConversationHandler) GetConversationName() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("会话ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -162,13 +162,13 @@ func (h *ConversationHandler) UpdateConversationName() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("会话ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateConversationNameReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -187,13 +187,13 @@ func (h *ConversationHandler) UpdateConversationIsPinned() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("会话ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateConversationIsPinnedReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

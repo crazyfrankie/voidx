@@ -38,21 +38,21 @@ func (h *AudioHandler) AudioToText() gin.HandlerFunc {
 		// 获取上传的文件
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("音频文件不能为空"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 		defer file.Close()
 
 		// 检查文件大小（25MB限制）
 		if header.Size > 25*1024*1024 {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("音频文件不能超过25MB"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		// 读取文件内容
 		fileContent, err := io.ReadAll(file)
 		if err != nil {
-			response.Error(c, errno.ErrInternalServer.AppendBizMessage("读取音频文件失败"))
+			response.Error(c, errno.ErrInternalServer)
 			return
 		}
 
@@ -78,7 +78,7 @@ func (h *AudioHandler) MessageToAudio() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var audioReq req.MessageToAudioReq
 		if err := c.ShouldBindUri(&audioReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("消息ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

@@ -35,20 +35,20 @@ func (h *SegmentHandler) CreateSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var createReq req.CreateSegmentReq
 		if err := c.ShouldBind(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -67,20 +67,20 @@ func (h *SegmentHandler) GetSegmentsWithPage() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var pageReq req.GetSegmentsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -102,21 +102,21 @@ func (h *SegmentHandler) GetSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("片段ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -135,27 +135,27 @@ func (h *SegmentHandler) UpdateSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("片段ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateSegmentReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -174,21 +174,21 @@ func (h *SegmentHandler) DeleteSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("片段ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -207,21 +207,21 @@ func (h *SegmentHandler) UpdateSegmentEnabled() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("文档ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("片段ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -229,7 +229,7 @@ func (h *SegmentHandler) UpdateSegmentEnabled() gin.HandlerFunc {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.ShouldBind(&enabledReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

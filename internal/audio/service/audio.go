@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -39,7 +41,7 @@ func (s *AudioService) AudioToText(ctx context.Context, userID uuid.UUID, audioD
 	// 3. 调用Whisper服务转换语音
 	resp, err := client.CreateTranscription(ctx, req)
 	if err != nil {
-		return "", errno.ErrInternalServer.AppendBizMessage("语音转文本失败: " + err.Error())
+		return "", errno.ErrInternalServer.AppendBizMessage(fmt.Errorf("语音转文本失败, %w", err))
 	}
 
 	return resp.Text, nil
@@ -50,25 +52,25 @@ func (s *AudioService) MessageToAudio(ctx context.Context, userID, messageID uui
 	// 1. 根据消息ID获取消息并校验权限
 	message, err := s.repo.GetMessageByID(ctx, messageID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("消息不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("消息不存在"))
 	}
 
 	if message.CreatedBy != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该消息")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该消息"))
 	}
 
 	if message.Answer == "" {
-		return nil, errno.ErrValidate.AppendBizMessage("消息内容为空")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("消息内容为空"))
 	}
 
 	// 2. 获取会话信息
 	conversation, err := s.repo.GetConversationByID(ctx, message.ConversationID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该会话")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该会话"))
 	}
 
 	// 3. 检查TTS配置
@@ -78,7 +80,7 @@ func (s *AudioService) MessageToAudio(ctx context.Context, userID, messageID uui
 	}
 
 	if !ttsConfig.Enable {
-		return nil, errno.ErrValidate.AppendBizMessage("该应用未开启文字转语音功能")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("该应用未开启文字转语音功能"))
 	}
 
 	// 4. 创建事件通道
@@ -109,16 +111,16 @@ func (s *AudioService) getTTSConfig(ctx context.Context, message *entity.Message
 	case "web_app", "debugger":
 		app, err := s.repo.GetAppByID(ctx, conversation.AppID)
 		if err != nil {
-			return nil, errno.ErrNotFound.AppendBizMessage("应用不存在")
+			return nil, errno.ErrNotFound.AppendBizMessage(errors.New("应用不存在"))
 		}
 
 		// 权限校验
 		if message.InvokeFrom == "debugger" && app.AccountID != message.CreatedBy {
-			return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该应用")
+			return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该应用"))
 		}
 
 		if message.InvokeFrom == "web_app" && app.Status != "published" {
-			return nil, errno.ErrValidate.AppendBizMessage("应用未发布")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("应用未发布"))
 		}
 
 		// 获取应用配置
@@ -138,7 +140,7 @@ func (s *AudioService) getTTSConfig(ctx context.Context, message *entity.Message
 		}
 
 	case "service_api":
-		return nil, errno.ErrValidate.AppendBizMessage("开放API消息不支持文本转语音服务")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("开放API消息不支持文本转语音服务"))
 	}
 
 	return config, nil

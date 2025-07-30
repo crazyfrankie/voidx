@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -136,8 +137,7 @@ func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID 
 		return err
 	}
 	if document == nil {
-		log.Printf("当前文档不存在, 文档id: %s", documentID)
-		return errno.ErrNotFound.AppendBizMessage("当前文档不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("当前文档不存在"))
 	}
 
 	// 3. 查询归属于当前文档的所有片段的节点id

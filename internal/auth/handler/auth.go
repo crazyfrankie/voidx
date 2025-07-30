@@ -33,7 +33,7 @@ func (h *AuthHandler) Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var loginReq req.LoginReq
 		if err := c.ShouldBind(&loginReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

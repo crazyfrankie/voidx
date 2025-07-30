@@ -34,7 +34,7 @@ func (h *PlatformHandler) GetWechatConfig() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -63,14 +63,14 @@ func (h *PlatformHandler) UpdateWechatConfig() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		// 绑定请求参数
 		var updateReq req.UpdateWechatConfigReq
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

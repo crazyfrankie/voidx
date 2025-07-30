@@ -15,8 +15,3 @@ type UploadFile struct {
 	Utime     int64     `gorm:"autoUpdateTime" json:"utime"`
 	Ctime     int64     `gorm:"autoCreateTime" json:"ctime"`
 }
-
-// TableName 指定表名
-func (UploadFile) TableName() string {
-	return "upload_file"
-}

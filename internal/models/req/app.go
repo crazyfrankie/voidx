@@ -19,14 +19,6 @@ type CreateAppReq struct {
 	Description string `json:"description" binding:"required,max=500"`
 }
 
-type T struct {
-	FileList []struct {
-	} `json:"fileList"`
-	Icon        string `json:"icon"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
 // UpdateAppReq 更新应用请求
 type UpdateAppReq struct {
 	Name        string `json:"name" binding:"omitempty,max=100"`

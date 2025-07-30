@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
 
@@ -48,7 +49,7 @@ func (h *OAuthHandler) Authorize() gin.HandlerFunc {
 
 		var authReq req.AuthorizeReq
 		if err := c.ShouldBind(&authReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("code代码不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("code代码不能为空")))
 			return
 		}
 

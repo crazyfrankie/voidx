@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -51,7 +52,7 @@ func (s *WorkflowService) CreateWorkflow(ctx context.Context, userID uuid.UUID, 
 		return nil, err
 	}
 	if existing != nil {
-		return nil, errno.ErrValidate.AppendBizMessage(fmt.Sprintf("在当前账号下已创建[%s]工作流，不支持重名", createReq.ToolCallName))
+		return nil, errno.ErrValidate.AppendBizMessage(fmt.Errorf("在当前账号下已创建[%s]工作流，不支持重名", createReq.ToolCallName))
 	}
 
 	// 2. 创建工作流
@@ -77,11 +78,11 @@ func (s *WorkflowService) CreateWorkflow(ctx context.Context, userID uuid.UUID, 
 func (s *WorkflowService) GetWorkflow(ctx context.Context, workflowID, userID uuid.UUID) (*resp.GetWorkflowResp, error) {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	// 计算节点数量
@@ -115,11 +116,11 @@ func (s *WorkflowService) GetWorkflow(ctx context.Context, workflowID, userID uu
 func (s *WorkflowService) DeleteWorkflow(ctx context.Context, workflowID, userID uuid.UUID) error {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	return s.repo.DeleteWorkflow(ctx, workflowID)
@@ -129,11 +130,11 @@ func (s *WorkflowService) DeleteWorkflow(ctx context.Context, workflowID, userID
 func (s *WorkflowService) UpdateWorkflow(ctx context.Context, workflowID, userID uuid.UUID, updateReq req.UpdateWorkflowReq) error {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	// 检查工具调用名称是否重复
@@ -143,7 +144,7 @@ func (s *WorkflowService) UpdateWorkflow(ctx context.Context, workflowID, userID
 		return err
 	}
 	if existing != nil && existing.ID != workflowID {
-		return errno.ErrValidate.AppendBizMessage(fmt.Sprintf("在当前账号下已创建[%s]工作流，不支持重名", toolCallName))
+		return errno.ErrValidate.AppendBizMessage(fmt.Errorf("在当前账号下已创建[%s]工作流，不支持重名", toolCallName))
 	}
 
 	updates := map[string]any{
@@ -209,11 +210,11 @@ func (s *WorkflowService) GetWorkflowsWithPage(ctx context.Context, userID uuid.
 func (s *WorkflowService) UpdateDraftGraph(ctx context.Context, workflowID, userID uuid.UUID, draftGraph map[string]any) error {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	validateDraftGraph, err := s.validateGraph(ctx, workflowID, draftGraph, userID)
@@ -233,11 +234,11 @@ func (s *WorkflowService) UpdateDraftGraph(ctx context.Context, workflowID, user
 func (s *WorkflowService) GetDraftGraph(ctx context.Context, workflowID, userID uuid.UUID) (map[string]any, error) {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	validateDraftGraph, err := s.validateGraph(ctx, workflowID, workflow.DraftGraph, userID)
@@ -258,11 +259,11 @@ func (s *WorkflowService) GetDraftGraph(ctx context.Context, workflowID, userID 
 func (s *WorkflowService) DebugWorkflow(ctx context.Context, workflowID, userID uuid.UUID, inputs map[string]any) (<-chan resp.WorkflowDebugEvent, error) {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	// 创建事件通道
@@ -278,15 +279,15 @@ func (s *WorkflowService) DebugWorkflow(ctx context.Context, workflowID, userID 
 func (s *WorkflowService) PublishWorkflow(ctx context.Context, workflowID, userID uuid.UUID) error {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	if !workflow.IsDebugPassed {
-		return errno.ErrValidate.AppendBizMessage("该工作流未调试通过，请调试通过后发布")
+		return errno.ErrValidate.AppendBizMessage(errors.New("该工作流未调试通过，请调试通过后发布"))
 	}
 
 	if _, err := corewf.NewWorkflow(map[string]any{
@@ -298,7 +299,7 @@ func (s *WorkflowService) PublishWorkflow(ctx context.Context, workflowID, userI
 	}); err != nil {
 		workflow.IsDebugPassed = false
 		if err := s.repo.SaveWorkflow(ctx, workflow); err != nil {
-			return errno.ErrInternalServer.AppendBizMessage(fmt.Sprintf("保存工作流状态失败: %v", err))
+			return errno.ErrInternalServer.AppendBizMessage(fmt.Errorf("保存工作流状态失败: %v", err))
 		}
 	}
 
@@ -317,15 +318,15 @@ func (s *WorkflowService) PublishWorkflow(ctx context.Context, workflowID, userI
 func (s *WorkflowService) CancelPublishWorkflow(ctx context.Context, workflowID, userID uuid.UUID) error {
 	workflow, err := s.repo.GetWorkflowByID(ctx, workflowID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("该工作流不存在，请核实后重试")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("该工作流不存在，请核实后重试"))
 	}
 
 	if workflow.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	if workflow.Status != consts.WorkflowStatusPublished {
-		return errno.ErrValidate.AppendBizMessage("该工作流未发布无法取消发布")
+		return errno.ErrValidate.AppendBizMessage(errors.New("该工作流未发布无法取消发布"))
 	}
 
 	emptyGraphJSON, _ := sonic.Marshal(map[string]any{})
@@ -522,7 +523,7 @@ func (s *WorkflowService) validateGraph(ctx context.Context, workflowID uuid.UUI
 	for _, edge := range edges {
 		edgeMap, ok := edge.(map[string]any)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("工作流边数据类型出错，请核实后重试")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("工作流边数据类型出错，请核实后重试"))
 		}
 		edgeData, err := s.createEdgeData(edgeMap)
 		if err != nil {
@@ -1027,22 +1028,22 @@ func (s *WorkflowService) createEdgeData(data map[string]any) (*wfentities.BaseE
 	edge := wfentities.NewBaseEdgeData()
 	target, ok := data["target"].(uuid.UUID)
 	if !ok {
-		return nil, errno.ErrValidate.AppendBizMessage("工作流边数据类型出错，请核实后重试")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("工作流边数据类型出错，请核实后重试"))
 	}
 	edge.Target = target
 	nodeType, ok := data["node_type"].(wfentities.NodeType)
 	if !ok {
-		return nil, errno.ErrValidate.AppendBizMessage("工作流边数据类型出错，请核实后重试")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("工作流边数据类型出错，请核实后重试"))
 	}
 	edge.TargetType = nodeType
 	source, ok := data["source"].(uuid.UUID)
 	if !ok {
-		return nil, errno.ErrValidate.AppendBizMessage("工作流边数据类型出错，请核实后重试")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("工作流边数据类型出错，请核实后重试"))
 	}
 	edge.Source = source
 	sourceType, ok := data["source_type"].(wfentities.NodeType)
 	if !ok {
-		return nil, errno.ErrValidate.AppendBizMessage("工作流边数据类型出错，请核实后重试")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("工作流边数据类型出错，请核实后重试"))
 	}
 	edge.SourceType = sourceType
 

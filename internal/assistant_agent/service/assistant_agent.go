@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -94,17 +95,17 @@ func (s *AssistantAgentService) StopChat(ctx context.Context, taskID, userID uui
 	// 1. 验证用户权限
 	account, err := s.repo.GetAccountByID(ctx, userID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("用户不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("用户不存在"))
 	}
 
 	// 2. 检查是否有正在进行的会话
 	if account.AssistantAgentConversationID == uuid.Nil {
-		return errno.ErrValidate.AppendBizMessage("没有正在进行的对话")
+		return errno.ErrValidate.AppendBizMessage(errors.New("没有正在进行的对话"))
 	}
 
 	// 3. 查找并取消对应的任务
 	if !s.cancelUserSession(userID.String(), taskID.String()) {
-		return errno.ErrValidate.AppendBizMessage("未找到对应的活跃会话")
+		return errno.ErrValidate.AppendBizMessage(errors.New("未找到对应的活跃会话"))
 	}
 
 	return nil
@@ -147,7 +148,7 @@ func (s *AssistantAgentService) DeleteConversation(ctx context.Context, userID u
 	// 1. 获取用户账户信息
 	account, err := s.repo.GetAccountByID(ctx, userID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("用户不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("用户不存在"))
 	}
 
 	// 2. 如果存在辅助Agent会话，则删除
@@ -172,7 +173,7 @@ func (s *AssistantAgentService) getOrCreateAssistantConversation(ctx context.Con
 	// 1. 获取用户账户信息
 	account, err := s.repo.GetAccountByID(ctx, userID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("用户不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("用户不存在"))
 	}
 
 	// 2. 如果已存在辅助Agent会话，直接返回

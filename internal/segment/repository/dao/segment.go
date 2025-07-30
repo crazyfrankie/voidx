@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -28,7 +29,7 @@ func (d *SegmentDao) ValidateDatasetAccess(ctx context.Context, datasetID, userI
 		return err
 	}
 	if count == 0 {
-		return errno.ErrForbidden.AppendBizMessage("无权限访问该知识库")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该知识库"))
 	}
 	return nil
 }
@@ -42,7 +43,7 @@ func (d *SegmentDao) ValidateDocumentAccess(ctx context.Context, documentID, dat
 		return err
 	}
 	if count == 0 {
-		return errno.ErrNotFound.AppendBizMessage("文档不存在或不属于该知识库")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("文档不存在或不属于该知识库"))
 	}
 	return nil
 }
@@ -66,7 +67,7 @@ func (d *SegmentDao) GetSegmentsByDocumentID(
 		query = query.Where("content ILIKE ? OR keywords::text ILIKE ?",
 			"%"+pageReq.SearchWord+"%", "%"+pageReq.SearchWord+"%")
 	}
-	
+
 	// 计算总数
 	if err := query.Model(&entity.Segment{}).Count(&total).Error; err != nil {
 		return nil, 0, err

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"io"
 
 	"github.com/gin-gonic/gin"
@@ -38,7 +39,7 @@ func (h *WebAppHandler) GetWebAppInfo() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
@@ -56,13 +57,13 @@ func (h *WebAppHandler) WebAppChat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
 		var chatReq req.WebAppChatReq
 		if err := c.ShouldBind(&chatReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
 			return
 		}
 
@@ -105,13 +106,13 @@ func (h *WebAppHandler) StopWebAppChat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
 		taskID := c.Param("task_id")
 		if taskID == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("task_id不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("task_id不能为空")))
 			return
 		}
 
@@ -129,13 +130,13 @@ func (h *WebAppHandler) GetConversations() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
 		var getReq req.GetWebAppConversationsReq
 		if err := c.ShouldBindQuery(&getReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
 			return
 		}
 
@@ -153,19 +154,19 @@ func (h *WebAppHandler) GetConversationMessages() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
 		conversationID := c.Param("conversation_id")
 		if conversationID == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("conversation_id不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("conversation_id不能为空")))
 			return
 		}
 
 		var pageReq req.GetWebAppConversationMessagesReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
 			return
 		}
 
@@ -186,13 +187,13 @@ func (h *WebAppHandler) DeleteConversation() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
 		conversationID := c.Param("conversation_id")
 		if conversationID == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("conversation_id不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("conversation_id不能为空")))
 			return
 		}
 
@@ -210,19 +211,19 @@ func (h *WebAppHandler) UpdateConversationName() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
 		conversationID := c.Param("conversation_id")
 		if conversationID == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("conversation_id不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("conversation_id不能为空")))
 			return
 		}
 
 		var updateReq req.UpdateWebAppConversationNameReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
 			return
 		}
 
@@ -240,19 +241,19 @@ func (h *WebAppHandler) UpdateConversationPin() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if token == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("token不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("token不能为空")))
 			return
 		}
 
 		conversationID := c.Param("conversation_id")
 		if conversationID == "" {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("conversation_id不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("conversation_id不能为空")))
 			return
 		}
 
 		var updateReq req.UpdateWebAppConversationPinReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
 			return
 		}
 

@@ -43,7 +43,7 @@ func (s *SegmentService) CreateSegment(ctx context.Context, datasetID, documentI
 	// 1.校验上传内容的token长度总数，不能超过1000
 	tokenCount := s.embeddingSvc.CalculateTokenCount(createReq.Content)
 	if tokenCount > 1000 {
-		return nil, errno.ErrValidate.AppendBizMessage("片段内容的长度不能超过1000 token")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("片段内容的长度不能超过1000 token"))
 	}
 
 	// 2.验证数据集和文档权限
@@ -198,12 +198,12 @@ func (s *SegmentService) GetSegment(ctx context.Context, datasetID, documentID, 
 	// 获取片段
 	segment, err := s.repo.GetSegmentByID(ctx, segmentID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("片段不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("片段不存在"))
 	}
 
 	// 验证片段属于指定文档
 	if segment.DocumentID != documentID {
-		return nil, errno.ErrValidate.AppendBizMessage("片段不属于指定文档")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("片段不属于指定文档"))
 	}
 
 	segmentResp := &resp.SegmentResp{
@@ -238,12 +238,12 @@ func (s *SegmentService) UpdateSegment(ctx context.Context, datasetID, documentI
 	// 验证片段存在
 	segment, err := s.repo.GetSegmentByID(ctx, segmentID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("片段不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("片段不存在"))
 	}
 
 	// 验证片段属于指定文档
 	if segment.DocumentID != documentID {
-		return errno.ErrValidate.AppendBizMessage("片段不属于指定文档")
+		return errno.ErrValidate.AppendBizMessage(errors.New("片段不属于指定文档"))
 	}
 
 	// 构建更新字段
@@ -279,12 +279,12 @@ func (s *SegmentService) DeleteSegment(ctx context.Context, datasetID, documentI
 	// 验证片段存在
 	segment, err := s.repo.GetSegmentByID(ctx, segmentID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("片段不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("片段不存在"))
 	}
 
 	// 验证片段属于指定文档
 	if segment.DocumentID != documentID {
-		return errno.ErrValidate.AppendBizMessage("片段不属于指定文档")
+		return errno.ErrValidate.AppendBizMessage(errors.New("片段不属于指定文档"))
 	}
 
 	return s.repo.DeleteSegment(ctx, segmentID)
@@ -308,12 +308,12 @@ func (s *SegmentService) UpdateSegmentEnabled(ctx context.Context, datasetID, do
 	// 验证片段存在
 	segment, err := s.repo.GetSegmentByID(ctx, segmentID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("片段不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("片段不存在"))
 	}
 
 	// 验证片段属于指定文档
 	if segment.DocumentID != documentID {
-		return errno.ErrValidate.AppendBizMessage("片段不属于指定文档")
+		return errno.ErrValidate.AppendBizMessage(errors.New("片段不属于指定文档"))
 	}
 
 	updates := map[string]any{

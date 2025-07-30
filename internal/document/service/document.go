@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -39,11 +40,11 @@ func (s *DocumentService) CreateDocuments(ctx context.Context, datasetID uuid.UU
 	// 1. 检测知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, "", errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, "", errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return nil, "", errno.ErrForbidden.AppendBizMessage("当前用户无该知识库权限或知识库不存在")
+		return nil, "", errno.ErrForbidden.AppendBizMessage(errors.New("当前用户无该知识库权限或知识库不存在"))
 	}
 
 	// 2. 提取文件并校验文件权限与文件扩展
@@ -66,7 +67,7 @@ func (s *DocumentService) CreateDocuments(ctx context.Context, datasetID uuid.UU
 	}
 
 	if len(validUploadFiles) == 0 {
-		return nil, "", errno.ErrValidate.AppendBizMessage("暂未解析到合法文件，请重新上传")
+		return nil, "", errno.ErrValidate.AppendBizMessage(errors.New("暂未解析到合法文件，请重新上传"))
 	}
 
 	// 3. 创建批次与处理规则并记录到数据库中
@@ -141,11 +142,11 @@ func (s *DocumentService) GetDocumentsStatus(ctx context.Context, datasetID uuid
 	// 1. 检测知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("当前用户无该知识库权限或知识库不存在")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("当前用户无该知识库权限或知识库不存在"))
 	}
 
 	// 2. 查询当前知识库下该批次的文档列表
@@ -155,7 +156,7 @@ func (s *DocumentService) GetDocumentsStatus(ctx context.Context, datasetID uuid
 	}
 
 	if len(documents) == 0 {
-		return nil, errno.ErrNotFound.AppendBizMessage("该处理批次未发现文档，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该处理批次未发现文档，请核实后重试"))
 	}
 
 	// 3. 循环遍历文档列表提取文档的状态信息
@@ -215,11 +216,11 @@ func (s *DocumentService) GetDocumentsWithPage(ctx context.Context, datasetID uu
 	// 验证知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return nil, resp.Paginator{}, errno.ErrForbidden.AppendBizMessage("无权限访问该知识库")
+		return nil, resp.Paginator{}, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该知识库"))
 	}
 
 	// 获取文档列表
@@ -259,21 +260,21 @@ func (s *DocumentService) GetDocument(ctx context.Context, datasetID, documentID
 	// 验证知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该知识库")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该知识库"))
 	}
 
 	// 获取文档
 	document, err := s.repo.GetDocumentByID(ctx, documentID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("文档不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("文档不存在"))
 	}
 
 	if document.DatasetID != datasetID {
-		return nil, errno.ErrValidate.AppendBizMessage("文档不属于该知识库")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("文档不属于该知识库"))
 	}
 
 	return s.buildDocumentResp(ctx, document)
@@ -288,21 +289,21 @@ func (s *DocumentService) UpdateDocument(ctx context.Context, datasetID, documen
 	// 验证知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限修改该知识库")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限修改该知识库"))
 	}
 
 	// 验证文档
 	document, err := s.repo.GetDocumentByID(ctx, documentID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("文档不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("文档不存在"))
 	}
 
 	if document.DatasetID != datasetID {
-		return errno.ErrValidate.AppendBizMessage("文档不属于该知识库")
+		return errno.ErrValidate.AppendBizMessage(errors.New("文档不属于该知识库"))
 	}
 
 	// 构建更新数据
@@ -323,26 +324,26 @@ func (s *DocumentService) DeleteDocument(ctx context.Context, datasetID, documen
 	// 验证知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限删除该知识库中的文档")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限删除该知识库中的文档"))
 	}
 
 	// 验证文档
 	document, err := s.repo.GetDocumentByID(ctx, documentID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("文档不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("文档不存在"))
 	}
 
 	if document.DatasetID != datasetID {
-		return errno.ErrValidate.AppendBizMessage("文档不属于该知识库")
+		return errno.ErrValidate.AppendBizMessage(errors.New("文档不属于该知识库"))
 	}
 
 	// 检查文档状态，只有完成或错误状态才能删除
 	if document.Status != "completed" && document.Status != "error" {
-		return errno.ErrValidate.AppendBizMessage("文档正在处理中，无法删除")
+		return errno.ErrValidate.AppendBizMessage(errors.New("文档正在处理中，无法删除"))
 	}
 
 	return s.repo.DeleteDocument(ctx, documentID)
@@ -357,21 +358,21 @@ func (s *DocumentService) UpdateDocumentEnabled(ctx context.Context, datasetID, 
 	// 验证知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限修改该知识库")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限修改该知识库"))
 	}
 
 	// 验证文档
 	document, err := s.repo.GetDocumentByID(ctx, documentID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("文档不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("文档不存在"))
 	}
 
 	if document.DatasetID != datasetID {
-		return errno.ErrValidate.AppendBizMessage("文档不属于该知识库")
+		return errno.ErrValidate.AppendBizMessage(errors.New("文档不属于该知识库"))
 	}
 
 	// 更新启用状态
@@ -452,21 +453,21 @@ func (s *DocumentService) RawGetDocument(ctx context.Context, datasetID, documen
 	// 验证知识库权限
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	if dataset.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该知识库")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该知识库"))
 	}
 
 	// 获取文档
 	document, err := s.repo.GetDocumentByID(ctx, documentID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("文档不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("文档不存在"))
 	}
 
 	if document.DatasetID != datasetID {
-		return nil, errno.ErrValidate.AppendBizMessage("文档不属于该知识库")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("文档不属于该知识库"))
 	}
 
 	return document, nil

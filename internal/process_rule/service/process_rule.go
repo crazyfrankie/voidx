@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 
@@ -192,7 +193,7 @@ func (s *ProcessRuleService) GetTextSplitterByProcessRule(
 	// 提取分段配置
 	segment, ok := rule["segment"].(map[string]any)
 	if !ok {
-		return nil, errno.ErrInternalServer.AppendBizMessage("分段配置不存在")
+		return nil, errno.ErrInternalServer.AppendBizMessage(errors.New("获取应用的调试会话消息列表"))
 	}
 
 	config := TextSplitterConfig{}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -34,7 +35,7 @@ func (s *BuiltinService) GetBuiltinApps(ctx context.Context) []*entities.Builtin
 func (s *BuiltinService) AddBuiltinAppToSpace(ctx context.Context, userID uuid.UUID, addReq req.AddBuiltinAppReq) (*entity.App, error) {
 	builtinApp := s.builtinAppManager.GetBuiltinApp(addReq.BuiltinAppID.String())
 	if builtinApp == nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("该内置应用不存在，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该内置应用不存在，请核实后重试"))
 	}
 
 	app, err := s.repo.AddBuiltinApp(ctx, builtinApp, &entity.App{

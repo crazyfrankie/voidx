@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -38,11 +39,11 @@ func (s *ApiKeyService) CreateApiKey(ctx context.Context, userID uuid.UUID, crea
 func (s *ApiKeyService) GetApiKey(ctx context.Context, apiKeyID, userID uuid.UUID) (*entity.ApiKey, error) {
 	apiKey, err := s.repo.GetApiKeyByID(ctx, apiKeyID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("API秘钥不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("API秘钥不存在"))
 	}
 
 	if apiKey.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("API秘钥不存在或无权限")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("API秘钥不存在或无权限"))
 	}
 
 	return apiKey, nil

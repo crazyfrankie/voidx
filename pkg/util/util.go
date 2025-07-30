@@ -3,6 +3,7 @@ package util
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
@@ -26,7 +27,7 @@ func SetAuthorization(c *gin.Context, access string, refresh string) {
 func GetCurrentUserID(ctx context.Context) (uuid.UUID, error) {
 	userID, ok := ctx.Value("user_id").(uuid.UUID)
 	if !ok {
-		return uuid.Nil, errno.ErrUnauthorized.AppendBizMessage("未登录")
+		return uuid.Nil, errno.ErrUnauthorized.AppendBizMessage(errors.New("未登录"))
 	}
 
 	return userID, nil

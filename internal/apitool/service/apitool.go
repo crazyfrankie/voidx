@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/bytedance/sonic"
@@ -83,11 +84,11 @@ func (s *ApiToolService) GetApiToolProvider(ctx context.Context, providerID uuid
 
 	provider, err := s.repo.GetApiToolProviderByID(ctx, providerID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("API工具提供商不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("API工具提供商不存在"))
 	}
 
 	if provider.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该API工具提供商")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该API工具提供商"))
 	}
 
 	return &resp.ApiToolProviderResp{
@@ -109,11 +110,11 @@ func (s *ApiToolService) UpdateApiToolProvider(ctx context.Context, providerID u
 
 	provider, err := s.repo.GetApiToolProviderByID(ctx, providerID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("API工具提供商不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("API工具提供商不存在"))
 	}
 
 	if provider.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限修改该API工具提供商")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限修改该API工具提供商"))
 	}
 
 	// 构建更新数据
@@ -125,7 +126,7 @@ func (s *ApiToolService) UpdateApiToolProvider(ctx context.Context, providerID u
 			return err
 		}
 		if exists {
-			return errno.ErrValidate.AppendBizMessage("提供商名称已存在")
+			return errno.ErrValidate.AppendBizMessage(errors.New("提供商名称已存在"))
 		}
 		updates["name"] = updateReq.Name
 	}
@@ -150,11 +151,11 @@ func (s *ApiToolService) DeleteApiToolProvider(ctx context.Context, providerID u
 
 	provider, err := s.repo.GetApiToolProviderByID(ctx, providerID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("API工具提供商不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("API工具提供商不存在"))
 	}
 
 	if provider.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限删除该API工具提供商")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限删除该API工具提供商"))
 	}
 
 	return s.repo.DeleteApiToolProvider(ctx, providerID)
@@ -175,11 +176,11 @@ func (s *ApiToolService) CreateApiTool(ctx context.Context, createReq req.Create
 	// 验证提供商权限
 	provider, err := s.repo.GetApiToolProviderByName(ctx, userID, createReq.Name)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("API工具提供商不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("API工具提供商不存在"))
 	}
 
 	if provider != nil {
-		return errno.ErrValidate.AppendBizMessage("该API提供商已存在")
+		return errno.ErrValidate.AppendBizMessage(errors.New("该API提供商已存在"))
 	}
 
 	newProvider := &entity.ApiToolProvider{
@@ -249,11 +250,11 @@ func (s *ApiToolService) GetApiTool(ctx context.Context, providerID uuid.UUID, t
 
 	tool, err := s.repo.GetApiToolByProviderID(ctx, providerID, toolName)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("API工具不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("API工具不存在"))
 	}
 
 	if tool.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该API工具")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该API工具"))
 	}
 
 	provider, err := s.repo.GetApiToolProviderByID(ctx, tool.ProviderID)

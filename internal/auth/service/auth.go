@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -26,7 +27,7 @@ func NewAuthService(repo *repository.AuthRepo, token *jwt.TokenService) *AuthSer
 func (s *AuthService) Login(ctx context.Context, ua string, loginReq req.LoginReq) ([]string, error) {
 	account, err := s.repo.GetAccountByEmail(ctx, loginReq.Email)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("账号不存在或者密码错误，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("账号或者密码错误，请核实后重试"))
 	}
 
 	var uid uuid.UUID
@@ -47,7 +48,7 @@ func (s *AuthService) Login(ctx context.Context, ua string, loginReq req.LoginRe
 	} else {
 		uid = account.ID
 		if err = bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(loginReq.Password)); err != nil {
-			return nil, errno.ErrNotFound.AppendBizMessage("账号不存在或者密码错误，请核实后重试")
+			return nil, errno.ErrNotFound.AppendBizMessage(errors.New("账号或者密码错误，请核实后重试"))
 		}
 	}
 

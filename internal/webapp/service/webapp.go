@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"github.com/crazyfrankie/voidx/internal/retriever"
+	"errors"
 
 	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
@@ -19,6 +19,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/webapp/repository"
 	"github.com/crazyfrankie/voidx/pkg/consts"
 	"github.com/crazyfrankie/voidx/pkg/errno"
@@ -53,13 +54,13 @@ func (s *WebAppService) GetWebAppInfo(ctx context.Context, token string) (*resp.
 	// 根据token获取应用信息
 	app, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	// 获取应用配置
 	appConfig, err := s.appConfigSvc.GetAppConfig(ctx, app)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("应用配置不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("应用配置不存在"))
 	}
 
 	// 从语言模型管理器中加载大语言模型以获取features
@@ -103,7 +104,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 	// 1. 获取WebApp应用并校验应用是否发布
 	app, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	// 2. 检测是否传递了会话id，如果传递了需要校验会话的归属信息
@@ -111,7 +112,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 	if chatReq.ConversationID != "" {
 		conversationID, err := uuid.Parse(chatReq.ConversationID)
 		if err != nil {
-			return nil, errno.ErrValidate.AppendBizMessage("会话ID格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("会话ID格式错误"))
 		}
 
 		// 验证会话归属
@@ -120,7 +121,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 			convers.AppID != app.ID ||
 			convers.InvokeFrom != consts.InvokeFromWebApp ||
 			convers.CreatedBy != accountID {
-			return nil, errno.ErrForbidden.AppendBizMessage("该会话不存在，或者不属于当前应用/用户/调用方式")
+			return nil, errno.ErrForbidden.AppendBizMessage(errors.New("该会话不存在，或者不属于当前应用/用户/调用方式"))
 		}
 	} else {
 		// 3. 如果没传递conversation_id表示新会话，这时候需要创建一个会话
@@ -138,7 +139,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 	// 4. 获取校验后的运行时配置
 	appConfig, err := s.appConfigSvc.GetAppConfig(ctx, app)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("应用配置不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("应用配置不存在"))
 	}
 
 	// 5. 新建一条消息记录
@@ -242,7 +243,7 @@ func (s *WebAppService) StopWebAppChat(ctx context.Context, token, taskID string
 	// 验证应用
 	_, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	task, err := uuid.Parse(taskID)
@@ -261,7 +262,7 @@ func (s *WebAppService) GetConversations(ctx context.Context, token string, getR
 	// 验证应用
 	app, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	// 使用ConversationService获取会话列表
@@ -414,13 +415,13 @@ func (s *WebAppService) GetConversationMessages(ctx context.Context, token, conv
 	// 验证应用
 	_, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	// 解析会话ID
 	convID, err := uuid.Parse(conversationID)
 	if err != nil {
-		return nil, resp.Paginator{}, errno.ErrValidate.AppendBizMessage("会话ID格式错误")
+		return nil, resp.Paginator{}, errno.ErrValidate.AppendBizMessage(errors.New("会话ID格式错误"))
 	}
 
 	// 使用ConversationService获取消息列表
@@ -457,13 +458,13 @@ func (s *WebAppService) DeleteConversation(ctx context.Context, token, conversat
 	// 验证应用
 	_, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	// 解析会话ID
 	convID, err := uuid.Parse(conversationID)
 	if err != nil {
-		return errno.ErrValidate.AppendBizMessage("会话ID格式错误")
+		return errno.ErrValidate.AppendBizMessage(errors.New("会话ID格式错误"))
 	}
 
 	// 使用ConversationService删除会话
@@ -474,13 +475,13 @@ func (s *WebAppService) UpdateConversationName(ctx context.Context, token, conve
 	// 验证应用
 	_, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	// 解析会话ID
 	convID, err := uuid.Parse(conversationID)
 	if err != nil {
-		return errno.ErrValidate.AppendBizMessage("会话ID格式错误")
+		return errno.ErrValidate.AppendBizMessage(errors.New("会话ID格式错误"))
 	}
 
 	// 使用ConversationService更新会话名称
@@ -491,13 +492,13 @@ func (s *WebAppService) UpdateConversationPin(ctx context.Context, token, conver
 	// 验证应用
 	_, err := s.repo.GetAppByToken(ctx, token)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("WebApp不存在或未发布")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("WebApp不存在或未发布"))
 	}
 
 	// 解析会话ID
 	convID, err := uuid.Parse(conversationID)
 	if err != nil {
-		return errno.ErrValidate.AppendBizMessage("会话ID格式错误")
+		return errno.ErrValidate.AppendBizMessage(errors.New("会话ID格式错误"))
 	}
 
 	// 使用ConversationService更新会话置顶状态

@@ -5,7 +5,7 @@ go 1.24.4
 require (
 	github.com/IBM/sarama v1.45.2
 	github.com/bytedance/sonic v1.13.3
-	github.com/crazyfrankie/gem v0.1.0
+	github.com/crazyfrankie/gem v0.1.1
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.2.3

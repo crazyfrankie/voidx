@@ -25,19 +25,19 @@ type App struct {
 type AppConfig struct {
 	ID                   uuid.UUID        `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AppID                uuid.UUID        `gorm:"type:uuid;not null;index:app_config_app_id_idx" json:"app_id"`
-	ModelConfig          map[string]any   `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"model_config"`
+	ModelConfig          map[string]any   `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"model_config"`
 	DialogRound          int              `gorm:"not null;default:0" json:"dialog_round"`
 	PresetPrompt         string           `gorm:"type:text;not null;default:''" json:"preset_prompt"`
-	Tools                []map[string]any `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"tools"`
-	Workflows            []string         `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"workflows"`
-	RetrievalConfig      map[string]any   `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"retrieval_config"`
-	LongTermMemory       map[string]any   `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"long_term_memory"`
+	Tools                []map[string]any `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"tools"`
+	Workflows            []string         `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"workflows"`
+	RetrievalConfig      map[string]any   `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"retrieval_config"`
+	LongTermMemory       map[string]any   `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"long_term_memory"`
 	OpeningStatement     string           `gorm:"type:text;not null;default:''" json:"opening_statement"`
-	OpeningQuestions     []string         `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"opening_questions"`
-	SpeechToText         map[string]any   `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"speech_to_text"`
-	TextToSpeech         map[string]any   `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"text_to_speech"`
-	SuggestedAfterAnswer map[string]any   `gorm:"type:jsonb;not null;default:'{\"enable\": true}'::jsonb" json:"suggested_after_answer"`
-	ReviewConfig         map[string]any   `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"review_config"`
+	OpeningQuestions     []string         `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"opening_questions"`
+	SpeechToText         map[string]any   `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"speech_to_text"`
+	TextToSpeech         map[string]any   `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"text_to_speech"`
+	SuggestedAfterAnswer map[string]any   `gorm:"type:jsonb;serializer:json;not null;default:'{\"enable\": true}'::jsonb" json:"suggested_after_answer"`
+	ReviewConfig         map[string]any   `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"review_config"`
 	Utime                int64            `gorm:"autoUpdateTime" json:"utime"`
 	Ctime                int64            `gorm:"autoCreateTime" json:"ctime"`
 }
@@ -46,27 +46,26 @@ type AppConfig struct {
 type AppConfigVersion struct {
 	ID                   uuid.UUID            `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AppID                uuid.UUID            `gorm:"type:uuid;not null;index:app_config_version_app_id_idx" json:"app_id"`
-	ModelConfig          map[string]any       `gorm:"serializer:json;type:jsonb;not null;default:'{}'::jsonb" json:"model_config"`
+	ModelConfig          map[string]any       `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"model_config"`
 	DialogRound          int                  `gorm:"not null;default:0" json:"dialog_round"`
 	PresetPrompt         string               `gorm:"type:text;not null;default:''" json:"preset_prompt"`
-	Tools                []map[string]any     `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"tools"`
-	Workflows            []string             `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"workflows"`
-	Datasets             []string             `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"datasets"`
-	RetrievalConfig      map[string]any       `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"retrieval_config"`
-	LongTermMemory       map[string]any       `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"long_term_memory"`
+	Tools                []map[string]any     `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"tools"`
+	Workflows            []string             `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"workflows"`
+	Datasets             []string             `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"datasets"`
+	RetrievalConfig      map[string]any       `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"retrieval_config"`
+	LongTermMemory       map[string]any       `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"long_term_memory"`
 	OpeningStatement     string               `gorm:"type:text;not null;default:''" json:"opening_statement"`
-	OpeningQuestions     []string             `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"opening_questions"`
-	SpeechToText         map[string]any       `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"speech_to_text"`
-	TextToSpeech         map[string]any       `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"text_to_speech"`
-	SuggestedAfterAnswer map[string]any       `gorm:"type:jsonb;not null;default:'{\"enable\": true}'::jsonb" json:"suggested_after_answer"`
-	ReviewConfig         map[string]any       `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"review_config"`
+	OpeningQuestions     []string             `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"opening_questions"`
+	SpeechToText         map[string]any       `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"speech_to_text"`
+	TextToSpeech         map[string]any       `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"text_to_speech"`
+	SuggestedAfterAnswer map[string]any       `gorm:"type:jsonb;serializer:json;not null;default:'{\"enable\": true}'::jsonb" json:"suggested_after_answer"`
+	ReviewConfig         map[string]any       `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"review_config"`
 	Version              int                  `gorm:"not null;default:0" json:"version"`
 	ConfigType           consts.AppConfigType `gorm:"size:255;not null;default:''" json:"config_type"`
 	Utime                int64                `gorm:"autoUpdateTime" json:"utime"`
 	Ctime                int64                `gorm:"autoCreateTime" json:"ctime"`
 }
 
-// AppDatasetJoin 应用知识库关联表模型
 type AppDatasetJoin struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AppID     uuid.UUID `gorm:"type:uuid;not null;index:app_dataset_join_app_id_dataset_id_idx,composite:app_dataset" json:"app_id"`

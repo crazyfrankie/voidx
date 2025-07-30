@@ -21,7 +21,7 @@ func NewApiKeyDao(db *gorm.DB) *ApiKeyDao {
 
 // CreateApiKey 创建API秘钥
 func (d *ApiKeyDao) CreateApiKey(ctx context.Context, apiKey *entity.ApiKey) error {
-	return d.db.WithContext(ctx).Create(apiKey).Error
+	return d.db.WithContext(ctx).Create(&apiKey).Error
 }
 
 // GetApiKeyByID 根据ID获取API秘钥

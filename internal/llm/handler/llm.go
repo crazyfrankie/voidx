@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	
+
 	"github.com/crazyfrankie/voidx/internal/llm/service"
 	"github.com/crazyfrankie/voidx/pkg/response"
 )
@@ -20,7 +20,7 @@ func NewLLMHandler(llmService *service.LLMService) *LLMHandler {
 }
 
 func (h *LLMHandler) RegisterRoute(r *gin.RouterGroup) {
-	llmGroup := r.Group("language-models")
+	llmGroup := r.Group("llms")
 	{
 		llmGroup.GET("", h.GetProviders())
 		llmGroup.GET("/:provider/icon", h.GetProviderIcon())

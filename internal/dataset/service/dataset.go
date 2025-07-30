@@ -2,8 +2,8 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/crazyfrankie/voidx/pkg/consts"
 	"sync"
 
 	"github.com/google/uuid"
@@ -14,6 +14,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment"
+	"github.com/crazyfrankie/voidx/pkg/consts"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
@@ -98,12 +99,12 @@ func (s *DatasetService) GetDataset(ctx context.Context, datasetID uuid.UUID) (*
 
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	// 验证权限
 	if dataset.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该知识库")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该知识库"))
 	}
 
 	return s.buildDatasetResponse(ctx, dataset)
@@ -117,12 +118,12 @@ func (s *DatasetService) UpdateDataset(ctx context.Context, datasetID uuid.UUID,
 
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	// 验证权限
 	if dataset.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限修改该知识库")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限修改该知识库"))
 	}
 
 	updates := make(map[string]any)
@@ -147,12 +148,12 @@ func (s *DatasetService) DeleteDataset(ctx context.Context, datasetID uuid.UUID)
 
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	// 验证权限
 	if dataset.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限删除该知识库")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限删除该知识库"))
 	}
 
 	// 发布异步删除任务
@@ -171,12 +172,12 @@ func (s *DatasetService) Hit(ctx context.Context, datasetID uuid.UUID, hitReq re
 
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	// 验证权限
 	if dataset.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该知识库")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该知识库"))
 	}
 
 	// 调用检索服务进行检索
@@ -247,12 +248,12 @@ func (s *DatasetService) GetDatasetQueries(ctx context.Context, datasetID uuid.U
 
 	dataset, err := s.repo.GetDatasetByID(ctx, datasetID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("知识库不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("知识库不存在"))
 	}
 
 	// 验证权限
 	if dataset.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该知识库")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该知识库"))
 	}
 
 	queries, err := s.repo.GetDatasetQueries(ctx, datasetID, 10) // 获取最近10条查询记录

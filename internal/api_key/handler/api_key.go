@@ -35,7 +35,7 @@ func (h *ApiKeyHandler) CreateApiKey() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateApiKeyReq
 		if err := c.ShouldBindJSON(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -60,7 +60,7 @@ func (h *ApiKeyHandler) GetApiKeysWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetApiKeysWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -99,13 +99,13 @@ func (h *ApiKeyHandler) UpdateApiKey() gin.HandlerFunc {
 		apiKeyIDStr := c.Param("api_key_id")
 		apiKeyID, err := uuid.Parse(apiKeyIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的API秘钥ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateApiKeyReq
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -131,13 +131,13 @@ func (h *ApiKeyHandler) UpdateApiKeyIsActive() gin.HandlerFunc {
 		apiKeyIDStr := c.Param("api_key_id")
 		apiKeyID, err := uuid.Parse(apiKeyIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的API秘钥ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var activeReq req.UpdateApiKeyIsActiveReq
 		if err := c.ShouldBindJSON(&activeReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -163,7 +163,7 @@ func (h *ApiKeyHandler) DeleteApiKey() gin.HandlerFunc {
 		apiKeyIDStr := c.Param("api_key_id")
 		apiKeyID, err := uuid.Parse(apiKeyIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的API秘钥ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

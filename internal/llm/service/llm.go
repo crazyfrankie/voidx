@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"mime"
@@ -67,9 +68,9 @@ func (s *LLMService) GetModelEntity(ctx context.Context, provider, modelName str
 func (s *LLMService) GetProviderIcon(ctx context.Context, providerName string) ([]byte, string, error) {
 	provider, err := s.llmCore.GetProvider(providerName)
 	if err != nil {
-		return nil, "", errno.ErrNotFound.AppendBizMessage("该服务提供者不存在")
+		return nil, "", errno.ErrNotFound.AppendBizMessage(errors.New("该服务提供者不存在"))
 	}
-	
+
 	rootPath, err := os.Getwd()
 	if err != nil {
 		return nil, "", err
@@ -83,7 +84,7 @@ func (s *LLMService) GetProviderIcon(ctx context.Context, providerName string) (
 	iconPath := filepath.Join(providerPath, "_asset", provider.ProviderEntity.Icon)
 
 	if _, err := os.Stat(iconPath); os.IsNotExist(err) {
-		return nil, "", errno.ErrNotFound.AppendBizMessage("该工具提供者_asset下未提供图标")
+		return nil, "", errno.ErrNotFound.AppendBizMessage(errors.New("该工具提供者_asset下未提供图标"))
 	}
 
 	mimetype := mime.TypeByExtension(filepath.Ext(iconPath))

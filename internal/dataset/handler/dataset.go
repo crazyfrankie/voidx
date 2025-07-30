@@ -35,7 +35,7 @@ func (h *DatasetHandler) CreateDataset() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateDatasetReq
 		if err := c.ShouldBind(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -53,7 +53,7 @@ func (h *DatasetHandler) GetDatasetsWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetDatasetsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -75,7 +75,7 @@ func (h *DatasetHandler) GetDataset() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -94,13 +94,13 @@ func (h *DatasetHandler) UpdateDataset() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateDatasetReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -119,7 +119,7 @@ func (h *DatasetHandler) DeleteDataset() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -138,13 +138,13 @@ func (h *DatasetHandler) Hit() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var hitReq req.HitReq
 		if err := c.ShouldBind(&hitReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -163,7 +163,7 @@ func (h *DatasetHandler) GetDatasetQueries() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("知识库ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

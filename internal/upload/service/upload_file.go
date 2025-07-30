@@ -47,12 +47,12 @@ func (s *OssService) UploadFile(ctx context.Context, data []byte, onlyImage bool
 
 	if onlyImage {
 		if !s.isAllowedExtension(extension, consts.AllowedImageExtension) {
-			return resp.UploadFileResp{}, errno.ErrValidate.AppendBizMessage(fmt.Sprintf("不支持的图片格式: .%s", extension))
+			return resp.UploadFileResp{}, errno.ErrValidate.AppendBizMessage(fmt.Errorf("不支持的图片格式: .%s", extension))
 		}
 	} else {
 		allowedExtensions := append(consts.AllowedDocumentExtension, consts.AllowedImageExtension...)
 		if !s.isAllowedExtension(extension, allowedExtensions) {
-			return resp.UploadFileResp{}, errno.ErrValidate.AppendBizMessage(fmt.Sprintf("不支持的文件格式: .%s", extension))
+			return resp.UploadFileResp{}, errno.ErrValidate.AppendBizMessage(fmt.Errorf("不支持的文件格式: .%s", extension))
 		}
 	}
 
@@ -60,7 +60,7 @@ func (s *OssService) UploadFile(ctx context.Context, data []byte, onlyImage bool
 
 	info, err := s.uploadToStorage(ctx, key, data)
 	if err != nil {
-		return resp.UploadFileResp{}, errno.ErrInternalServer.AppendBizMessage("上传文件失败: " + err.Error())
+		return resp.UploadFileResp{}, errno.ErrInternalServer.AppendBizMessage(fmt.Errorf("上传文件失败, %w", err))
 	}
 
 	uploadFile := &entity.UploadFile{

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -34,7 +35,7 @@ func (h *OpenAPIHandler) Chat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var chatReq req.OpenAPIChatReq
 		if err := c.ShouldBindJSON(&chatReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
 			return
 		}
 

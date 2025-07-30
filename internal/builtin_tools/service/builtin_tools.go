@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"mime"
 	"os"
@@ -62,12 +63,12 @@ func (s *BuiltinToolsService) GetBuiltinTools(ctx context.Context) []map[string]
 func (s *BuiltinToolsService) GetProviderTool(ctx context.Context, providerName string, toolName string) (map[string]any, error) {
 	provider := s.providerManager.GetProvider(providerName)
 	if provider == nil {
-		return nil, errno.ErrNotFound.AppendBizMessage(fmt.Sprintf("该提供商 %s 不存在", providerName))
+		return nil, errno.ErrNotFound.AppendBizMessage(fmt.Errorf("该提供商 %s 不存在", providerName))
 	}
 
 	toolEntity := provider.GetToolEntity(toolName)
 	if toolEntity == nil {
-		return nil, errno.ErrNotFound.AppendBizMessage(fmt.Sprintf("该工具 %s 不存在", toolName))
+		return nil, errno.ErrNotFound.AppendBizMessage(fmt.Errorf("该工具 %s 不存在", toolName))
 	}
 
 	providerEntity := provider.ProviderEntity
@@ -93,7 +94,7 @@ func (s *BuiltinToolsService) GetProviderTool(ctx context.Context, providerName 
 func (s *BuiltinToolsService) GetProviderIcon(ctx context.Context, providerName string) ([]byte, string, error) {
 	provider := s.providerManager.GetProvider(providerName)
 	if provider == nil {
-		return nil, "", errno.ErrNotFound.AppendBizMessage(fmt.Sprintf("该工具提供者 %s 不存在", providerName))
+		return nil, "", errno.ErrNotFound.AppendBizMessage(fmt.Errorf("该工具提供者 %s 不存在", providerName))
 	}
 
 	rootPath, err := os.Getwd()
@@ -109,7 +110,7 @@ func (s *BuiltinToolsService) GetProviderIcon(ctx context.Context, providerName 
 	iconPath := filepath.Join(providerPath, "_asset", provider.ProviderEntity.Icon)
 
 	if _, err := os.Stat(iconPath); os.IsNotExist(err) {
-		return nil, "", errno.ErrNotFound.AppendBizMessage("该工具提供者_asset下未提供图标")
+		return nil, "", errno.ErrNotFound.AppendBizMessage(errors.New("该工具提供者_asset下未提供图标"))
 	}
 
 	mimetype := mime.TypeByExtension(filepath.Ext(iconPath))

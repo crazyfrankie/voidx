@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -80,11 +81,11 @@ func (s *AIService) GenerateSuggestedQuestions(ctx context.Context, messageID, u
 	// 1. 查询消息并校验权限信息
 	message, err := s.repo.GetMessageByID(ctx, messageID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("消息不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("消息不存在"))
 	}
 
 	if message.CreatedBy != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("该条消息不存在或无权限")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("该条消息不存在或无权限"))
 	}
 
 	// 2. 构建对话历史列表

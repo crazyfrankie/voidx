@@ -28,19 +28,26 @@ func NewAppHandler(appService *service.AppService, appCfgSvc *app_config.Service
 func (h *AppHandler) RegisterRoute(r *gin.RouterGroup) {
 	appGroup := r.Group("/apps")
 	{
-		appGroup.POST("", h.CreateApp())                                //
-		appGroup.GET("", h.GetAppsWithPage())                           //
-		appGroup.GET("/:app_id", h.GetApp())                            //
-		appGroup.PUT("/:app_id", h.UpdateApp())                         //
-		appGroup.POST("/:app_id", h.CopyApp())                          //
-		appGroup.DELETE("/:app_id", h.DeleteApp())                      //
-		appGroup.GET("/:app_id/draft-config", h.GetAppDraftConfig())    //
-		appGroup.PUT("/:app_id/draft-config", h.UpdateAppDraftConfig()) //
-		appGroup.POST("/:app_id/publish", h.PublishApp())               //
-		appGroup.POST("/:app_id/unpublish", h.UnpublishApp())           //
-		appGroup.POST("/:app_id/summary", h.UpdateAppSummary())
+		appGroup.GET("/:app_id", h.GetApp())
+		appGroup.POST("", h.CreateApp())
+		appGroup.PUT("/:app_id", h.UpdateApp())
+		appGroup.DELETE("/:app_id", h.DeleteApp())
+		appGroup.POST("/:app_id", h.CopyApp())
+		appGroup.GET("", h.GetAppsWithPage())
+		appGroup.GET("/:app_id/draft-app-config", h.GetAppDraftConfig())
+		appGroup.PUT("/:app_id/draft-app-config", h.UpdateAppDraftConfig())
+		appGroup.GET("/:app_id/summary", h.GetDebugAppSummary())
+		appGroup.PUT("/:app_id/summary", h.UpdateDebugAppSummary())
+		appGroup.POST("/:app_id/conversation", h.DebugChat())
+		appGroup.POST("/:app_id/conversation/tasks/:task_id/stop")
+		appGroup.GET("/:app_id/conversation/messages", h.GetDebugConversationWithPage())
+		appGroup.DELETE("/:app_id/debug-conversation")
+		appGroup.POST("/:app_id/publish", h.PublishApp())
+		appGroup.POST("/:app_id/unpublish", h.UnpublishApp())
+		appGroup.GET("/:app_id/publish-histories", h.GetPublishedHistoryWithPage())
+		appGroup.GET("/:app_id/fallback-history", h.FallBackHistory())
 		appGroup.GET("/:app_id/published-config", h.GetPublishedConfig())
-		appGroup.POST("/:app_id/conversations", h.DebugChat())
+		appGroup.POST("/:app_id/published-config/regenerate-web-app-token", h.RegenerateToken())
 	}
 }
 
@@ -49,7 +56,7 @@ func (h *AppHandler) CreateApp() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateAppReq
 		if err := c.ShouldBindJSON(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -75,7 +82,7 @@ func (h *AppHandler) GetApp() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -99,7 +106,7 @@ func (h *AppHandler) GetApp() gin.HandlerFunc {
 			"status":      app.Status,
 			"token":       app.Token,
 			"updated_at":  app.Utime,
-			"created_at":  app.Ctime,
+			"ctime":       app.Ctime,
 		})
 	}
 }
@@ -110,13 +117,13 @@ func (h *AppHandler) UpdateApp() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateAppReq
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -142,7 +149,7 @@ func (h *AppHandler) CopyApp() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -168,7 +175,7 @@ func (h *AppHandler) DeleteApp() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -193,7 +200,7 @@ func (h *AppHandler) GetAppsWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetAppsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -227,7 +234,7 @@ func (h *AppHandler) GetAppDraftConfig() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -253,13 +260,13 @@ func (h *AppHandler) UpdateAppDraftConfig() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		updateReq := make(map[string]any)
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -285,7 +292,7 @@ func (h *AppHandler) PublishApp() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -311,7 +318,7 @@ func (h *AppHandler) UnpublishApp() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -331,19 +338,19 @@ func (h *AppHandler) UnpublishApp() gin.HandlerFunc {
 	}
 }
 
-// UpdateAppSummary 更新应用长记忆
-func (h *AppHandler) UpdateAppSummary() gin.HandlerFunc {
+// UpdateDebugAppSummary 更新应用长记忆
+func (h *AppHandler) UpdateDebugAppSummary() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var summaryReq req.UpdateAppSummaryReq
 		if err := c.ShouldBindJSON(&summaryReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -369,7 +376,7 @@ func (h *AppHandler) GetPublishedConfig() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -395,13 +402,13 @@ func (h *AppHandler) DebugChat() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("应用ID格式不正确"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var chatReq req.DebugChatReq
 		if err := c.ShouldBindJSON(&chatReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -419,5 +426,184 @@ func (h *AppHandler) DebugChat() gin.HandlerFunc {
 		}
 
 		response.Success(c)
+	}
+}
+
+// GetDebugAppSummary 获取应用调试长记忆
+func (h *AppHandler) GetDebugAppSummary() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		appIDStr := c.Param("app_id")
+		appID, err := uuid.Parse(appIDStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		userID, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		res, err := h.appService.GetDebugConversationSummary(c.Request.Context(), appID, userID)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		response.SuccessWithData(c, gin.H{"summary": res})
+	}
+}
+
+// TODO
+func (h *AppHandler) StopDebugChat() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+	}
+}
+
+// GetDebugConversationWithPage 获取应用的调试会话消息列表
+func (h *AppHandler) GetDebugConversationWithPage() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var pageReq req.GetDebugConversationMessagesWithPageReq
+		if err := c.ShouldBindQuery(&pageReq); err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		appIDStr := c.Param("app_id")
+		appID, err := uuid.Parse(appIDStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		userID, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, errno.ErrUnauthorized)
+			return
+		}
+
+		list, paginator, err := h.appService.GetDebugConversationMessagesWithPage(c.Request.Context(), appID, pageReq, userID)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		response.SuccessWithData(c, gin.H{"list": list, "paginator": paginator})
+	}
+}
+
+// DeleteDebugConversation 清空应用的调试会话记录
+func (h *AppHandler) DeleteDebugConversation() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		appIDStr := c.Param("app_id")
+		appID, err := uuid.Parse(appIDStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		userID, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		err = h.appService.DeleteDebugConversation(c.Request.Context(), appID, userID)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		response.Success(c)
+	}
+}
+
+// GetPublishedHistoryWithPage 获取应用的发布历史列表信息
+func (h *AppHandler) GetPublishedHistoryWithPage() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var pageReq req.GetPublishHistoriesWithPageReq
+		if err := c.ShouldBindQuery(&pageReq); err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		appIDStr := c.Param("app_id")
+		appID, err := uuid.Parse(appIDStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		userID, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, errno.ErrUnauthorized)
+			return
+		}
+
+		list, paginator, err := h.appService.GetPublishHistoriesWithPage(c.Request.Context(), appID, pageReq, userID)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		response.SuccessWithData(c, gin.H{"list": list, "paginator": paginator})
+	}
+}
+
+// FallBackHistory 回退指定的历史配置到草稿
+func (h *AppHandler) FallBackHistory() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var fallbackReq req.FallbackHistoryToDraftReq
+		if err := c.ShouldBind(&fallbackReq); err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		appIDStr := c.Param("app_id")
+		appID, err := uuid.Parse(appIDStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		userID, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		_, err = h.appService.FallbackHistoryToDraft(c.Request.Context(), appID, fallbackReq.AppConfigVersionID, userID)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+	}
+}
+
+// RegenerateToken 重新生成 WebApp 的凭证标识
+func (h *AppHandler) RegenerateToken() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		appIDStr := c.Param("app_id")
+		appID, err := uuid.Parse(appIDStr)
+		if err != nil {
+			response.Error(c, errno.ErrValidate)
+			return
+		}
+
+		userID, err := util.GetCurrentUserID(c.Request.Context())
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		res, err := h.appService.RegenerateWebAppToken(c.Request.Context(), appID, userID)
+		if err != nil {
+			response.Error(c, err)
+			return
+		}
+
+		response.SuccessWithData(c, gin.H{"token": res})
 	}
 }

@@ -36,7 +36,7 @@ func (h *AIHandler) OptimizePrompt() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var optimizeReq req.OptimizePromptReq
 		if err := c.ShouldBindJSON(&optimizeReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -81,7 +81,7 @@ func (h *AIHandler) GenerateSuggestedQuestions() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var suggestedReq req.GenerateSuggestedQuestionsReq
 		if err := c.ShouldBindJSON(&suggestedReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

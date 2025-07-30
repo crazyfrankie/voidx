@@ -19,7 +19,7 @@ func NewApiToolDao(db *gorm.DB) *ApiToolDao {
 }
 
 func (d *ApiToolDao) CreateApiToolProvider(ctx context.Context, provider *entity.ApiToolProvider) error {
-	return d.db.WithContext(ctx).Create(provider).Error
+	return d.db.WithContext(ctx).Create(&provider).Error
 }
 
 func (d *ApiToolDao) GetApiToolProviderByID(ctx context.Context, id uuid.UUID) (*entity.ApiToolProvider, error) {
@@ -95,7 +95,7 @@ func (d *ApiToolDao) CheckProviderNameExistsExclude(ctx context.Context, account
 }
 
 func (d *ApiToolDao) CreateApiTool(ctx context.Context, tool *entity.ApiTool) error {
-	return d.db.WithContext(ctx).Create(tool).Error
+	return d.db.WithContext(ctx).Create(&tool).Error
 }
 
 func (d *ApiToolDao) GetApiToolByProviderID(ctx context.Context, providerID uuid.UUID, toolName string) (*entity.ApiTool, error) {

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"regexp"
@@ -38,11 +39,11 @@ func (s *ConversationService) GetConversationMessagesWithPage(ctx context.Contex
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, conversationID)
 	if err != nil {
-		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != userID {
-		return nil, resp.Paginator{}, errno.ErrForbidden.AppendBizMessage("无权限访问该会话")
+		return nil, resp.Paginator{}, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该会话"))
 	}
 
 	// 获取消息列表
@@ -72,11 +73,11 @@ func (s *ConversationService) DeleteConversation(ctx context.Context, conversati
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, conversationID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限删除该会话")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限删除该会话"))
 	}
 
 	return s.repo.DeleteConversation(ctx, conversationID)
@@ -91,21 +92,21 @@ func (s *ConversationService) DeleteMessage(ctx context.Context, conversationID,
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, conversationID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限操作该会话")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限操作该会话"))
 	}
 
 	// 验证消息是否属于该会话
 	message, err := s.repo.GetMessageByID(ctx, messageID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("消息不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("消息不存在"))
 	}
 
 	if message.ConversationID != conversationID {
-		return errno.ErrValidate.AppendBizMessage("消息不属于该会话")
+		return errno.ErrValidate.AppendBizMessage(errors.New("消息不属于该会话"))
 	}
 
 	return s.repo.DeleteMessage(ctx, messageID)
@@ -120,11 +121,11 @@ func (s *ConversationService) GetConversationName(ctx context.Context, conversat
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, conversationID)
 	if err != nil {
-		return "", errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return "", errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != userID {
-		return "", errno.ErrForbidden.AppendBizMessage("无权限访问该会话")
+		return "", errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该会话"))
 	}
 
 	return conversation.Name, nil
@@ -139,11 +140,11 @@ func (s *ConversationService) UpdateConversationName(ctx context.Context, conver
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, conversationID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限修改该会话")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限修改该会话"))
 	}
 
 	return s.repo.UpdateConversationName(ctx, conversationID, name)
@@ -158,11 +159,11 @@ func (s *ConversationService) UpdateConversationIsPinned(ctx context.Context, co
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, conversationID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限修改该会话")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限修改该会话"))
 	}
 
 	return s.repo.UpdateConversationIsPinned(ctx, conversationID, isPinned)
@@ -193,11 +194,11 @@ func (s *ConversationService) CreateMessage(ctx context.Context, accountID uuid.
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, createReq.ConversationID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != accountID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限操作该会话")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限操作该会话"))
 	}
 
 	// 创建消息实体
@@ -224,17 +225,17 @@ func (s *ConversationService) UpdateMessage(ctx context.Context, accountID uuid.
 	// 验证消息权限
 	message, err := s.repo.GetMessageByID(ctx, messageID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("消息不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("消息不存在"))
 	}
 
 	// 验证会话权限
 	conversation, err := s.repo.GetConversationByID(ctx, message.ConversationID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("会话不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("会话不存在"))
 	}
 
 	if conversation.CreatedBy != accountID {
-		return errno.ErrForbidden.AppendBizMessage("无权限操作该消息")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限操作该会话"))
 	}
 
 	// 构建更新字段

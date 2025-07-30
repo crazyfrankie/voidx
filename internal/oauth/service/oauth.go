@@ -38,7 +38,7 @@ func NewOAuthService(repo *repository.OAuthRepo, token *jwt.TokenService) *OAuth
 func (s *OAuthService) GetOAuthByProviderName(ctx context.Context, providerName string) (oauth.OAuth, error) {
 	oAuth := s.oauthMap[providerName]
 	if oAuth == nil {
-		return nil, errno.ErrNotFound.AppendBizMessage(fmt.Sprintf("该授权方式 %s 不存在", providerName))
+		return nil, errno.ErrNotFound.AppendBizMessage(fmt.Errorf("该授权方式 %s 不存在", providerName))
 	}
 
 	return oAuth, nil

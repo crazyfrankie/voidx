@@ -2,6 +2,7 @@ package tool
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -77,7 +78,7 @@ func (t *ToolNode) initializeAPITool() error {
 		return fmt.Errorf("获取API工具失败: %v", err)
 	}
 	if apiTool == nil {
-		return errno.ErrNotFound.AppendBizMessage("该API扩展插件不存在，请核实重试")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("该API扩展插件不存在，请核实重试"))
 	}
 
 	var apiToolProvider *entity.ApiToolProvider
@@ -87,7 +88,7 @@ func (t *ToolNode) initializeAPITool() error {
 		return fmt.Errorf("获取API提供者失败: %v", err)
 	}
 	if apiToolProvider == nil {
-		return errno.ErrNotFound.AppendBizMessage("该API提供商不存在，请核实重试")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("该API提供商不存在，请核实重试"))
 	}
 
 	t.tool = t.apiToolProvider.GetTool(&toolsentity.ToolEntity{

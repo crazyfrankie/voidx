@@ -32,7 +32,7 @@ func (h *AnalysisHandler) GetAppAnalysis() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的应用ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

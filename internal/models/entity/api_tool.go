@@ -12,7 +12,7 @@ type ApiToolProvider struct {
 	Icon          string    `gorm:"size:255;not null;default:''" json:"icon"`
 	Description   string    `gorm:"type:text;not null;default:''" json:"description"`
 	OpenapiSchema string    `gorm:"type:text;not null;default:''" json:"openapi_schema"`
-	Headers       []Header  `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"headers"`
+	Headers       []Header  `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"headers"`
 	Utime         int64     `gorm:"autoUpdateTime" json:"utime"`
 	Ctime         int64     `gorm:"autoCreateTime" json:"ctime"`
 }
@@ -31,7 +31,7 @@ type ApiTool struct {
 	Description string           `gorm:"type:text;not null;default:''" json:"description"`
 	URL         string           `gorm:"size:255;not null;default:''" json:"url"`
 	Method      string           `gorm:"size:255;not null;default:''" json:"method"`
-	Parameters  []map[string]any `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"parameters"`
+	Parameters  []map[string]any `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"parameters"`
 	Utime       int64            `gorm:"autoUpdateTime" json:"utime"`
 	Ctime       int64            `gorm:"autoCreateTime" json:"ctime"`
 }

@@ -39,7 +39,7 @@ func (h *AssistantAgentHandler) Chat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var chatReq req.AssistantAgentChatReq
 		if err := c.ShouldBindJSON(&chatReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -90,7 +90,7 @@ func (h *AssistantAgentHandler) StopChat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var stopReq req.StopAssistantAgentChatReq
 		if err := c.ShouldBindUri(&stopReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("任务ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -115,7 +115,7 @@ func (h *AssistantAgentHandler) GetMessagesWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetAssistantAgentMessagesWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

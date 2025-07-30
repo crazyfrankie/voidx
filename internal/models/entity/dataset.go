@@ -52,7 +52,7 @@ type Segment struct {
 	Content             string               `gorm:"type:text;not null;default:''" json:"content"`
 	CharacterCount      int                  `gorm:"not null;default:0" json:"character_count"`
 	TokenCount          int                  `gorm:"not null;default:0" json:"token_count"`
-	Keywords            []string             `gorm:"type:jsonb;not null;default:'[]'::jsonb" json:"keywords"`
+	Keywords            []string             `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"keywords"`
 	Hash                string               `gorm:"size:255;not null;default:''" json:"hash"`
 	HitCount            int                  `gorm:"not null;default:0" json:"hit_count"`
 	Enabled             bool                 `gorm:"not null;default:false" json:"enabled"`
@@ -71,7 +71,7 @@ type Segment struct {
 type Keyword struct {
 	ID         uuid.UUID           `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	DatasetID  uuid.UUID           `gorm:"type:uuid;not null;index:keyword_table_dataset_id_idx" json:"dataset_id"`
-	KeywordMap map[string][]string `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"keyword_map"`
+	KeywordMap map[string][]string `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"keyword_map"`
 	Utime      int64               `gorm:"autoUpdateTime" json:"utime"`
 	Ctime      int64               `gorm:"autoCreateTime" json:"ctime"`
 }
@@ -94,7 +94,7 @@ type ProcessRule struct {
 	AccountID uuid.UUID      `gorm:"type:uuid;not null;index:process_rule_account_id_idx" json:"account_id"`
 	DatasetID uuid.UUID      `gorm:"type:uuid;not null;index:process_rule_dataset_id_idx" json:"dataset_id"`
 	Mode      string         `gorm:"size:255;not null;default:'automic'" json:"mode"`
-	Rule      map[string]any `gorm:"type:jsonb;not null;default:'{}'::jsonb" json:"rule"`
+	Rule      map[string]any `gorm:"type:jsonb;serializer:json;not null;default:'{}'::jsonb" json:"rule"`
 	Utime     int64          `gorm:"autoUpdateTime" json:"utime"`
 	Ctime     int64          `gorm:"autoCreateTime" json:"ctime"`
 }

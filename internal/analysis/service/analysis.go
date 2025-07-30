@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,11 +31,11 @@ func (s *AnalysisService) GetAppAnalysis(ctx context.Context, appID, userID uuid
 	// 1. 验证应用权限
 	application, err := s.appSvc.GetApp(ctx, appID, userID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("应用不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("应用不存在"))
 	}
 
 	if application.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该应用")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该应用"))
 	}
 
 	// 2. 尝试从缓存获取数据

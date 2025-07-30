@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -28,11 +29,11 @@ func (s *PlatformService) GetWechatConfig(ctx context.Context, appID, userID uui
 	// 1. 获取应用信息并校验权限
 	app, err := s.repo.GetAppByID(ctx, appID)
 	if err != nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("应用不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("应用不存在"))
 	}
 
 	if app.AccountID != userID {
-		return nil, errno.ErrForbidden.AppendBizMessage("无权限访问该应用")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该应用"))
 	}
 
 	// 2. 获取或创建微信配置
@@ -70,11 +71,11 @@ func (s *PlatformService) UpdateWechatConfig(ctx context.Context, appID, userID 
 	// 1. 获取应用信息并校验权限
 	app, err := s.repo.GetAppByID(ctx, appID)
 	if err != nil {
-		return errno.ErrNotFound.AppendBizMessage("应用不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("应用不存在"))
 	}
 
 	if app.AccountID != userID {
-		return errno.ErrForbidden.AppendBizMessage("无权限访问该应用")
+		return errno.ErrForbidden.AppendBizMessage(errors.New("无权限访问该应用"))
 	}
 
 	// 2. 获取或创建微信配置

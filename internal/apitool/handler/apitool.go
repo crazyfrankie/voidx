@@ -35,7 +35,7 @@ func (h *ApiToolHandler) CreateApiTool() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateApiToolReq
 		if err := c.ShouldBind(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -53,7 +53,7 @@ func (h *ApiToolHandler) GetApiToolProvidersWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetApiToolProvidersWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -72,7 +72,7 @@ func (h *ApiToolHandler) GetApiToolProvider() gin.HandlerFunc {
 		providerIDStr := c.Param("provider_id")
 		providerID, err := uuid.Parse(providerIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("提供商ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -91,13 +91,13 @@ func (h *ApiToolHandler) UpdateApiToolProvider() gin.HandlerFunc {
 		providerIDStr := c.Param("provider_id")
 		providerID, err := uuid.Parse(providerIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("提供商ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateApiToolProviderReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -116,7 +116,7 @@ func (h *ApiToolHandler) DeleteApiToolProvider() gin.HandlerFunc {
 		providerIDStr := c.Param("provider_id")
 		providerID, err := uuid.Parse(providerIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("提供商ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -136,7 +136,7 @@ func (h *ApiToolHandler) GetApiTool() gin.HandlerFunc {
 		toolName := c.Param("tool_name")
 		providerId, err := uuid.Parse(providerIdStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("工具ID格式错误"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -154,7 +154,7 @@ func (h *ApiToolHandler) ValidateOpenApiSchema() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var validateReq req.ValidateOpenApiSchemaReq
 		if err := c.ShouldBind(&validateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

@@ -120,3 +120,9 @@ type AppDraftConfigResp struct {
 	SuggestedAfterAnswer map[string]any   `json:"suggested_after_answer"`
 	ReviewConfig         map[string]any   `json:"review_config"`
 }
+
+type GetPublishHistoriesWithPageResp struct {
+	ID      uuid.UUID `json:"id"`
+	Version int       `json:"version"`
+	Ctime   int64     `json:"ctime"`
+}

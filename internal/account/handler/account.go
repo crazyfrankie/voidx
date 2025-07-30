@@ -43,7 +43,7 @@ func (h *AccountHandler) UpdatePassword() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var updateReq req.UpdatePasswdReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -61,7 +61,7 @@ func (h *AccountHandler) UpdateName() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var updateReq req.UpdateNameReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -79,7 +79,7 @@ func (h *AccountHandler) UpdateAvatar() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var updateReq req.UpdateAvatarReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

@@ -45,7 +45,7 @@ func (h *WorkflowHandler) CreateWorkflow() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateWorkflowReq
 		if err := c.ShouldBindJSON(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -70,7 +70,7 @@ func (h *WorkflowHandler) GetWorkflowsWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetWorkflowsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -109,7 +109,7 @@ func (h *WorkflowHandler) GetWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -135,13 +135,13 @@ func (h *WorkflowHandler) UpdateWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateWorkflowReq
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -167,7 +167,7 @@ func (h *WorkflowHandler) DeleteWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -193,13 +193,13 @@ func (h *WorkflowHandler) UpdateDraftGraph() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var draftGraphReq req.UpdateDraftGraphReq
 		if err := c.ShouldBindJSON(&draftGraphReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -230,7 +230,7 @@ func (h *WorkflowHandler) GetDraftGraph() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -256,13 +256,13 @@ func (h *WorkflowHandler) DebugWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
 		var debugReq req.DebugWorkflowReq
 		if err := c.ShouldBindJSON(&debugReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("请求参数验证失败"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -314,7 +314,7 @@ func (h *WorkflowHandler) PublishWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 
@@ -340,7 +340,7 @@ func (h *WorkflowHandler) CancelPublishWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("无效的工作流ID格式"))
+			response.Error(c, errno.ErrValidate)
 			return
 		}
 

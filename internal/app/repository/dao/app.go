@@ -23,7 +23,7 @@ func NewAppDao(db *gorm.DB) *AppDao {
 
 // CreateApp 创建应用
 func (d *AppDao) CreateApp(ctx context.Context, app *entity.App) (*entity.App, error) {
-	if err := d.db.WithContext(ctx).Create(app).Error; err != nil {
+	if err := d.db.WithContext(ctx).Model(&entity.App{}).Create(&app).Error; err != nil {
 		return nil, err
 	}
 
@@ -81,29 +81,8 @@ func (d *AppDao) GetAppsWithPage(ctx context.Context, accountID uuid.UUID, page 
 	return apps, totalRecords, totalPages, nil
 }
 
-// CreateAppConfigVersion 创建应用配置版本
-//
-//	func (d *AppDao) CreateAppConfigVersion(ctx context.Context, appID uuid.UUID, version int, configType string, config map[string]any) (*entity.AppConfigVersion, error) {
-//		var err error
-//
-//		appConfigVersion := &entity.AppConfigVersion{
-//			AppID:      appID,
-//			Version:    version,
-//			ConfigType: configType,
-//		}
-//		appConfigVersion.ModelConfig, err = sonic.Marshal(config)
-//		if err != nil {
-//			return nil, err
-//		}
-//
-//		if err := d.db.WithContext(ctx).Create(appConfigVersion).Error; err != nil {
-//			return nil, err
-//		}
-//
-//		return appConfigVersion, nil
-//	}
 func (d *AppDao) CreateAppConfigVersion(ctx context.Context, appCfgVer *entity.AppConfigVersion) (*entity.AppConfigVersion, error) {
-	if err := d.db.WithContext(ctx).Create(appCfgVer).Error; err != nil {
+	if err := d.db.WithContext(ctx).Create(&appCfgVer).Error; err != nil {
 		return nil, err
 	}
 	return appCfgVer, nil
@@ -144,7 +123,7 @@ func (d *AppDao) GetMaxPublishedVersion(ctx context.Context, appID uuid.UUID) (i
 
 // CreateAppConfig 创建应用配置
 func (d *AppDao) CreateAppConfig(ctx context.Context, appConfig *entity.AppConfig) (*entity.AppConfig, error) {
-	if err := d.db.WithContext(ctx).Create(appConfig).Error; err != nil {
+	if err := d.db.WithContext(ctx).Create(&appConfig).Error; err != nil {
 		return nil, err
 	}
 
@@ -168,7 +147,7 @@ func (d *AppDao) CreateConversation(ctx context.Context, accountID, appID uuid.U
 		Summary:   "",
 	}
 
-	if err := d.db.WithContext(ctx).Create(conversation).Error; err != nil {
+	if err := d.db.WithContext(ctx).Create(&conversation).Error; err != nil {
 		return nil, err
 	}
 

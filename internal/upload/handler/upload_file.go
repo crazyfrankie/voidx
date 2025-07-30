@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"io"
 
 	"github.com/gin-gonic/gin"
@@ -33,14 +34,14 @@ func (h *UploadFileHandler) UploadFile() gin.HandlerFunc {
 		// 获取上传的文件
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("上传图片不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传图片不能为空")))
 			return
 		}
 		defer file.Close()
 
 		// 检查文件大小（15MB限制）
 		if header.Size > 15*1024*1024 {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("上传文件最大不能超过15MB"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传文件最大不能超过15MB")))
 		}
 		data, err := io.ReadAll(file)
 		if err != nil {
@@ -70,14 +71,14 @@ func (h *UploadFileHandler) UploadImage() gin.HandlerFunc {
 		// 获取上传的文件
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("上传图片不能为空"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传图片不能为空")))
 			return
 		}
 		defer file.Close()
 
 		// 检查文件大小（15MB限制）
 		if header.Size > 15*1024*1024 {
-			response.Error(c, errno.ErrValidate.AppendBizMessage("上传文件最大不能超过15MB"))
+			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传文件最大不能超过15MB")))
 		}
 		data, err := io.ReadAll(file)
 		if err != nil {

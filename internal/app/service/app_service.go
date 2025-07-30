@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -115,12 +116,12 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 	if iconURL != "" {
 		httpResp, err := http.Get(iconURL)
 		if err != nil {
-			return errno.ErrInternalServer.AppendBizMessage("下载生成的图标失败")
+			return errno.ErrInternalServer.AppendBizMessage(errors.New("下载生成的图标失败"))
 		}
 		defer httpResp.Body.Close()
 
 		if httpResp.StatusCode != 200 {
-			return errno.ErrInternalServer.AppendBizMessage("生成应用icon图标出错")
+			return errno.ErrInternalServer.AppendBizMessage(errors.New("生成应用icon图标出错"))
 		}
 
 		data, err := io.ReadAll(httpResp.Body)
@@ -130,7 +131,7 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 		// 上传到OSS
 		uploadedIconURL, err := s.ossSvc.UploadFile(ctx, data, true, "icon.png", accountID)
 		if err != nil {
-			return errno.ErrInternalServer.AppendBizMessage("上传图标失败")
+			return errno.ErrInternalServer.AppendBizMessage(errors.New("上传图标失败"))
 		}
 		iconURL = uploadedIconURL.URL
 	}
@@ -231,12 +232,12 @@ func (s *AppService) GetApp(ctx context.Context, appID uuid.UUID, accountID uuid
 
 	// 2. 判断应用是否存在
 	if app == nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("该应用不存在，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该应用不存在，请核实后重试"))
 	}
 
 	// 3. 判断当前账号是否有权限访问该应用
 	if app.AccountID != accountID {
-		return nil, errno.ErrForbidden.AppendBizMessage("当前账号无权限访问该应用，请核实后尝试")
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
 	return app, nil
@@ -431,7 +432,7 @@ func (s *AppService) UpdateDraftAppConfig(ctx context.Context, appID uuid.UUID, 
 
 	// 3. 获取当前应用的最新草稿信息
 	if app.DraftAppConfigID == uuid.Nil {
-		return errno.ErrNotFound.AppendBizMessage("草稿配置不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("草稿配置不存在"))
 	}
 
 	_, err = s.repo.GetAppConfigVersion(ctx, app.DraftAppConfigID)
@@ -552,7 +553,7 @@ func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID,
 
 	// 6. 获取应用草稿记录
 	if app.DraftAppConfigID == uuid.Nil {
-		return errno.ErrNotFound.AppendBizMessage("草稿配置不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("草稿配置不存在"))
 	}
 
 	draftAppConfigCopy, err := s.repo.GetAppConfigVersion(ctx, app.DraftAppConfigID)
@@ -606,7 +607,7 @@ func (s *AppService) CancelPublishAppConfig(ctx context.Context, appID uuid.UUID
 
 	// 2. 检测下当前应用的状态是否为已发布
 	if app.Status != consts.AppStatusPublished {
-		return errno.ErrValidate.AppendBizMessage("当前应用未发布，请核实后重试")
+		return errno.ErrValidate.AppendBizMessage(errors.New("当前应用未发布，请核实后重试"))
 	}
 
 	// 3. 修改账号的发布状态，并清空关联配置id
@@ -629,7 +630,7 @@ func (s *AppService) CancelPublishAppConfig(ctx context.Context, appID uuid.UUID
 }
 
 // GetPublishHistoriesWithPage 根据传递的应用id+请求数据，获取指定应用的发布历史配置列表信息
-func (s *AppService) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUID, req req.GetPublishHistoriesWithPageReq, accountID uuid.UUID) ([]*entity.AppConfigVersion, resp.Paginator, error) {
+func (s *AppService) GetPublishHistoriesWithPage(ctx context.Context, appID uuid.UUID, req req.GetPublishHistoriesWithPageReq, accountID uuid.UUID) ([]resp.GetPublishHistoriesWithPageResp, resp.Paginator, error) {
 	// 1. 获取应用信息并校验权限
 	_, err := s.GetApp(ctx, appID, accountID)
 	if err != nil {
@@ -642,7 +643,16 @@ func (s *AppService) GetPublishHistoriesWithPage(ctx context.Context, appID uuid
 		return nil, resp.Paginator{}, err
 	}
 
-	return appConfigVersions, paginator, nil
+	res := make([]resp.GetPublishHistoriesWithPageResp, 0, len(appConfigVersions))
+	for _, a := range appConfigVersions {
+		res = append(res, resp.GetPublishHistoriesWithPageResp{
+			ID:      a.ID,
+			Version: a.Version,
+			Ctime:   a.Ctime,
+		})
+	}
+
+	return res, paginator, nil
 }
 
 // FallbackHistoryToDraft 根据传递的应用id、历史配置版本id、账号信息，回退特定配置到草稿
@@ -660,7 +670,7 @@ func (s *AppService) FallbackHistoryToDraft(ctx context.Context, appID, appConfi
 	}
 
 	if appConfigVersion == nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("该历史版本配置不存在，请核实后重试")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该历史版本配置不存在，请核实后重试"))
 	}
 
 	// 3. 校验历史版本配置信息（剔除已删除的工具、知识库、工作流）
@@ -687,7 +697,7 @@ func (s *AppService) FallbackHistoryToDraft(ctx context.Context, appID, appConfi
 
 	// 5. 更新草稿配置信息
 	if app.DraftAppConfigID == uuid.Nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("草稿配置不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("草稿配置不存在"))
 	}
 
 	err = s.repo.UpdateAppConfigVersion(ctx, &entity.AppConfigVersion{
@@ -722,13 +732,13 @@ func (s *AppService) GetDebugConversationSummary(ctx context.Context, appID uuid
 
 	if longTermMemory := draftAppConfig.LongTermMemory; longTermMemory != nil {
 		if enable, ok := longTermMemory["enable"].(bool); !ok || !enable {
-			return "", errno.ErrValidate.AppendBizMessage("该应用并未开启长期记忆，无法获取")
+			return "", errno.ErrValidate.AppendBizMessage(errors.New("该应用并未开启长期记忆，无法获取"))
 		}
 	}
 
 	// 3. 获取调试会话
 	if app.DebugConversationID == uuid.Nil {
-		return "", errno.ErrNotFound.AppendBizMessage("调试会话不存在")
+		return "", errno.ErrNotFound.AppendBizMessage(errors.New("调试会话不存在"))
 	}
 
 	convers, err := s.conversationService.GetConversationByID(ctx, app.DebugConversationID)
@@ -755,13 +765,13 @@ func (s *AppService) UpdateDebugConversationSummary(ctx context.Context, appID u
 
 	if longTermMemory := draftAppConfig.LongTermMemory; longTermMemory != nil {
 		if enable, ok := longTermMemory["enable"].(bool); !ok || !enable {
-			return errno.ErrValidate.AppendBizMessage("该应用并未开启长期记忆，无法获取")
+			return errno.ErrValidate.AppendBizMessage(errors.New("该应用并未开启长期记忆，无法获取"))
 		}
 	}
 
 	// 3. 更新应用长期记忆
 	if app.DebugConversationID == uuid.Nil {
-		return errno.ErrNotFound.AppendBizMessage("调试会话不存在")
+		return errno.ErrNotFound.AppendBizMessage(errors.New("调试会话不存在"))
 	}
 
 	err = s.conversationService.UpdateConversationSummary(ctx, app.DebugConversationID, summary)
@@ -773,16 +783,16 @@ func (s *AppService) UpdateDebugConversationSummary(ctx context.Context, appID u
 }
 
 // DeleteDebugConversation 根据传递的应用id，删除指定的应用调试会话
-func (s *AppService) DeleteDebugConversation(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) (*entity.App, error) {
+func (s *AppService) DeleteDebugConversation(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) error {
 	// 1. 获取应用信息并校验权限
 	app, err := s.GetApp(ctx, appID, accountID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// 2. 判断是否存在debug_conversation_id这个数据，如果不存在表示没有会话，无需执行任何操作
 	if app.DebugConversationID == uuid.Nil {
-		return app, nil
+		return nil
 	}
 
 	// 3. 否则将debug_conversation_id的值重置为None
@@ -791,10 +801,10 @@ func (s *AppService) DeleteDebugConversation(ctx context.Context, appID uuid.UUI
 		DraftAppConfigID: uuid.Nil,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return app, nil
+	return nil
 }
 
 // DebugChat 根据传递的应用id+提问query向特定的应用发起会话调试
@@ -1051,7 +1061,7 @@ func (s *AppService) GetDebugConversationMessagesWithPage(ctx context.Context, a
 
 	// 2. 获取应用的调试会话
 	if app.DebugConversationID == uuid.Nil {
-		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage("调试会话不存在")
+		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage(errors.New("调试会话不存在"))
 	}
 
 	// 3. 执行分页并查询数据
@@ -1098,7 +1108,7 @@ func (s *AppService) RegenerateWebAppToken(ctx context.Context, appID uuid.UUID,
 
 	// 2. 判断应用是否已发布
 	if app.Status != consts.AppStatusPublished {
-		return "", errno.ErrValidate.AppendBizMessage("应用未发布，无法生成WebApp凭证标识")
+		return "", errno.ErrValidate.AppendBizMessage(errors.New("应用未发布，无法生成WebApp凭证标识"))
 	}
 
 	// 3. 重新生成token并更新数据
@@ -1126,7 +1136,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 
 	// 2. 判断传递的草稿配置是否在可接受字段内
 	if draftAppConfig == nil || len(draftAppConfig) == 0 {
-		return nil, errno.ErrValidate.AppendBizMessage("草稿配置字段出错，请核实后重试")
+		return nil, errno.ErrValidate.AppendBizMessage(errors.New("草稿配置字段出错，请核实后重试"))
 	}
 
 	for key := range draftAppConfig {
@@ -1138,7 +1148,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			}
 		}
 		if !found {
-			return nil, errno.ErrValidate.AppendBizMessage("草稿配置字段出错，请核实后重试")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("草稿配置字段出错，请核实后重试"))
 		}
 	}
 
@@ -1148,37 +1158,37 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			// 3.1 判断model_config键信息是否正确
 			requiredKeys := []string{"provider", "model", "parameters"}
 			if len(modelConfigMap) != 3 {
-				return nil, errno.ErrValidate.AppendBizMessage("模型键配置格式错误，请核实后重试")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("模型键配置格式错误，请核实后重试"))
 			}
 
 			for _, key := range requiredKeys {
 				if _, exists := modelConfigMap[key]; !exists {
-					return nil, errno.ErrValidate.AppendBizMessage("模型键配置格式错误，请核实后重试")
+					return nil, errno.ErrValidate.AppendBizMessage(errors.New("模型键配置格式错误，请核实后重试"))
 				}
 			}
 
 			// 3.2 判断模型提供者信息是否正确
 			if provider, ok := modelConfigMap["provider"].(string); !ok || provider == "" {
-				return nil, errno.ErrValidate.AppendBizMessage("模型服务提供商类型必须为字符串")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("模型服务提供商类型必须为字符串"))
 			}
 			provider, err := s.llmManager.GetProvider(modelConfigMap["provider"].(string))
 			if err != nil {
 				return nil, err
 			}
 			if provider == nil {
-				return nil, errno.ErrNotFound.AppendBizMessage("该模型服务提供商不存在，请核实后重试")
+				return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该模型服务提供商不存在，请核实后重试"))
 			}
 
 			// 3.3 判断模型信息是否正确
 			if model, ok := modelConfigMap["model"].(string); !ok || model == "" {
-				return nil, errno.ErrValidate.AppendBizMessage("模型名字必须是字符串")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("模型名字必须是字符串"))
 			}
 			model, err := provider.GetModelEntity(modelConfigMap["model"].(string))
 			if err != nil {
 				return nil, err
 			}
 			if model == nil {
-				return nil, errno.ErrNotFound.AppendBizMessage("该服务提供商下不存在该模型，请核实后重试")
+				return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该服务提供商下不存在该模型，请核实后重试"))
 			}
 
 			var parameters map[string]any
@@ -1231,7 +1241,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			draftAppConfig["model_config"] = modelConfigMap
 
 		} else {
-			return nil, errno.ErrValidate.AppendBizMessage("模型配置格式错误，请核实后重试")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("模型配置格式错误，请核实后重试"))
 		}
 	}
 
@@ -1239,10 +1249,10 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if dialogRound, exists := draftAppConfig["dialog_round"]; exists {
 		if round, ok := dialogRound.(int); ok {
 			if round < 0 || round > 100 {
-				return nil, errno.ErrValidate.AppendBizMessage("携带上下文轮数范围为0-100")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("携带上下文轮数范围为0-100"))
 			}
 		} else {
-			return nil, errno.ErrValidate.AppendBizMessage("携带上下文轮数必须为整数")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("携带上下文轮数必须为整数"))
 		}
 	}
 
@@ -1250,10 +1260,10 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if presetPrompt, exists := draftAppConfig["preset_prompt"]; exists {
 		if prompt, ok := presetPrompt.(string); ok {
 			if len(prompt) > 2000 {
-				return nil, errno.ErrValidate.AppendBizMessage("人设与回复逻辑必须是字符串，长度在0-2000个字符")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("人设与回复逻辑必须是字符串，长度在0-2000个字符"))
 			}
 		} else {
-			return nil, errno.ErrValidate.AppendBizMessage("人设与回复逻辑必须是字符串")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("人设与回复逻辑必须是字符串"))
 		}
 	}
 
@@ -1261,12 +1271,12 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if tools, exists := draftAppConfig["tools"]; exists {
 		toolsSlice, ok := tools.([]map[string]any)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("工具列表必须是列表型数据")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("工具列表必须是列表型数据"))
 		}
 
 		// 6.1 tools的长度不能超过5
 		if len(toolsSlice) > 5 {
-			return nil, errno.ErrValidate.AppendBizMessage("Agent绑定的工具数不能超过5")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("Agent绑定的工具数不能超过5"))
 		}
 
 		validateTools := make([]map[string]any, 0)
@@ -1275,7 +1285,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 		// 6.2 循环校验工具里的每一个参数
 		for _, tool := range toolsSlice {
 			if tool == nil {
-				return nil, errno.ErrValidate.AppendBizMessage("绑定插件工具参数出错")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定插件工具参数出错"))
 			}
 
 			// 6.3 校验工具的参数是不是type、provider_id、tool_id、params
@@ -1290,25 +1300,25 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 				delete(requiredKeys, k)
 			}
 			if len(requiredKeys) > 0 {
-				return nil, errno.ErrValidate.AppendBizMessage("绑定插件工具参数出错")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定插件工具参数出错"))
 			}
 
 			// 6.4 校验type类型是否为builtin_tool以及api_tool
 			toolType, ok := tool["type"].(string)
 			if !ok || (toolType != "builtin_tool" && toolType != "api_tool") {
-				return nil, errno.ErrValidate.AppendBizMessage("绑定插件工具参数出错")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定插件工具参数出错"))
 			}
 
 			// 6.5 校验provider_id和tool_id
 			providerID, ok1 := tool["provider_id"].(string)
 			toolID, ok2 := tool["tool_id"].(string)
 			if !ok1 || !ok2 || providerID == "" || toolID == "" {
-				return nil, errno.ErrValidate.AppendBizMessage("插件提供者或者插件标识参数出错")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("插件提供者或者插件标识参数出错"))
 			}
 
 			// 6.6 校验params参数，类型为字典
 			if _, ok := tool["params"].(map[string]any); !ok {
-				return nil, errno.ErrValidate.AppendBizMessage("插件自定义参数格式错误")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("插件自定义参数格式错误"))
 			}
 
 			// 6.7 校验对应的工具是否存在
@@ -1327,7 +1337,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			// 检查工具是否重复
 			key := providerID + "_" + toolID
 			if toolKeys[key] {
-				return nil, errno.ErrValidate.AppendBizMessage("绑定插件存在重复")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定插件存在重复"))
 			}
 			toolKeys[key] = true
 
@@ -1342,12 +1352,12 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if workflows, exists := draftAppConfig["workflows"]; exists {
 		workflowsSlice, ok := workflows.([]any)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("绑定工作流列表参数格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定工作流列表参数格式错误"))
 		}
 
 		// 7.2 判断关联的工作流列表是否超过5个
 		if len(workflowsSlice) > 5 {
-			return nil, errno.ErrValidate.AppendBizMessage("Agent绑定的工作流数量不能超过5个")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("Agent绑定的工作流数量不能超过5个"))
 		}
 
 		// 7.3 校验每个工作流ID是否为UUID
@@ -1355,20 +1365,20 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 		for _, item := range workflowsSlice {
 			workflowID, ok := item.(uuid.UUID)
 			if !ok {
-				return nil, errno.ErrValidate.AppendBizMessage("工作流参数必须是UUID")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("工作流参数必须是UUID"))
 			}
 			workflowIDs = append(workflowIDs, workflowID)
 		}
 
 		// 7.4 判断是否重复关联了工作流
 		if len(workflowIDs) != len(util.UniqueUUID(workflowIDs)) {
-			return nil, errno.ErrValidate.AppendBizMessage("绑定工作流存在重复")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定工作流存在重复"))
 		}
 
 		// 7.5 校验关联工作流的权限
 		workflowRecords, err := s.repo.GetWorkflows(context.Background(), workflowIDs, accountID, consts.WorkflowStatusPublished)
 		if err != nil {
-			return nil, errno.ErrNotFound.AppendBizMessage("查询工作流失败")
+			return nil, errno.ErrNotFound.AppendBizMessage(errors.New("查询工作流失败"))
 		}
 
 		validWorkflows := make([]uuid.UUID, 0)
@@ -1390,29 +1400,29 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if datasets, exists := draftAppConfig["datasets"]; exists {
 		datasetsSlice, ok := datasets.([]any)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("绑定知识库列表参数格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定知识库列表参数格式错误"))
 		}
 
 		if len(datasetsSlice) > 5 {
-			return nil, errno.ErrValidate.AppendBizMessage("Agent绑定的知识库数量不能超过5个")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("Agent绑定的知识库数量不能超过5个"))
 		}
 
 		datasetIDs := make([]uuid.UUID, 0, len(datasetsSlice))
 		for _, item := range datasetsSlice {
 			datasetID, ok := item.(uuid.UUID)
 			if !ok {
-				return nil, errno.ErrValidate.AppendBizMessage("知识库列表参数必须是UUID")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("知识库列表参数必须是UUID"))
 			}
 			datasetIDs = append(datasetIDs, datasetID)
 		}
 
 		if len(datasetIDs) != len(util.UniqueUUID(datasetIDs)) {
-			return nil, errno.ErrValidate.AppendBizMessage("绑定知识库存在重复")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("绑定知识库存在重复"))
 		}
 
 		datasetRecords, err := s.repo.GetDatasets(context.Background(), datasetIDs, accountID)
 		if err != nil {
-			return nil, errno.ErrNotFound.AppendBizMessage("查询知识库失败")
+			return nil, errno.ErrNotFound.AppendBizMessage(errors.New("查询知识库失败"))
 		}
 
 		validDatasets := make([]uuid.UUID, 0)
@@ -1434,7 +1444,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if retrievalConfig, exists := draftAppConfig["retrieval_config"]; exists {
 		rc, ok := retrievalConfig.(map[string]any)
 		if !ok || len(rc) == 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("检索配置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("检索配置格式错误"))
 		}
 
 		requiredKeys := map[string]bool{
@@ -1447,22 +1457,22 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			delete(requiredKeys, k)
 		}
 		if len(requiredKeys) > 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("检索配置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("检索配置格式错误"))
 		}
 
 		strategy, ok := rc["retrieval_strategy"].(string)
 		if !ok || (strategy != "semantic" && strategy != "full_text" && strategy != "hybrid") {
-			return nil, errno.ErrValidate.AppendBizMessage("检测策略格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("检测策略格式错误"))
 		}
 
 		k, ok := rc["k"].(float64)
 		if !ok || k < 0 || k > 10 {
-			return nil, errno.ErrValidate.AppendBizMessage("最大召回数量范围为0-10")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("最大召回数量范围为0-10"))
 		}
 
 		score, ok := rc["score"].(float64)
 		if !ok || score < 0 || score > 1 {
-			return nil, errno.ErrValidate.AppendBizMessage("最小匹配范围为0-1")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("最小匹配范围为0-1"))
 		}
 	}
 
@@ -1470,19 +1480,19 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if longTermMemory, exists := draftAppConfig["long_term_memory"]; exists {
 		ltm, ok := longTermMemory.(map[string]any)
 		if !ok || len(ltm) == 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("长期记忆设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("长期记忆设置格式错误"))
 		}
 
 		if len(ltm) != 1 {
-			return nil, errno.ErrValidate.AppendBizMessage("长期记忆设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("长期记忆设置格式错误"))
 		}
 
 		enable, ok := ltm["enable"]
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("长期记忆设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("长期记忆设置格式错误"))
 		}
 		if _, ok := enable.(bool); !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("长期记忆设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("长期记忆设置格式错误"))
 		}
 	}
 
@@ -1490,7 +1500,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if openingStatement, exists := draftAppConfig["opening_statement"]; exists {
 		openS, ok := openingStatement.(string)
 		if !ok || len(openS) > 2000 {
-			return nil, errno.ErrValidate.AppendBizMessage("对话开场白的长度范围是0-2000")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("对话开场白的长度范围是0-2000"))
 		}
 	}
 
@@ -1498,12 +1508,12 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if openingQuestions, exists := draftAppConfig["opening_questions"]; exists {
 		oq, ok := openingQuestions.([]any)
 		if !ok || len(oq) > 3 {
-			return nil, errno.ErrValidate.AppendBizMessage("开场建议问题不能超过3个")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("开场建议问题不能超过3个"))
 		}
 
 		for _, question := range oq {
 			if _, ok := question.(string); !ok {
-				return nil, errno.ErrValidate.AppendBizMessage("开场建议问题必须是字符串")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("开场建议问题必须是字符串"))
 			}
 		}
 	}
@@ -1513,22 +1523,22 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 		// 13.1 检查是否是 map 且非空
 		stt, ok := speechToText.(map[string]interface{})
 		if !ok || len(stt) == 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("语音转文本设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("语音转文本设置格式错误"))
 		}
 
 		// 13.2 检查是否只有 "enable" 键
 		if len(stt) != 1 {
-			return nil, errno.ErrValidate.AppendBizMessage("语音转文本设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("语音转文本设置格式错误"))
 		}
 
 		// 检查 enable 是否存在且是 bool 类型
 		enable, exists := stt["enable"]
 		if !exists {
-			return nil, errno.ErrValidate.AppendBizMessage("语音转文本设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("语音转文本设置格式错误"))
 		}
 
 		if _, ok := enable.(bool); !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("语音转文本设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("语音转文本设置格式错误"))
 		}
 	}
 
@@ -1536,7 +1546,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if textToSpeech, exists := draftAppConfig["text_to_speech"]; exists {
 		tts, ok := textToSpeech.(map[string]any)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("文本转语音设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 
 		requiredKeys := map[string]bool{
@@ -1549,28 +1559,28 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			delete(requiredKeys, k)
 		}
 		if len(requiredKeys) > 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("文本转语音设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 
 		enable, ok := tts["enable"]
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("文本转语音设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 		if _, ok := enable.(bool); !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("文本转语音设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 
 		voice, ok := tts["voice"].(string)
 		if !ok || !util.Contains(consts.AllowedAudioVoices, voice) {
-			return nil, errno.ErrValidate.AppendBizMessage("文本转语音设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 
 		autoPlay, ok := tts["auto_play"]
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("文本转语音设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 		if _, ok := autoPlay.(bool); !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("文本转语音设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 	}
 
@@ -1578,19 +1588,19 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if suggestedAfterAnswer, exists := draftAppConfig["suggested_after_answer"]; exists {
 		saa, ok := suggestedAfterAnswer.(map[string]any)
 		if !ok || len(saa) == 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("回答后建议问题设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("回答后建议问题设置格式错误"))
 		}
 
 		if len(saa) != 1 {
-			return nil, errno.ErrValidate.AppendBizMessage("回答后建议问题设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("回答后建议问题设置格式错误"))
 		}
 
 		enable, ok := saa["enable"]
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("回答后建议问题设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("回答后建议问题设置格式错误"))
 		}
 		if _, ok := enable.(bool); !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("回答后建议问题设置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("回答后建议问题设置格式错误"))
 		}
 	}
 
@@ -1598,7 +1608,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 	if reviewConfig, exists := draftAppConfig["review_config"]; exists {
 		rc, ok := reviewConfig.(map[string]any)
 		if !ok || len(rc) == 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("审核配置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("审核配置格式错误"))
 		}
 
 		requiredKeys := map[string]bool{
@@ -1612,65 +1622,65 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			delete(requiredKeys, k)
 		}
 		if len(requiredKeys) > 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("审核配置格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("审核配置格式错误"))
 		}
 
 		enable, ok := rc["enable"].(bool)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("review.enable格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.enable格式错误"))
 		}
 
 		keywords, ok := rc["keywords"].([]any)
 		if !ok || (enable && len(keywords) == 0) || len(keywords) > 100 {
-			return nil, errno.ErrValidate.AppendBizMessage("review.keywords非空且不能超过100个关键词")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.keywords非空且不能超过100个关键词"))
 		}
 
 		for _, keyword := range keywords {
 			if _, ok := keyword.(string); !ok {
-				return nil, errno.ErrValidate.AppendBizMessage("review.keywords敏感词必须是字符串")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.keywords敏感词必须是字符串"))
 			}
 		}
 
 		inputsConfig, ok := rc["inputs_config"].(map[string]any)
 		if !ok || len(inputsConfig) == 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("review.inputs_config必须是一个字典")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.inputs_config必须是一个字典"))
 		}
 
 		if len(inputsConfig) != 2 {
-			return nil, errno.ErrValidate.AppendBizMessage("review.inputs_config必须是一个字典")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.inputs_config必须是一个字典"))
 		}
 
 		inputEnable, ok := inputsConfig["enable"].(bool)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("review.inputs_config必须是一个字典")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.inputs_config必须是一个字典"))
 		}
 
 		presetResponse, ok := inputsConfig["preset_response"].(string)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("review.inputs_config必须是一个字典")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.inputs_config必须是一个字典"))
 		}
 
 		outputsConfig, ok := rc["outputs_config"].(map[string]any)
 		if !ok || len(outputsConfig) == 0 {
-			return nil, errno.ErrValidate.AppendBizMessage("review.outputs_config格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.outputs_config格式错误"))
 		}
 
 		if len(outputsConfig) != 1 {
-			return nil, errno.ErrValidate.AppendBizMessage("review.outputs_config格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.outputs_config格式错误"))
 		}
 
 		outputEnable, ok := outputsConfig["enable"].(bool)
 		if !ok {
-			return nil, errno.ErrValidate.AppendBizMessage("review.outputs_config格式错误")
+			return nil, errno.ErrValidate.AppendBizMessage(errors.New("review.outputs_config格式错误"))
 		}
 
 		if enable {
 			if !inputEnable && !outputEnable {
-				return nil, errno.ErrValidate.AppendBizMessage("输入审核和输出审核至少需要开启一项")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("输入审核和输出审核至少需要开启一项"))
 			}
 
 			if inputEnable && strings.TrimSpace(presetResponse) == "" {
-				return nil, errno.ErrValidate.AppendBizMessage("输入审核预设响应不能为空")
+				return nil, errno.ErrValidate.AppendBizMessage(errors.New("输入审核预设响应不能为空"))
 			}
 		}
 	}

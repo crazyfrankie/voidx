@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	langchaintool "github.com/tmc/langchaingo/tools"
@@ -39,7 +40,7 @@ func NewAppConfigService(repo *repository.AppConfigRepo, llmMgr *llm.LanguageMod
 func (s *AppConfigService) GetDraftAppConfig(ctx context.Context, app *entity.App) (*resp.AppDraftConfigResp, error) {
 	// 1. 提取应用的草稿配置
 	if app.DraftAppConfigID == uuid.Nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("草稿配置不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("草稿配置不存在"))
 	}
 
 	draftAppConfig, err := s.repo.GetAppConfigVersion(ctx, app.DraftAppConfigID)
@@ -107,7 +108,7 @@ func (s *AppConfigService) GetDraftAppConfig(ctx context.Context, app *entity.Ap
 func (s *AppConfigService) GetAppConfig(ctx context.Context, app *entity.App) (*resp.AppDraftConfigResp, error) {
 	// 1. 提取应用的运行配置
 	if app.AppConfigID == uuid.Nil {
-		return nil, errno.ErrNotFound.AppendBizMessage("运行配置不存在")
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("运行配置不存在"))
 	}
 
 	appConfig, err := s.repo.GetAppConfigByID(ctx, app.AppConfigID)
@@ -147,7 +148,7 @@ func (s *AppConfigService) GetAppConfig(ctx context.Context, app *entity.App) (*
 
 	var originDatasets []string
 	for _, join := range appDatasetJoins {
-		originDatasets = append(originDatasets, join.DatasetID.String())
+		originDatasets = append(originDatasets, join.ID.String())
 	}
 
 	datasets, validateDatasets := s.processAndValidateDatasets(ctx, originDatasets)

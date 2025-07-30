@@ -19,7 +19,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&App{},
 		&AppConfig{},
 		&AppConfigVersion{},
-		&AppDatasetJoin{},
 
 		// Conversation 相关表
 		&Conversation{},
