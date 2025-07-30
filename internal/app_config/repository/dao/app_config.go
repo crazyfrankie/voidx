@@ -146,8 +146,8 @@ func (d *AppConfigDao) GetAppConfigVersion(ctx context.Context, appConfigVersion
 }
 
 // UpdateAppConfigVersion 更新应用配置版本
-func (d *AppConfigDao) UpdateAppConfigVersion(ctx context.Context, appConfigVersion *entity.AppConfigVersion) error {
-	return d.db.WithContext(ctx).Save(appConfigVersion).Error
+func (d *AppConfigDao) UpdateAppConfigVersion(ctx context.Context, appConfigVersionID uuid.UUID, updates map[string]any) error {
+	return d.db.WithContext(ctx).Model(&entity.AppConfigVersion{}).Where("id = ?", appConfigVersionID).Updates(updates).Error
 }
 
 func (d *AppConfigDao) GetDatasetByID(ctx context.Context, id uuid.UUID) (*entity.Dataset, error) {

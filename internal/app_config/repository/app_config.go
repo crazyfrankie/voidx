@@ -62,8 +62,8 @@ func (r *AppConfigRepo) GetAppConfigVersion(ctx context.Context, appConfigVersio
 	return r.dao.GetAppConfigVersion(ctx, appConfigVersionID)
 }
 
-func (r *AppConfigRepo) UpdateAppConfigVersion(ctx context.Context, appConfigVersion *entity.AppConfigVersion) error {
-	return r.dao.UpdateAppConfigVersion(ctx, appConfigVersion)
+func (r *AppConfigRepo) UpdateAppConfigVersion(ctx context.Context, appConfigVersionID uuid.UUID, updates map[string]any) error {
+	return r.dao.UpdateAppConfigVersion(ctx, appConfigVersionID, updates)
 }
 
 func (r *AppConfigRepo) GetDatasetByID(ctx context.Context, id uuid.UUID) (*entity.Dataset, error) {

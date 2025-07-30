@@ -6,6 +6,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	langchaintool "github.com/tmc/langchaingo/tools"
+	"reflect"
 
 	"github.com/crazyfrankie/voidx/internal/app_config/repository"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
@@ -51,9 +52,8 @@ func (s *AppConfigService) GetDraftAppConfig(ctx context.Context, app *entity.Ap
 	// 2. 校验model_config信息，如果使用了不存在的提供者或者模型，则使用默认值(宽松校验)
 	validateModelConfig := s.processAndValidateModelConfig(draftAppConfig.ModelConfig)
 	if !s.compareJSON(draftAppConfig.ModelConfig, validateModelConfig) {
-		err = s.repo.UpdateAppConfigVersion(ctx, &entity.AppConfigVersion{
-			ID:          app.DraftAppConfigID,
-			ModelConfig: validateModelConfig,
+		err = s.repo.UpdateAppConfigVersion(ctx, app.DraftAppConfigID, map[string]any{
+			"model_config": validateModelConfig,
 		})
 		if err != nil {
 			return nil, err
@@ -65,9 +65,8 @@ func (s *AppConfigService) GetDraftAppConfig(ctx context.Context, app *entity.Ap
 
 	// 4. 判断是否需要更新草稿配置中的工具列表信息
 	if !s.compareJSON(draftAppConfig.Tools, validateTools) {
-		err = s.repo.UpdateAppConfigVersion(ctx, &entity.AppConfigVersion{
-			ID:    app.DraftAppConfigID,
-			Tools: validateTools,
+		err = s.repo.UpdateAppConfigVersion(ctx, app.DraftAppConfigID, map[string]any{
+			"tools": tools,
 		})
 		if err != nil {
 			return nil, err
@@ -79,9 +78,8 @@ func (s *AppConfigService) GetDraftAppConfig(ctx context.Context, app *entity.Ap
 
 	// 6. 判断是否存在已删除的知识库，如果存在则更新
 	if !s.compareDatasetSlices(validateDatasets, draftAppConfig.Datasets) {
-		err = s.repo.UpdateAppConfigVersion(ctx, &entity.AppConfigVersion{
-			ID:       app.DraftAppConfigID,
-			Datasets: validateDatasets,
+		err = s.repo.UpdateAppConfigVersion(ctx, app.DraftAppConfigID, map[string]any{
+			"datasets": datasets,
 		})
 		if err != nil {
 			return nil, err
@@ -91,9 +89,8 @@ func (s *AppConfigService) GetDraftAppConfig(ctx context.Context, app *entity.Ap
 	// 7. 校验工作流列表对应的数据
 	workflows, validateWorkflows := s.processAndValidateWorkflows(ctx, draftAppConfig.Workflows)
 	if !s.compareWorkflowSlices(validateWorkflows, draftAppConfig.Workflows) {
-		err = s.repo.UpdateAppConfigVersion(ctx, &entity.AppConfigVersion{
-			ID:        app.DraftAppConfigID,
-			Workflows: validateWorkflows,
+		err = s.repo.UpdateAppConfigVersion(ctx, app.DraftAppConfigID, map[string]any{
+			"workflows": workflows,
 		})
 		if err != nil {
 			return nil, err
@@ -578,6 +575,20 @@ func (s *AppConfigService) processAndValidateWorkflows(ctx context.Context, work
 
 // compareJSON 比较两个JSON是否相等
 func (s *AppConfigService) compareJSON(a, b any) bool {
+	if a == nil && b == nil {
+		return true
+	}
+
+	aValue := reflect.ValueOf(a)
+	bValue := reflect.ValueOf(b)
+
+	if aValue.Kind() == reflect.Slice && bValue.Kind() == reflect.Slice {
+		if (aValue.IsNil() || aValue.Len() == 0) &&
+			(bValue.IsNil() || bValue.Len() == 0) {
+			return true
+		}
+	}
+
 	aJson, _ := sonic.Marshal(a)
 	bJson, _ := sonic.Marshal(b)
 

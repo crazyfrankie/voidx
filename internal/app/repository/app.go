@@ -31,8 +31,8 @@ func (r *AppRepo) GetAppByID(ctx context.Context, appID uuid.UUID) (*entity.App,
 }
 
 // UpdateApp 更新应用
-func (r *AppRepo) UpdateApp(ctx context.Context, app *entity.App) error {
-	return r.dao.UpdateApp(ctx, app)
+func (r *AppRepo) UpdateApp(ctx context.Context, appID uuid.UUID, updates map[string]any) error {
+	return r.dao.UpdateApp(ctx, appID, updates)
 }
 
 func (r *AppRepo) UpdatesApp(ctx context.Context, appID uuid.UUID, updates map[string]any) error {
@@ -65,8 +65,8 @@ func (r *AppRepo) GetDraftAppConfigVersion(ctx context.Context, appID uuid.UUID)
 }
 
 // UpdateAppConfigVersion 更新应用配置版本
-func (r *AppRepo) UpdateAppConfigVersion(ctx context.Context, appConfigVersion *entity.AppConfigVersion) error {
-	return r.dao.UpdateAppConfigVersion(ctx, appConfigVersion)
+func (r *AppRepo) UpdateAppConfigVersion(ctx context.Context, appConfigVersionID uuid.UUID, updates map[string]any) error {
+	return r.dao.UpdateAppConfigVersion(ctx, appConfigVersionID, updates)
 }
 
 // GetMaxPublishedVersion 获取最大发布版本号
@@ -87,16 +87,6 @@ func (r *AppRepo) GetConversation(ctx context.Context, conversationID uuid.UUID)
 // CreateConversation 创建会话
 func (r *AppRepo) CreateConversation(ctx context.Context, accountID, appID uuid.UUID) (*entity.Conversation, error) {
 	return r.dao.CreateConversation(ctx, accountID, appID)
-}
-
-// UpdateConversation 更新会话
-func (r *AppRepo) UpdateConversation(ctx context.Context, conversation *entity.Conversation) error {
-	return r.dao.UpdateConversation(ctx, conversation)
-}
-
-// UpdateMessage 更新消息
-func (r *AppRepo) UpdateMessage(ctx context.Context, message *entity.Message) error {
-	return r.dao.UpdateMessage(ctx, message)
 }
 
 // GetDebugConversationMessagesWithPage 获取调试会话消息分页列表

@@ -43,10 +43,6 @@ func (r *WorkflowRepo) UpdateWorkflow(ctx context.Context, id uuid.UUID, updates
 	return r.dao.UpdateWorkflow(ctx, id, updates)
 }
 
-func (r *WorkflowRepo) SaveWorkflow(ctx context.Context, workflow *entity.Workflow) error {
-	return r.dao.SaveWorkflow(ctx, workflow)
-}
-
 // DeleteWorkflow 删除工作流
 func (r *WorkflowRepo) DeleteWorkflow(ctx context.Context, id uuid.UUID) error {
 	return r.dao.DeleteWorkflow(ctx, id)

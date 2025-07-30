@@ -98,16 +98,7 @@ func (h *AppHandler) GetApp() gin.HandlerFunc {
 			return
 		}
 
-		response.SuccessWithData(c, map[string]any{
-			"id":          app.ID,
-			"name":        app.Name,
-			"icon":        app.Icon,
-			"description": app.Description,
-			"status":      app.Status,
-			"token":       app.Token,
-			"updated_at":  app.Utime,
-			"ctime":       app.Ctime,
-		})
+		response.SuccessWithData(c, app)
 	}
 }
 

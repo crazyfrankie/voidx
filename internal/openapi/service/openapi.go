@@ -55,7 +55,7 @@ func NewOpenAPIService(repo *repository.OpenAPIRepo, conversationService *servic
 // Chat 根据传递的请求+账号信息发起聊天对话，返回块内容
 func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req.OpenAPIChatReq) (*resp.OpenAPIChatResp, error) {
 	// 1. 验证应用权限和状态
-	app, err := s.appSvc.GetApp(ctx, chatReq.AppID, userID)
+	app, err := s.appSvc.RawGetApp(ctx, chatReq.AppID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 // ProcessStreamChat 根据传递的请求+账号信息发起聊天对话，返回流式事件
 func (s *OpenAPIService) ProcessStreamChat(ctx context.Context, userID uuid.UUID, chatReq req.OpenAPIChatReq) (<-chan string, error) {
 	// 1. 验证应用权限和状态
-	app, err := s.appSvc.GetApp(ctx, chatReq.AppID, userID)
+	app, err := s.appSvc.RawGetApp(ctx, chatReq.AppID, userID)
 	if err != nil {
 		return nil, err
 	}

@@ -19,6 +19,10 @@ const (
 	AppStatusPublished AppStatus = "published"
 )
 
+func (as AppStatus) String() string {
+	return string(as)
+}
+
 // AppConfigType 应用配置类型
 type AppConfigType string
 

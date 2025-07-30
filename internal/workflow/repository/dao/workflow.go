@@ -85,11 +85,6 @@ func (d *WorkflowDao) UpdateWorkflow(ctx context.Context, id uuid.UUID, updates 
 	return d.db.WithContext(ctx).Model(&entity.Workflow{}).Where("id = ?", id).Updates(updates).Error
 }
 
-// SaveWorkflow 更新工作流
-func (d *WorkflowDao) SaveWorkflow(ctx context.Context, workflow *entity.Workflow) error {
-	return d.db.WithContext(ctx).Model(&entity.Workflow{}).Save(workflow).Error
-}
-
 // DeleteWorkflow 删除工作流
 func (d *WorkflowDao) DeleteWorkflow(ctx context.Context, id uuid.UUID) error {
 	return d.db.WithContext(ctx).Where("id = ?", id).Delete(&entity.Workflow{}).Error

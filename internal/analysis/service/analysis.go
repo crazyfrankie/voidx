@@ -29,7 +29,7 @@ func NewAnalysisService(repo *repository.AnalysisRepo, appSvc *app.Service) *Ana
 // GetAppAnalysis 根据传递的应用id+账号获取指定应用的分析信息
 func (s *AnalysisService) GetAppAnalysis(ctx context.Context, appID, userID uuid.UUID) (*resp.AppAnalysisResp, error) {
 	// 1. 验证应用权限
-	application, err := s.appSvc.GetApp(ctx, appID, userID)
+	application, err := s.appSvc.RawGetApp(ctx, appID, userID)
 	if err != nil {
 		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("应用不存在"))
 	}

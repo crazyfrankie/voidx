@@ -41,8 +41,8 @@ func (d *KeywordDao) Create(ctx context.Context, keywordTable *entity.Keyword) e
 }
 
 // Update 更新关键词表
-func (d *KeywordDao) Update(ctx context.Context, keywordTable *entity.Keyword) error {
-	return d.db.WithContext(ctx).Save(keywordTable).Error
+func (d *KeywordDao) Update(ctx context.Context, keywordTableID uuid.UUID, updates map[string]any) error {
+	return d.db.WithContext(ctx).Model(&entity.Keyword{}).Where("id = ?", keywordTableID).Updates(updates).Error
 }
 
 func (d *KeywordDao) GetKeywordBySegments(ctx context.Context, segmentIDs []uuid.UUID) ([]entity.Segment, error) {

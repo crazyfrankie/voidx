@@ -35,8 +35,8 @@ func (r *KeywordRepository) Create(ctx context.Context, keywordTable *entity.Key
 }
 
 // Update 更新关键词表
-func (r *KeywordRepository) Update(ctx context.Context, keywordTable *entity.Keyword) error {
-	return r.dao.Update(ctx, keywordTable)
+func (r *KeywordRepository) Update(ctx context.Context, keywordTableID uuid.UUID, updates map[string]any) error {
+	return r.dao.Update(ctx, keywordTableID, updates)
 }
 
 func (r *KeywordRepository) GetKeywordBySegments(ctx context.Context, segmentIDs []uuid.UUID) ([]entity.Segment, error) {

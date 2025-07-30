@@ -297,8 +297,9 @@ func (s *WorkflowService) PublishWorkflow(ctx context.Context, workflowID, userI
 		"nodes":       workflow.DraftGraph["nodes"],
 		"edges":       workflow.DraftGraph["edges"],
 	}); err != nil {
-		workflow.IsDebugPassed = false
-		if err := s.repo.SaveWorkflow(ctx, workflow); err != nil {
+		if err := s.repo.UpdateWorkflow(ctx, workflowID, map[string]any{
+			"is_debug_passed": false,
+		}); err != nil {
 			return errno.ErrInternalServer.AppendBizMessage(fmt.Errorf("保存工作流状态失败: %v", err))
 		}
 	}

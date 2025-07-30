@@ -37,6 +37,6 @@ func (r *OAuthRepo) CreateAccountOAuth(ctx context.Context, accountOAuth *entity
 	return r.dao.CreateAccountOAuth(ctx, accountOAuth)
 }
 
-func (r *OAuthRepo) UpdateAccountInfo(ctx context.Context, accountID uuid.UUID, account *entity.Account, accountOAuth *entity.AccountOAuth) error {
-	return r.dao.UpdateAccountInfo(ctx, accountID, account, accountOAuth)
+func (r *OAuthRepo) UpdateAccountInfo(ctx context.Context, accountID uuid.UUID, accountUpdates map[string]any, accountOAuthUpdates map[string]any) error {
+	return r.dao.UpdateAccountInfo(ctx, accountID, accountUpdates, accountOAuthUpdates)
 }

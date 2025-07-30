@@ -100,11 +100,11 @@ func (s *OAuthService) OAuthLogin(ctx context.Context, providerName string, code
 	}
 
 	// 9.更新账号信息，涵盖最后一次登录时间，以及ip地址
-	if err := s.repo.UpdateAccountInfo(ctx, account.ID, &entity.Account{
-		LastLoginAt: time.Now().Unix(),
-		LastLoginIP: s.getLastLoginIP(ctx),
-	}, &entity.AccountOAuth{
-		EncryptedToken: accessToken,
+	if err := s.repo.UpdateAccountInfo(ctx, account.ID, map[string]any{
+		"last_login_at": time.Now().Unix(),
+		"last_login_ip": s.getLastLoginIP(ctx),
+	}, map[string]any{
+		"encrypted_token": accessToken,
 	}); err != nil {
 		return nil, err
 	}

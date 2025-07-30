@@ -40,8 +40,8 @@ func (d *AppDao) GetAppByID(ctx context.Context, appID uuid.UUID) (*entity.App, 
 }
 
 // UpdateApp 更新应用
-func (d *AppDao) UpdateApp(ctx context.Context, app *entity.App) error {
-	return d.db.WithContext(ctx).Save(app).Error
+func (d *AppDao) UpdateApp(ctx context.Context, appID uuid.UUID, updates map[string]any) error {
+	return d.db.WithContext(ctx).Model(&entity.App{}).Where("id = ?", appID).Updates(updates).Error
 }
 
 func (d *AppDao) UpdatesApp(ctx context.Context, appID uuid.UUID, updates map[string]any) error {
@@ -107,8 +107,8 @@ func (d *AppDao) GetDraftAppConfigVersion(ctx context.Context, appID uuid.UUID) 
 }
 
 // UpdateAppConfigVersion 更新应用配置版本
-func (d *AppDao) UpdateAppConfigVersion(ctx context.Context, appConfigVersion *entity.AppConfigVersion) error {
-	return d.db.WithContext(ctx).Save(appConfigVersion).Error
+func (d *AppDao) UpdateAppConfigVersion(ctx context.Context, appConfigVersionID uuid.UUID, updates map[string]any) error {
+	return d.db.WithContext(ctx).Model(&entity.AppConfigVersion{}).Where("id = ?", appConfigVersionID).Updates(updates).Error
 }
 
 // GetMaxPublishedVersion 获取最大发布版本号
@@ -152,16 +152,6 @@ func (d *AppDao) CreateConversation(ctx context.Context, accountID, appID uuid.U
 	}
 
 	return conversation, nil
-}
-
-// UpdateConversation 更新会话
-func (d *AppDao) UpdateConversation(ctx context.Context, conversation *entity.Conversation) error {
-	return d.db.WithContext(ctx).Save(conversation).Error
-}
-
-// UpdateMessage 更新消息
-func (d *AppDao) UpdateMessage(ctx context.Context, message *entity.Message) error {
-	return d.db.WithContext(ctx).Save(message).Error
 }
 
 // GetDebugConversationMessagesWithPage 获取调试会话消息分页列表

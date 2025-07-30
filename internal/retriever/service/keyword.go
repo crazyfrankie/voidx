@@ -95,10 +95,9 @@ func (s *KeywordService) AddKeywords(ctx context.Context, datasetID uuid.UUID, s
 		updateMap[field] = ids
 	}
 
-	return s.repo.Update(ctx, &entity.Keyword{
-		ID:         record.ID,
-		DatasetID:  datasetID,
-		KeywordMap: updateMap,
+	return s.repo.Update(ctx, record.ID, map[string]any{
+		"dataset_id":  datasetID,
+		"keyword_map": updateMap,
 	})
 }
 
@@ -141,7 +140,9 @@ func (s *KeywordService) RemoveSegmentIDs(ctx context.Context, datasetID uuid.UU
 	}
 
 	// 保存关键词表
-	return s.repo.Update(ctx, keywordTable)
+	return s.repo.Update(ctx, keywordTable.ID, map[string]any{
+		"keyword_map": keywordTable.KeywordMap,
+	})
 }
 
 func getLockKey(datasetID uuid.UUID) string {

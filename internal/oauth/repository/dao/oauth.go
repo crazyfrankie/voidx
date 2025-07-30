@@ -63,12 +63,12 @@ func (d *OAuthDao) CreateAccountOAuth(ctx context.Context, auth *entity.AccountO
 	return d.db.WithContext(ctx).Model(&entity.AccountOAuth{}).Create(auth).Error
 }
 
-func (d *OAuthDao) UpdateAccountInfo(ctx context.Context, accountID uuid.UUID, account *entity.Account, accountOAuth *entity.AccountOAuth) error {
+func (d *OAuthDao) UpdateAccountInfo(ctx context.Context, accountID uuid.UUID, accountUpdates map[string]any, accountOAuthUpdates map[string]any) error {
 	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&entity.Account{}).Where("id = ?", accountID).Save(account).Error; err != nil {
+		if err := tx.Model(&entity.Account{}).Where("id = ?", accountID).Updates(accountUpdates).Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&entity.AccountOAuth{}).Where("account_id = ?", accountID).Save(accountOAuth).Error; err != nil {
+		if err := tx.Model(&entity.AccountOAuth{}).Where("account_id = ?", accountID).Updates(accountOAuthUpdates).Error; err != nil {
 			return err
 		}
 

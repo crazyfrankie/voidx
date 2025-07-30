@@ -172,9 +172,9 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 	}
 
 	// 更新应用配置id
-	return s.repo.UpdateApp(ctx, &entity.App{
-		ID:               app.ID,
-		DraftAppConfigID: appConfigVersion.ID,
+	return s.repo.UpdateApp(ctx, app.ID, map[string]any{
+		"id":                  app.ID,
+		"draft_app_config_id": appConfigVersion.ID,
 	})
 }
 
@@ -210,9 +210,9 @@ func (s *AppService) CreateApp(ctx context.Context, accountID uuid.UUID, req req
 	}
 
 	// 为应用添加草稿配置id
-	err = s.repo.UpdateApp(ctx, &entity.App{
-		ID:               app.ID,
-		DraftAppConfigID: appConfigVersion.ID,
+	err = s.repo.UpdateApp(ctx, app.ID, map[string]any{
+		"id":                  app.ID,
+		"draft_app_config_id": appConfigVersion.ID,
 	})
 	if err != nil {
 		return nil, err
@@ -223,7 +223,43 @@ func (s *AppService) CreateApp(ctx context.Context, accountID uuid.UUID, req req
 }
 
 // GetApp 根据传递的id获取应用的基础信息
-func (s *AppService) GetApp(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) (*entity.App, error) {
+func (s *AppService) GetApp(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) (*resp.AppResp, error) {
+	// 1. 查询数据库获取应用基础信息
+	app, err := s.repo.GetAppByID(ctx, appID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 判断应用是否存在
+	if app == nil {
+		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("该应用不存在，请核实后重试"))
+	}
+
+	// 3. 判断当前账号是否有权限访问该应用
+	if app.AccountID != accountID {
+		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
+	}
+
+	draft, err := s.repo.GetDraftAppConfigVersion(ctx, app.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp.AppResp{
+		ID:                  app.ID,
+		DebugConversationID: app.DebugConversationID,
+		Name:                app.Name,
+		Icon:                app.Icon,
+		Description:         app.Description,
+		Status:              app.Status.String(),
+		DraftUtime:          draft.Utime,
+		Ctime:               app.Ctime,
+		Utime:               app.Utime,
+	}, nil
+}
+
+// RawGetApp 根据传递的id获取应用的基础信息
+func (s *AppService) RawGetApp(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) (*entity.App, error) {
 	// 1. 查询数据库获取应用基础信息
 	app, err := s.repo.GetAppByID(ctx, appID)
 	if err != nil {
@@ -282,7 +318,7 @@ func (s *AppService) UpdateApp(ctx context.Context, appID uuid.UUID, accountID u
 // CopyApp 根据传递的应用id，拷贝Agent相关信息并创建一个新Agent
 func (s *AppService) CopyApp(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) error {
 	// 1. 获取App+草稿配置，并校验权限
-	app, err := s.GetApp(ctx, appID, accountID)
+	app, err := s.RawGetApp(ctx, appID, accountID)
 	if err != nil {
 		return err
 	}
@@ -339,9 +375,9 @@ func (s *AppService) CopyApp(ctx context.Context, appID uuid.UUID, accountID uui
 		}
 
 		// 4. 更新应用的草稿配置id
-		err = s.repo.UpdateApp(ctx, &entity.App{
-			ID:               app.ID,
-			DraftAppConfigID: newDraftAppConfig.ID,
+		err = s.repo.UpdateApp(ctx, app.ID, map[string]any{
+			"id":                  app.ID,
+			"draft_app_config_id": newDraftAppConfig.ID,
 		})
 		if err != nil {
 			return err
@@ -395,10 +431,19 @@ func (s *AppService) GetAppsWithPage(ctx context.Context, accountID uuid.UUID, r
 
 func (s *AppService) getAppConfigs(ctx context.Context, apps []*entity.App) ([]*resp.AppDraftConfigResp, error) {
 	appConfigs := make([]*resp.AppDraftConfigResp, 0, len(apps))
-	for _, a := range apps {
-		appCfg, err := s.appConfigService.GetAppConfig(ctx, a)
-		if err != nil {
-			return nil, err
+	for _, app := range apps {
+		var appCfg *resp.AppDraftConfigResp
+		var err error
+		if app.Status == consts.AppStatusDraft {
+			appCfg, err = s.appConfigService.GetDraftAppConfig(ctx, app)
+			if err != nil {
+				continue
+			}
+		} else {
+			appCfg, err = s.appConfigService.GetAppConfig(ctx, app)
+			if err != nil {
+				continue
+			}
 		}
 		appConfigs = append(appConfigs, appCfg)
 	}
@@ -408,7 +453,7 @@ func (s *AppService) getAppConfigs(ctx context.Context, apps []*entity.App) ([]*
 
 // GetDraftAppConfig 根据传递的应用id，获取指定的应用草稿配置信息
 func (s *AppService) GetDraftAppConfig(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) (*resp.AppDraftConfigResp, error) {
-	app, err := s.GetApp(ctx, appID, accountID)
+	app, err := s.RawGetApp(ctx, appID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -419,7 +464,7 @@ func (s *AppService) GetDraftAppConfig(ctx context.Context, appID uuid.UUID, acc
 // UpdateDraftAppConfig 根据传递的应用id+草稿配置修改指定应用的最新草稿
 func (s *AppService) UpdateDraftAppConfig(ctx context.Context, appID uuid.UUID, accountID uuid.UUID, draftAppConfig map[string]any) error {
 	// 1. 获取应用信息并校验
-	app, err := s.GetApp(ctx, appID, accountID)
+	app, err := s.RawGetApp(ctx, appID, accountID)
 	if err != nil {
 		return err
 	}
@@ -441,9 +486,8 @@ func (s *AppService) UpdateDraftAppConfig(ctx context.Context, appID uuid.UUID, 
 	}
 
 	// app.DraftAppConfigID, validatedConfig
-	err = s.repo.UpdateAppConfigVersion(ctx, &entity.AppConfigVersion{
-		ID:          app.DraftAppConfigID,
-		ModelConfig: validatedConfig,
+	err = s.repo.UpdateAppConfigVersion(ctx, app.DraftAppConfigID, map[string]any{
+		"model_config": validatedConfig,
 	})
 	if err != nil {
 		return err
@@ -455,7 +499,7 @@ func (s *AppService) UpdateDraftAppConfig(ctx context.Context, appID uuid.UUID, 
 // PublishDraftAppConfig 根据传递的应用id+账号，发布/更新指定的应用草稿配置为运行时配置
 func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) error {
 	// 1. 获取应用的信息以及草稿信息
-	app, err := s.GetApp(ctx, appID, accountID)
+	app, err := s.RawGetApp(ctx, appID, accountID)
 	if err != nil {
 		return err
 	}
@@ -522,10 +566,9 @@ func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID,
 	}
 
 	// 3. 更新应用关联的运行时配置以及状态
-	err = s.repo.UpdateApp(ctx, &entity.App{
-		ID:          appID,
-		AppConfigID: app.AppConfigID,
-		Status:      consts.AppStatusPublished,
+	err = s.repo.UpdateApp(ctx, appID, map[string]any{
+		"app_config_id": appConfig.ID,
+		"status":        consts.AppStatusPublished,
 	})
 	if err != nil {
 		return err
@@ -600,7 +643,7 @@ func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID,
 // CancelPublishAppConfig 根据传递的应用id+账号，取消发布指定的应用配置
 func (s *AppService) CancelPublishAppConfig(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) error {
 	// 1. 获取应用信息并校验权限
-	app, err := s.GetApp(ctx, appID, accountID)
+	app, err := s.RawGetApp(ctx, appID, accountID)
 	if err != nil {
 		return err
 	}
@@ -611,10 +654,9 @@ func (s *AppService) CancelPublishAppConfig(ctx context.Context, appID uuid.UUID
 	}
 
 	// 3. 修改账号的发布状态，并清空关联配置id
-	err = s.repo.UpdateApp(ctx, &entity.App{
-		ID:          appID,
-		Status:      consts.AppStatusDraft,
-		AppConfigID: uuid.Nil,
+	err = s.repo.UpdateApp(ctx, appID, map[string]any{
+		"status":        consts.AppStatusDraft,
+		"app_config_Id": uuid.Nil,
 	})
 	if err != nil {
 		return err
@@ -658,7 +700,7 @@ func (s *AppService) GetPublishHistoriesWithPage(ctx context.Context, appID uuid
 // FallbackHistoryToDraft 根据传递的应用id、历史配置版本id、账号信息，回退特定配置到草稿
 func (s *AppService) FallbackHistoryToDraft(ctx context.Context, appID, appConfigVersionID uuid.UUID, accountID uuid.UUID) (*entity.AppConfigVersion, error) {
 	// 1. 校验应用权限并获取信息
-	app, err := s.GetApp(ctx, appID, accountID)
+	app, err := s.RawGetApp(ctx, appID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -700,9 +742,8 @@ func (s *AppService) FallbackHistoryToDraft(ctx context.Context, appID, appConfi
 		return nil, errno.ErrNotFound.AppendBizMessage(errors.New("草稿配置不存在"))
 	}
 
-	err = s.repo.UpdateAppConfigVersion(ctx, &entity.AppConfigVersion{
-		ID:          app.DraftAppConfigID,
-		ModelConfig: validatedConfig,
+	err = s.repo.UpdateAppConfigVersion(ctx, app.DraftAppConfigID, map[string]any{
+		"model_config": validatedConfig,
 	})
 	if err != nil {
 		return nil, err
@@ -796,9 +837,9 @@ func (s *AppService) DeleteDebugConversation(ctx context.Context, appID uuid.UUI
 	}
 
 	// 3. 否则将debug_conversation_id的值重置为None
-	err = s.repo.UpdateApp(ctx, &entity.App{
-		ID:               appID,
-		DraftAppConfigID: uuid.Nil,
+	err = s.repo.UpdateApp(ctx, app.ID, map[string]any{
+		"id":                  app.ID,
+		"draft_app_config_id": uuid.Nil,
 	})
 	if err != nil {
 		return err
@@ -836,9 +877,9 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 		}
 
 		// 更新应用的调试会话ID
-		err = s.repo.UpdateApp(ctx, &entity.App{
-			ID:                  appID,
-			DebugConversationID: debugConversation.ID,
+		err = s.repo.UpdateApp(ctx, appID, map[string]any{
+			"id":                    appID,
+			"debug_conversation_id": debugConversation.ID,
 		})
 		if err != nil {
 			return nil, err
@@ -1052,7 +1093,7 @@ func (s *AppService) StopDebugChat(ctx context.Context, appID, taskID uuid.UUID,
 }
 
 // GetDebugConversationMessagesWithPage 根据传递的应用id+请求数据，获取调试会话消息列表分页数据
-func (s *AppService) GetDebugConversationMessagesWithPage(ctx context.Context, appID uuid.UUID, getReq req.GetDebugConversationMessagesWithPageReq, accountID uuid.UUID) ([]entity.Message, resp.Paginator, error) {
+func (s *AppService) GetDebugConversationMessagesWithPage(ctx context.Context, appID uuid.UUID, getReq req.GetDebugConversationMessagesWithPageReq, accountID uuid.UUID) ([]resp.DebugConversationMessageResp, resp.Paginator, error) {
 	// 1. 获取应用信息并校验权限
 	app, err := s.GetApp(ctx, appID, accountID)
 	if err != nil {
@@ -1061,7 +1102,10 @@ func (s *AppService) GetDebugConversationMessagesWithPage(ctx context.Context, a
 
 	// 2. 获取应用的调试会话
 	if app.DebugConversationID == uuid.Nil {
-		return nil, resp.Paginator{}, errno.ErrNotFound.AppendBizMessage(errors.New("调试会话不存在"))
+		return nil, resp.Paginator{
+			CurrentPage: getReq.CurrentPage,
+			PageSize:    getReq.PageSize,
+		}, nil
 	}
 
 	// 3. 执行分页并查询数据
@@ -1074,7 +1118,43 @@ func (s *AppService) GetDebugConversationMessagesWithPage(ctx context.Context, a
 		return nil, resp.Paginator{}, err
 	}
 
-	return messages, paginator, nil
+	res := make([]resp.DebugConversationMessageResp, 0, len(messages))
+	for _, message := range messages {
+		dbAgentThoughts, err := s.conversationService.GetConversationAgentThoughts(ctx, message.ConversationID)
+		if err != nil {
+			continue
+		}
+		agentThoughts := make([]resp.AgentThought, 0, len(dbAgentThoughts))
+		for _, at := range dbAgentThoughts {
+			agentThoughts = append(agentThoughts, resp.AgentThought{
+				ID:              at.ID,
+				MessageID:       message.ID,
+				Event:           at.Event,
+				Thought:         at.Thought,
+				Observation:     at.Observation,
+				Tool:            at.Tool,
+				ToolInput:       at.ToolInput,
+				Answer:          at.Answer,
+				TotalTokenCount: at.TotalTokenCount,
+				TotalPrice:      at.TotalPrice,
+				Latency:         at.Latency,
+				Ctime:           at.Ctime,
+			})
+		}
+		res = append(res, resp.DebugConversationMessageResp{
+			ID:              message.ID,
+			ConversationID:  message.ConversationID,
+			Query:           message.Query,
+			ImageUrls:       message.ImageUrls,
+			Answer:          message.Answer,
+			Latency:         message.Latency,
+			TotalTokenCount: message.TotalTokenCount,
+			AgentThoughts:   agentThoughts,
+			Ctime:           message.Ctime,
+		})
+	}
+
+	return res, paginator, nil
 }
 
 // GetPublishedConfig 根据传递的应用id+账号，获取应用的发布配置
@@ -1101,7 +1181,7 @@ func (s *AppService) GetPublishedConfig(ctx context.Context, appID uuid.UUID, ac
 // RegenerateWebAppToken 根据传递的应用id+账号，重新生成WebApp凭证标识
 func (s *AppService) RegenerateWebAppToken(ctx context.Context, appID uuid.UUID, accountID uuid.UUID) (string, error) {
 	// 1. 获取应用信息并校验权限
-	app, err := s.GetApp(ctx, appID, accountID)
+	app, err := s.RawGetApp(ctx, appID, accountID)
 	if err != nil {
 		return "", err
 	}
@@ -1113,9 +1193,8 @@ func (s *AppService) RegenerateWebAppToken(ctx context.Context, appID uuid.UUID,
 
 	// 3. 重新生成token并更新数据
 	token := s.generateRandomString(16)
-	err = s.repo.UpdateApp(ctx, &entity.App{
-		ID:    app.ID,
-		Token: token,
+	err = s.repo.UpdateApp(ctx, appID, map[string]any{
+		"token": token,
 	})
 	if err != nil {
 		return "", err
@@ -1693,16 +1772,18 @@ func (s *AppService) generateDefaultToken(ctx context.Context, appID uuid.UUID) 
 	if err != nil {
 		return "", err
 	}
+	var token string
 	if app.Status != consts.AppStatusPublished {
 		if app.Token != "" {
-			app.Token = ""
+			token = ""
 		}
 	}
-	if app.Token == "" {
-		app.Token = s.generateRandomString(16)
-	}
 
-	return app.Token, s.repo.UpdateApp(ctx, app)
+	token = s.generateRandomString(16)
+
+	return token, s.repo.UpdateApp(ctx, appID, map[string]any{
+		"token": token,
+	})
 }
 
 func (s *AppService) generateRandomString(length int) string {

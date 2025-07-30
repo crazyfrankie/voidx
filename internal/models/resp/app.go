@@ -7,14 +7,12 @@ import (
 // AppResp 应用响应
 type AppResp struct {
 	ID                  uuid.UUID `json:"id"`
+	DebugConversationID uuid.UUID `json:"debug_conversation_id"`
 	Name                string    `json:"name"`
 	Icon                string    `json:"icon"`
 	Description         string    `json:"description"`
 	Status              string    `json:"status"`
-	AppConfigID         uuid.UUID `json:"app_config_id"`
-	DraftAppConfigID    uuid.UUID `json:"draft_app_config_id"`
-	DebugConversationID uuid.UUID `json:"debug_conversation_id"`
-	Token               string    `json:"jwt"`
+	DraftUtime          int64     `json:"draft_utime"`
 	Ctime               int64     `json:"ctime"`
 	Utime               int64     `json:"utime"`
 }
@@ -37,18 +35,18 @@ type MessageResp struct {
 
 // AgentThought 智能体思考过程
 type AgentThought struct {
-	ID              uuid.UUID `json:"id"`
-	MessageID       uuid.UUID `json:"message_id"`
-	Event           string    `json:"event"`
-	Thought         string    `json:"thought"`
-	Observation     string    `json:"observation"`
-	Tool            string    `json:"tool"`
-	ToolInput       string    `json:"tool_input"`
-	Answer          string    `json:"answer"`
-	TotalTokenCount int       `json:"total_token_count"`
-	TotalPrice      float64   `json:"total_price"`
-	Latency         float64   `json:"latency"`
-	Ctime           int64     `json:"ctime"`
+	ID              uuid.UUID      `json:"id"`
+	MessageID       uuid.UUID      `json:"message_id"`
+	Event           string         `json:"event"`
+	Thought         string         `json:"thought"`
+	Observation     string         `json:"observation"`
+	Tool            string         `json:"tool"`
+	ToolInput       map[string]any `json:"tool_input"`
+	Answer          string         `json:"answer"`
+	TotalTokenCount int            `json:"total_token_count"`
+	TotalPrice      float64        `json:"total_price"`
+	Latency         float64        `json:"latency"`
+	Ctime           int64          `json:"ctime"`
 }
 
 // Paginator 分页器
@@ -73,6 +71,7 @@ type DebugConversationMessageResp struct {
 	AgentThoughts   []AgentThought `json:"agent_thoughts"`
 	Query           string         `json:"query"`
 	Answer          string         `json:"answer"`
+	ImageUrls       []string       `json:"image_urls"`
 	TotalTokenCount int            `json:"total_token_count"`
 	TotalPrice      float64        `json:"total_price"`
 	Latency         float64        `json:"latency"`
