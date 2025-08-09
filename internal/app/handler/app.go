@@ -1,15 +1,15 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-
 	"github.com/crazyfrankie/voidx/internal/app/service"
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"io"
 )
 
 type AppHandler struct {
@@ -410,13 +410,25 @@ func (h *AppHandler) DebugChat() gin.HandlerFunc {
 		}
 
 		// 调用服务发起调试对话，并将结果流式返回
-		_, err = h.appService.DebugChat(c.Request.Context(), appID, userID, chatReq)
+		res, err := h.appService.DebugChat(c.Request.Context(), appID, userID, chatReq)
 		if err != nil {
 			response.Error(c, err)
 			return
 		}
 
-		response.Success(c)
+		// 流式输出
+		c.Stream(func(w io.Writer) bool {
+			select {
+			case resp, ok := <-res:
+				if !ok {
+					return false
+				}
+				c.SSEvent("message", resp)
+				return true
+			case <-c.Request.Context().Done():
+				return false
+			}
+		})
 	}
 }
 

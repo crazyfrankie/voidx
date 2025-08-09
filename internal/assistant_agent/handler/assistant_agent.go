@@ -1,12 +1,9 @@
 package handler
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
+	"io"
 
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
@@ -49,12 +46,6 @@ func (h *AssistantAgentHandler) Chat() gin.HandlerFunc {
 			return
 		}
 
-		// 设置SSE响应头
-		c.Header("Content-Type", "text/event-stream")
-		c.Header("Cache-Control", "no-cache")
-		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
-
 		// 获取流式响应
 		eventChan, err := h.svc.Chat(c.Request.Context(), userID, chatReq)
 		if err != nil {
@@ -71,12 +62,7 @@ func (h *AssistantAgentHandler) Chat() gin.HandlerFunc {
 				}
 
 				eventData, _ := sonic.Marshal(event)
-				fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event.Event, string(eventData))
-
-				// 刷新缓冲区
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
-				}
+				c.SSEvent("message", eventData)
 				return true
 			case <-c.Request.Context().Done():
 				return false

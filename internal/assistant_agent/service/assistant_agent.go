@@ -3,19 +3,16 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
-	"os"
-	"strings"
+	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"sync"
-	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	"github.com/sashabaranov/go-openai"
 
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/repository"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/task"
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
+	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
@@ -26,25 +23,20 @@ import (
 type AssistantAgentService struct {
 	repo                *repository.AssistantAgentRepo
 	conversationService *service.ConversationService
-	openaiClient        *openai.Client
 	appProducer         *task.AppProducer
+	tokenBufMem         *memory.TokenBufferMemory
+	llm                 llmentity.BaseLanguageModel
 	// 用于跟踪活跃的聊天会话，按用户ID分组
 	activeSessions sync.Map // map[string]map[string]context.CancelFunc - key: userID, value: map[taskID]cancelFunc
 }
 
-func NewAssistantAgentService(repo *repository.AssistantAgentRepo,
-	conversationService *service.ConversationService, appProducer *task.AppProducer) *AssistantAgentService {
-	// 初始化OpenAI客户端
-	config := openai.DefaultConfig(os.Getenv("OPENAI_API_KEY"))
-	if baseURL := os.Getenv("OPENAI_API_BASE"); baseURL != "" {
-		config.BaseURL = baseURL
-	}
-	openaiClient := openai.NewClientWithConfig(config)
-
+func NewAssistantAgentService(repo *repository.AssistantAgentRepo, conversationService *service.ConversationService,
+	appProducer *task.AppProducer, llm llmentity.BaseLanguageModel, tokenBufMem *memory.TokenBufferMemory) *AssistantAgentService {
 	return &AssistantAgentService{
+		llm:                 llm,
 		repo:                repo,
 		conversationService: conversationService,
-		openaiClient:        openaiClient,
+		tokenBufMem:         tokenBufMem,
 		appProducer:         appProducer,
 	}
 }
@@ -81,13 +73,14 @@ func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chat
 	// 4. 将取消函数存储到用户的活跃会话中
 	s.addUserSession(userID.String(), taskID.String(), cancel)
 
-	// 5. 创建事件通道
-	eventChan := make(chan resp.AssistantAgentChatEvent, 100)
+	s.tokenBufMem = s.tokenBufMem.WithLLM(s.llm)
+	history, err := s.tokenBufMem.GetHistoryPromptMessages(2000, 3)
+	if err != nil {
+		return nil, err
+	}
 
-	// 6. 启动异步处理
-	go s.processAssistantChat(chatCtx, userID, conversation, message, chatReq, eventChan, taskID)
+	tools, err :=
 
-	return eventChan, nil
 }
 
 // StopChat 停止与辅助智能体的对话聊天
@@ -202,270 +195,6 @@ func (s *AssistantAgentService) getOrCreateAssistantConversation(ctx context.Con
 	}
 
 	return conversation, nil
-}
-
-// processAssistantChat 处理辅助Agent对话
-func (s *AssistantAgentService) processAssistantChat(ctx context.Context, userID uuid.UUID, conversation *entity.Conversation, message *entity.Message, chatReq req.AssistantAgentChatReq, eventChan chan<- resp.AssistantAgentChatEvent, taskID uuid.UUID) {
-	defer close(eventChan)
-	defer s.removeUserSession(userID.String(), taskID.String()) // 清理活跃会话
-
-	startTime := time.Now()
-
-	// 检查context是否已被取消
-	select {
-	case <-ctx.Done():
-		s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-			ID:             uuid.New().String(),
-			ConversationID: conversation.ID.String(),
-			MessageID:      message.ID.String(),
-			TaskID:         taskID.String(),
-			Event:          "error",
-			Answer:         "对话已被取消",
-			Latency:        time.Since(startTime).Seconds(),
-		})
-		return
-	default:
-	}
-
-	// 发送思考事件
-	s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-		ID:             uuid.New().String(),
-		ConversationID: conversation.ID.String(),
-		MessageID:      message.ID.String(),
-		TaskID:         taskID.String(),
-		Event:          "agent_thought",
-		Thought:        "正在分析用户问题...",
-		Latency:        time.Since(startTime).Seconds(),
-	})
-
-	// 检查是否被取消
-	select {
-	case <-ctx.Done():
-		return
-	default:
-	}
-
-	// 获取对话历史
-	historyMessages, _, err := s.repo.GetMessagesByConversationID(ctx, conversation.ID, 1, 10, 0)
-	if err != nil {
-		s.sendErrorEvent(eventChan, conversation, message, taskID, "获取对话历史失败")
-		return
-	}
-
-	// 构建对话上下文
-	s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-		ID:             uuid.New().String(),
-		ConversationID: conversation.ID.String(),
-		MessageID:      message.ID.String(),
-		TaskID:         taskID.String(),
-		Event:          "agent_thought",
-		Thought:        "正在构建对话上下文...",
-		Latency:        time.Since(startTime).Seconds(),
-	})
-
-	messages := s.buildChatMessages(historyMessages, chatReq.Query)
-
-	// 检查是否被取消
-	select {
-	case <-ctx.Done():
-		return
-	default:
-	}
-
-	// 调用OpenAI API
-	s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-		ID:             uuid.New().String(),
-		ConversationID: conversation.ID.String(),
-		MessageID:      message.ID.String(),
-		TaskID:         taskID.String(),
-		Event:          "agent_thought",
-		Thought:        "正在生成AI回复...",
-		Latency:        time.Since(startTime).Seconds(),
-	})
-
-	// 定义工具
-	tools := []openai.Tool{
-		{
-			Type: openai.ToolTypeFunction,
-			Function: &openai.FunctionDefinition{
-				Name:        "create_app",
-				Description: "如果用户提出了需要创建一个Agent/应用，你可以调用此工具，参数的输入是应用的名称+描述，返回的数据是创建后的成功提示",
-				Parameters: map[string]interface{}{
-					"type": "object",
-					"properties": map[string]interface{}{
-						"name": map[string]interface{}{
-							"type":        "string",
-							"description": "需要创建的Agent/应用名称，长度不超过50个字符",
-						},
-						"description": map[string]interface{}{
-							"type":        "string",
-							"description": "需要创建的Agent/应用描述，请详细概括该应用的功能",
-						},
-					},
-					"required": []string{"name", "description"},
-				},
-			},
-		},
-	}
-
-	// 创建流式请求
-	stream, err := s.openaiClient.CreateChatCompletionStream(ctx, openai.ChatCompletionRequest{
-		Model:       openai.GPT4oMini,
-		Messages:    messages,
-		Tools:       tools,
-		ToolChoice:  "auto",
-		Temperature: 0.7,
-		MaxTokens:   2000,
-		Stream:      true,
-	})
-	if err != nil {
-		s.sendErrorEvent(eventChan, conversation, message, taskID, fmt.Sprintf("AI调用失败: %v", err))
-		return
-	}
-	defer stream.Close()
-
-	// 处理流式响应
-	var fullAnswer strings.Builder
-	var totalTokens int
-	var toolCalls []openai.ToolCall
-
-	for {
-		// 检查是否被取消
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		response, err := stream.Recv()
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			s.sendErrorEvent(eventChan, conversation, message, taskID, fmt.Sprintf("接收AI响应失败: %v", err))
-			return
-		}
-
-		if len(response.Choices) > 0 {
-			choice := response.Choices[0]
-
-			// 处理文本内容
-			if choice.Delta.Content != "" {
-				fullAnswer.WriteString(choice.Delta.Content)
-
-				// 发送增量消息事件
-				s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-					ID:             uuid.New().String(),
-					ConversationID: conversation.ID.String(),
-					MessageID:      message.ID.String(),
-					TaskID:         taskID.String(),
-					Event:          "agent_message",
-					Answer:         fullAnswer.String(),
-					Latency:        time.Since(startTime).Seconds(),
-				})
-			}
-
-			// 处理工具调用
-			if len(choice.Delta.ToolCalls) > 0 {
-				toolCalls = append(toolCalls, choice.Delta.ToolCalls...)
-			}
-		}
-
-		if response.Usage != nil {
-			totalTokens = response.Usage.TotalTokens
-		}
-	}
-
-	// 处理工具调用
-	if len(toolCalls) > 0 {
-		for _, toolCall := range toolCalls {
-			if toolCall.Function.Name == "create_app" {
-				s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-					ID:             uuid.New().String(),
-					ConversationID: conversation.ID.String(),
-					MessageID:      message.ID.String(),
-					TaskID:         taskID.String(),
-					Event:          "agent_thought",
-					Thought:        "正在创建应用...",
-					Tool:           toolCall.Function.Name,
-					ToolInput:      toolCall.Function.Arguments,
-					Latency:        time.Since(startTime).Seconds(),
-				})
-
-				// 解析工具参数
-				var args struct {
-					Name        string `json:"name"`
-					Description string `json:"description"`
-				}
-				if err := sonic.Unmarshal([]byte(toolCall.Function.Arguments), &args); err != nil {
-					s.sendErrorEvent(eventChan, conversation, message, taskID, "解析工具参数失败")
-					continue
-				}
-
-				// 调用异步任务
-				if err := s.appProducer.PublishAutoCreateAppTask(ctx, args.Name, args.Description, userID); err != nil {
-					s.sendErrorEvent(eventChan, conversation, message, taskID, "发布创建应用任务失败")
-					continue
-				}
-
-				// 发送工具执行结果
-				toolResult := fmt.Sprintf("已调用后端异步任务创建Agent应用。\n应用名称: %s\n应用描述: %s", args.Name, args.Description)
-				fullAnswer.WriteString("\n\n" + toolResult)
-
-				s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-					ID:             uuid.New().String(),
-					ConversationID: conversation.ID.String(),
-					MessageID:      message.ID.String(),
-					TaskID:         taskID.String(),
-					Event:          "agent_thought",
-					Observation:    toolResult,
-					Latency:        time.Since(startTime).Seconds(),
-				})
-			}
-		}
-	}
-
-	// 发送最终消息事件
-	finalAnswer := fullAnswer.String()
-	s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-		ID:              uuid.New().String(),
-		ConversationID:  conversation.ID.String(),
-		MessageID:       message.ID.String(),
-		TaskID:          taskID.String(),
-		Event:           "message_end",
-		Answer:          finalAnswer,
-		Latency:         time.Since(startTime).Seconds(),
-		TotalTokenCount: totalTokens,
-	})
-
-	// 更新消息状态
-	s.conversationService.UpdateMessage(ctx, userID, message.ID, req.UpdateMessageReq{
-		Answer: finalAnswer,
-		Status: string(consts.MessageStatusNormal),
-	})
-}
-
-// sendEvent 发送事件到通道
-func (s *AssistantAgentService) sendEvent(eventChan chan<- resp.AssistantAgentChatEvent, event resp.AssistantAgentChatEvent) {
-	select {
-	case eventChan <- event:
-	default:
-		// 通道已满或已关闭，忽略
-	}
-}
-
-// sendErrorEvent 发送错误事件
-func (s *AssistantAgentService) sendErrorEvent(eventChan chan<- resp.AssistantAgentChatEvent,
-	conversation *entity.Conversation, message *entity.Message, taskID uuid.UUID, errorMsg string) {
-	s.sendEvent(eventChan, resp.AssistantAgentChatEvent{
-		ID:             uuid.New().String(),
-		ConversationID: conversation.ID.String(),
-		MessageID:      message.ID.String(),
-		TaskID:         taskID.String(),
-		Event:          "error",
-		Answer:         fmt.Sprintf("抱歉，处理您的请求时出现错误: %s", errorMsg),
-		Latency:        0,
-	})
 }
 
 // buildChatMessages 构建对话消息

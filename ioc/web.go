@@ -77,5 +77,7 @@ func InitMiddlewares(jwt *jwt.TokenService) []gin.HandlerFunc {
 		middlewares.NewAuthnHandler(jwt).
 			IgnorePath("/api/auth/login").
 			Auth(),
+
+		middlewares.SSEHeaders(),
 	}
 }

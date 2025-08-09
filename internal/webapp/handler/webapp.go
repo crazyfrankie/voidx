@@ -73,12 +73,6 @@ func (h *WebAppHandler) WebAppChat() gin.HandlerFunc {
 			return
 		}
 
-		// 设置SSE响应头
-		c.Header("Content-Type", "text/event-stream")
-		c.Header("Cache-Control", "no-cache")
-		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
-
 		// 获取响应流
 		responseStream, err := h.svc.WebAppChat(c.Request.Context(), token, chatReq, userID)
 		if err != nil {

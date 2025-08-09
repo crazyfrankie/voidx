@@ -266,6 +266,14 @@ func (s *WorkflowService) DebugWorkflow(ctx context.Context, workflowID, userID 
 		return nil, errno.ErrForbidden.AppendBizMessage(errors.New("当前账号无权限访问该应用，请核实后尝试"))
 	}
 
+	workflowTool, err := corewf.NewWorkflow(map[string]any{
+		"account_id":  userID,
+		"name":        workflow.ToolCallName,
+		"description": workflow.Description,
+		"nodes":       workflow.DraftGraph["nodes"],
+		"edges":       workflow.DraftGraph["edges"],
+	})
+
 	// 创建事件通道
 	eventChan := make(chan resp.WorkflowDebugEvent, 100)
 

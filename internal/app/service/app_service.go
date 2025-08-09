@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bytedance/sonic"
@@ -54,6 +55,7 @@ type AppService struct {
 	llmManager          *llmManager.LanguageModelManager
 	llmSvc              *llm.Service
 	tokenBufMem         *memory.TokenBufferMemory
+	activeSessions      sync.Map
 }
 
 func NewAppService(repo *repository.AppRepo, vecStore *vecstore.VecStoreService,
@@ -878,7 +880,6 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 
 		// 更新应用的调试会话ID
 		err = s.repo.UpdateApp(ctx, appID, map[string]any{
-			"id":                    appID,
 			"debug_conversation_id": debugConversation.ID,
 		})
 		if err != nil {
@@ -1803,4 +1804,59 @@ func (s *AppService) getParamWithDefault(params map[string]any, name string, def
 		return val
 	}
 	return defaultValue
+}
+
+// getUserSessions 获取用户的会话map，如果不存在则创建
+func (s *AppService) getUserSessions(userID string) map[string]context.CancelFunc {
+	if sessions, exists := s.activeSessions.Load(userID); exists {
+		return sessions.(map[string]context.CancelFunc)
+	}
+
+	// 创建新的用户会话map
+	userSessions := make(map[string]context.CancelFunc)
+	s.activeSessions.Store(userID, userSessions)
+	return userSessions
+}
+
+// addUserSession 添加用户会话
+func (s *AppService) addUserSession(userID, taskID string, cancel context.CancelFunc) {
+	if sessions, exists := s.activeSessions.Load(userID); exists {
+		userSessions := sessions.(map[string]context.CancelFunc)
+		userSessions[taskID] = cancel
+	} else {
+		userSessions := make(map[string]context.CancelFunc)
+		userSessions[taskID] = cancel
+		s.activeSessions.Store(userID, userSessions)
+	}
+}
+
+// removeUserSession 移除用户会话
+func (s *AppService) removeUserSession(userID, taskID string) {
+	if sessions, exists := s.activeSessions.Load(userID); exists {
+		userSessions := sessions.(map[string]context.CancelFunc)
+		delete(userSessions, taskID)
+
+		// 如果用户没有活跃会话了，清理用户记录
+		if len(userSessions) == 0 {
+			s.activeSessions.Delete(userID)
+		}
+	}
+}
+
+// cancelUserSession 取消用户的特定会话
+func (s *AppService) cancelUserSession(userID, taskID string) bool {
+	if sessions, exists := s.activeSessions.Load(userID); exists {
+		userSessions := sessions.(map[string]context.CancelFunc)
+		if cancel, exists := userSessions[taskID]; exists {
+			cancel()
+			delete(userSessions, taskID)
+
+			// 如果用户没有活跃会话了，清理用户记录
+			if len(userSessions) == 0 {
+				s.activeSessions.Delete(userID)
+			}
+			return true
+		}
+	}
+	return false
 }

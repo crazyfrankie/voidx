@@ -1,12 +1,9 @@
 package handler
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
+	"io"
 
 	"github.com/crazyfrankie/voidx/internal/ai/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
@@ -40,12 +37,6 @@ func (h *AIHandler) OptimizePrompt() gin.HandlerFunc {
 			return
 		}
 
-		// 设置SSE响应头
-		c.Header("Content-Type", "text/event-stream")
-		c.Header("Cache-Control", "no-cache")
-		c.Header("Connection", "keep-alive")
-		c.Header("Access-Control-Allow-Origin", "*")
-
 		// 获取流式响应
 		eventChan, err := h.svc.OptimizePrompt(c.Request.Context(), optimizeReq.Prompt)
 		if err != nil {
@@ -60,14 +51,8 @@ func (h *AIHandler) OptimizePrompt() gin.HandlerFunc {
 				if !ok {
 					return false
 				}
-
 				eventData, _ := sonic.Marshal(event)
-				fmt.Fprintf(w, "event: optimize_prompt\ndata: %s\n\n", string(eventData))
-
-				// 刷新缓冲区
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
-				}
+				c.SSEvent("message", eventData)
 				return true
 			case <-c.Request.Context().Done():
 				return false
