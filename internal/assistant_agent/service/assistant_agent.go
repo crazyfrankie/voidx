@@ -3,16 +3,23 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/crazyfrankie/voidx/internal/core/memory"
+	"fmt"
+	"github.com/crazyfrankie/voidx/pkg/util"
 	"sync"
 
+	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	"github.com/sashabaranov/go-openai"
+	"github.com/tmc/langchaingo/llms"
+	"github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/repository"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/task"
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
+	"github.com/crazyfrankie/voidx/internal/core/agent"
+	agenteneity "github.com/crazyfrankie/voidx/internal/core/agent/entities"
 	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
@@ -25,25 +32,27 @@ type AssistantAgentService struct {
 	conversationService *service.ConversationService
 	appProducer         *task.AppProducer
 	tokenBufMem         *memory.TokenBufferMemory
+	agentManager        *agent.AgentQueueManager
 	llm                 llmentity.BaseLanguageModel
 	// 用于跟踪活跃的聊天会话，按用户ID分组
 	activeSessions sync.Map // map[string]map[string]context.CancelFunc - key: userID, value: map[taskID]cancelFunc
 }
 
 func NewAssistantAgentService(repo *repository.AssistantAgentRepo, conversationService *service.ConversationService,
-	appProducer *task.AppProducer, llm llmentity.BaseLanguageModel, tokenBufMem *memory.TokenBufferMemory) *AssistantAgentService {
+	appProducer *task.AppProducer, llm llmentity.BaseLanguageModel, tokenBufMem *memory.TokenBufferMemory,
+	agentManager *agent.AgentQueueManager) *AssistantAgentService {
 	return &AssistantAgentService{
 		llm:                 llm,
 		repo:                repo,
 		conversationService: conversationService,
 		tokenBufMem:         tokenBufMem,
 		appProducer:         appProducer,
+		agentManager:        agentManager,
 	}
 }
 
-// TODO
 // Chat 与辅助智能体进行对话聊天
-func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chatReq req.AssistantAgentChatReq) (<-chan resp.AssistantAgentChatEvent, error) {
+func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chatReq req.AssistantAgentChatReq) (<-chan string, error) {
 	assistantAgentID, _ := uuid.Parse(consts.AssistantAgentID)
 
 	// 1. 获取或创建辅助Agent会话
@@ -66,21 +75,128 @@ func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chat
 		return nil, err
 	}
 
-	// 3. 创建可取消的context和taskID
-	taskID := uuid.New()
-	chatCtx, cancel := context.WithCancel(ctx)
-
-	// 4. 将取消函数存储到用户的活跃会话中
-	s.addUserSession(userID.String(), taskID.String(), cancel)
-
 	s.tokenBufMem = s.tokenBufMem.WithLLM(s.llm)
 	history, err := s.tokenBufMem.GetHistoryPromptMessages(2000, 3)
 	if err != nil {
 		return nil, err
 	}
 
-	tools, err :=
+	tool := s.convertCreateAppToTool(userID, s.appProducer)
 
+	agentCfg := agenteneity.AgentConfig{
+		UserID:               userID,
+		InvokeFrom:           consts.InvokeFromDebugger,
+		EnableLongTermMemory: true,
+		Tools:                []tools.Tool{tool},
+	}
+	agentIns := agent.NewFunctionCallAgent(s.llm, agentCfg, s.agentManager)
+
+	responseStream := make(chan string, 100)
+
+	// 启动异步处理
+	go s.processChat(ctx, assistantAgentID, userID, agentIns, history, message, conversation, chatReq, responseStream)
+
+	return responseStream, nil
+}
+
+func (s *AssistantAgentService) processChat(ctx context.Context,
+	appID uuid.UUID, userID uuid.UUID,
+	agent agent.BaseAgent, history []llms.MessageContent,
+	message *entity.Message, conversation *entity.Conversation,
+	chatReq req.AssistantAgentChatReq,
+	responseStream chan string) {
+
+	defer close(responseStream)
+
+	// 实现完整的Agent流式处理逻辑
+	agentState := agenteneity.AgentState{
+		TaskID:         uuid.New(),
+		Messages:       util.MessageContentToChatMessages(history),
+		History:        util.MessageContentToChatMessages(history),
+		LongTermMemory: conversation.Summary,
+		IterationCount: 0,
+	}
+
+	// 添加当前用户消息
+	if len(chatReq.Query) > 0 {
+		userMsg := llms.HumanChatMessage{Content: chatReq.Query}
+		agentState.Messages = append(agentState.Messages, userMsg)
+	}
+
+	// 获取Agent流式输出
+	thoughtChan, err := agent.Stream(ctx, agentState)
+	if err != nil {
+		select {
+		case responseStream <- fmt.Sprintf("event: error\ndata: %s\n\n", err.Error()):
+		case <-ctx.Done():
+		}
+		return
+	}
+
+	// 存储agent思考过程
+	agentThoughts := make(map[string]agenteneity.AgentThought)
+
+	// 处理流式输出
+	for agentThought := range thoughtChan {
+		eventID := agentThought.ID.String()
+
+		// 除了ping事件，其他事件全部记录
+		if agentThought.Event != agenteneity.EventPing {
+			// 单独处理agent_message事件，因为该事件为数据叠加
+			if agentThought.Event == agenteneity.EventAgentMessage {
+				if existing, exists := agentThoughts[eventID]; exists {
+					// 叠加智能体消息事件
+					existing.Thought = existing.Thought + agentThought.Thought
+					existing.Answer = existing.Answer + agentThought.Answer
+					existing.Latency = agentThought.Latency
+					agentThoughts[eventID] = existing
+				} else {
+					// 初始化智能体消息事件
+					agentThoughts[eventID] = agentThought
+				}
+			} else {
+				// 处理其他类型事件的消息
+				agentThoughts[eventID] = agentThought
+			}
+		}
+
+		// 构建响应数据
+		data := map[string]any{
+			"id":              eventID,
+			"conversation_id": conversation.ID.String(),
+			"message_id":      message.ID.String(),
+			"task_id":         agentState.TaskID.String(),
+			"event":           string(agentThought.Event),
+			"thought":         agentThought.Thought,
+			"observation":     agentThought.Observation,
+			"tool":            agentThought.Tool,
+			"tool_input":      agentThought.ToolInput,
+			"answer":          agentThought.Answer,
+			"latency":         agentThought.Latency,
+		}
+
+		jsonData, _ := sonic.Marshal(data)
+		eventStr := fmt.Sprintf("event: %s\ndata: %s\n\n", agentThought.Event, string(jsonData))
+
+		select {
+		case responseStream <- eventStr:
+		case <-ctx.Done():
+			return
+		}
+	}
+
+	// 将agent思考过程转换为切片
+	agentThoughtsList := make([]agenteneity.AgentThought, 0, len(agentThoughts))
+	for _, thought := range agentThoughts {
+		agentThoughtsList = append(agentThoughtsList, thought)
+	}
+
+	// 将消息以及推理过程添加到数据库
+	err = s.conversationService.SaveAgentThoughts(ctx, userID, appID, conversation.ID, message.ID, agentThoughtsList)
+	if err != nil {
+		// 记录错误但不中断流程
+		fmt.Printf("Failed to save agent thoughts: %v\n", err)
+	}
 }
 
 // StopChat 停止与辅助智能体的对话聊天
@@ -96,12 +212,7 @@ func (s *AssistantAgentService) StopChat(ctx context.Context, taskID, userID uui
 		return errno.ErrValidate.AppendBizMessage(errors.New("没有正在进行的对话"))
 	}
 
-	// 3. 查找并取消对应的任务
-	if !s.cancelUserSession(userID.String(), taskID.String()) {
-		return errno.ErrValidate.AppendBizMessage(errors.New("未找到对应的活跃会话"))
-	}
-
-	return nil
+	return s.agentManager.SetStopFlag(taskID, consts.InvokeFromWebApp, userID)
 }
 
 // GetMessagesWithPage 获取辅助智能体消息分页列表
@@ -243,57 +354,56 @@ func (s *AssistantAgentService) buildChatMessages(historyMessages []entity.Messa
 	return messages
 }
 
-// getUserSessions 获取用户的会话map，如果不存在则创建
-func (s *AssistantAgentService) getUserSessions(userID string) map[string]context.CancelFunc {
-	if sessions, exists := s.activeSessions.Load(userID); exists {
-		return sessions.(map[string]context.CancelFunc)
-	}
+type CreateAppTool struct {
+	accountID uuid.UUID
 
-	// 创建新的用户会话map
-	userSessions := make(map[string]context.CancelFunc)
-	s.activeSessions.Store(userID, userSessions)
-	return userSessions
+	appProducer *task.AppProducer
 }
 
-// addUserSession 添加用户会话
-func (s *AssistantAgentService) addUserSession(userID, taskID string, cancel context.CancelFunc) {
-	if sessions, exists := s.activeSessions.Load(userID); exists {
-		userSessions := sessions.(map[string]context.CancelFunc)
-		userSessions[taskID] = cancel
-	} else {
-		userSessions := make(map[string]context.CancelFunc)
-		userSessions[taskID] = cancel
-		s.activeSessions.Store(userID, userSessions)
+type CreateAppInput struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (s *AssistantAgentService) convertCreateAppToTool(accountID uuid.UUID, producer *task.AppProducer) tools.Tool {
+	return &CreateAppTool{
+		accountID:   accountID,
+		appProducer: producer,
 	}
 }
 
-// removeUserSession 移除用户会话
-func (s *AssistantAgentService) removeUserSession(userID, taskID string) {
-	if sessions, exists := s.activeSessions.Load(userID); exists {
-		userSessions := sessions.(map[string]context.CancelFunc)
-		delete(userSessions, taskID)
-
-		// 如果用户没有活跃会话了，清理用户记录
-		if len(userSessions) == 0 {
-			s.activeSessions.Delete(userID)
-		}
-	}
+func (t *CreateAppTool) Name() string {
+	return "需要创建的Agent/应用名称，长度不超过50个字符"
 }
 
-// cancelUserSession 取消用户的特定会话
-func (s *AssistantAgentService) cancelUserSession(userID, taskID string) bool {
-	if sessions, exists := s.activeSessions.Load(userID); exists {
-		userSessions := sessions.(map[string]context.CancelFunc)
-		if cancel, exists := userSessions[taskID]; exists {
-			cancel()
-			delete(userSessions, taskID)
+func (t *CreateAppTool) Description() string {
+	return "需要创建的Agent/应用描述，请详细概括该应用的功能"
+}
 
-			// 如果用户没有活跃会话了，清理用户记录
-			if len(userSessions) == 0 {
-				s.activeSessions.Delete(userID)
-			}
-			return true
-		}
+func (t *CreateAppTool) Call(ctx context.Context, input string) (string, error) {
+	// 解析输入参数
+	var params CreateAppInput
+	err := sonic.Unmarshal([]byte(input), &params)
+	if err != nil {
+		return "", fmt.Errorf("invalid input format: %v", err)
 	}
-	return false
+
+	// 验证参数
+	if params.Name == "" || len(params.Name) > 50 {
+		return "", fmt.Errorf("name must be between 1 and 50 characters")
+	}
+	if params.Description == "" {
+		return "", fmt.Errorf("description cannot be empty")
+	}
+
+	// 1. 调用异步任务在后端创建应用
+	err = t.appProducer.PublishAutoCreateAppTask(ctx, params.Name, params.Description, t.accountID)
+	if err != nil {
+		return "", err
+	}
+
+	// 2. 返回成功提示
+	result := fmt.Sprintf("已调用后端异步任务创建Agent应用。\n应用名称: %s\n应用描述: %s",
+		params.Name, params.Description)
+	return result, nil
 }

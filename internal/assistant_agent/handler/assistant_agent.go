@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"io"
 
@@ -61,8 +60,7 @@ func (h *AssistantAgentHandler) Chat() gin.HandlerFunc {
 					return false
 				}
 
-				eventData, _ := sonic.Marshal(event)
-				c.SSEvent("message", eventData)
+				c.SSEvent("message", event)
 				return true
 			case <-c.Request.Context().Done():
 				return false

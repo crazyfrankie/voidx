@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/bytedance/sonic"
 	"os"
 	"strings"
 
@@ -96,9 +97,9 @@ func (s *AIService) GenerateSuggestedQuestions(ctx context.Context, messageID, u
 }
 
 // OptimizePrompt 根据传递的prompt进行优化生成
-func (s *AIService) OptimizePrompt(ctx context.Context, prompt string) (<-chan resp.OptimizePromptEvent, error) {
+func (s *AIService) OptimizePrompt(ctx context.Context, prompt string) (<-chan string, error) {
 	// 创建事件通道
-	eventChan := make(chan resp.OptimizePromptEvent, 100)
+	eventChan := make(chan string, 100)
 
 	// 启动异步处理
 	go s.processOptimizePrompt(ctx, prompt, eventChan)
@@ -107,7 +108,7 @@ func (s *AIService) OptimizePrompt(ctx context.Context, prompt string) (<-chan r
 }
 
 // processOptimizePrompt 处理prompt优化
-func (s *AIService) processOptimizePrompt(ctx context.Context, prompt string, eventChan chan<- resp.OptimizePromptEvent) {
+func (s *AIService) processOptimizePrompt(ctx context.Context, prompt string, eventChan chan<- string) {
 	defer close(eventChan)
 
 	// 1. 创建OpenAI客户端
@@ -137,7 +138,7 @@ func (s *AIService) processOptimizePrompt(ctx context.Context, prompt string, ev
 	stream, err := client.CreateChatCompletionStream(ctx, req)
 	if err != nil {
 		// 发送错误事件
-		eventChan <- resp.OptimizePromptEvent{OptimizePrompt: ""}
+		eventChan <- ""
 		return
 	}
 	defer stream.Close()
@@ -156,8 +157,10 @@ func (s *AIService) processOptimizePrompt(ctx context.Context, prompt string, ev
 				optimizedPrompt.WriteString(delta)
 
 				// 发送增量事件
+				data := resp.OptimizePromptEvent{OptimizePrompt: delta}
+				eventData, _ := sonic.Marshal(data)
 				select {
-				case eventChan <- resp.OptimizePromptEvent{OptimizePrompt: delta}:
+				case eventChan <- fmt.Sprintf("event: %s\ndata: %s\n\n", "optimize_prompt", string(eventData)):
 				case <-ctx.Done():
 					return
 				}

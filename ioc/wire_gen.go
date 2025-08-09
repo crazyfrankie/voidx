@@ -75,7 +75,7 @@ func InitApplication() *Application {
 	apiToolModule := apitool.InitApiToolHandler(db)
 	apiToolHandler := apiToolModule.Handler
 	appHandler := appModule.Handler
-	assistantModule := assistant_agent.InitAssistantModule(db, conversationModule)
+	assistantModule := assistant_agent.InitAssistantModule(db, conversationModule, agentQueueManager, languageModelManager, tokenBufferMemory)
 	assistantAgentHandler := assistantModule.Handler
 	audioModule := audio.InitAudioModule(db)
 	audioHandler := audioModule.Handler
