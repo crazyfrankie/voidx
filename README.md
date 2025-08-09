@@ -1,4 +1,31 @@
 # VoidX
-这是一个类似于 [Dify](https://dify.ai)、[coze](https://coze.com) 的 LLMOps 平台.
 
-项目前端: [llmops-ui](https://github.com/crazyfrankie/llmops-ui)
+一个基于 Go 语言开发的 LLMOps 平台，类似于 [Dify](https://dify.ai) 和 [Coze](https://coze.com)，提供完整的大语言模型应用开发和运营解决方案。
+
+## 项目结构
+
+- **后端**: Go + Gin 框架
+- **前端**: [llmops-ui](https://github.com/crazyfrankie/llmops-ui)
+
+## 核心功能
+
+### Dataset
+
+- **文档处理**: 支持多种文档格式的上传和解析
+- **向量化存储**: 基于向量数据库的文档检索
+- **分段管理**: 智能文档分段和索引构建
+- **检索优化**: 支持多种检索策略和相似度计算
+
+### Assistant Agent
+
+- **多模型支持**: 集成多种大语言模型
+- **工具调用**: 支持外部工具和API集成
+- **上下文管理**: 智能对话上下文维护
+- **任务执行**: 异步任务处理和状态管理
+
+### 🔄 工作流引擎 (Workflow)
+
+- **可视化编排**: 支持拖拽式工作流设计
+- **节点管理**: 丰富的预置节点类型
+- **流程控制**: 条件分支、循环等控制结构
+- **状态追踪**: 实时工作流执行状态监控
