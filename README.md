@@ -1,6 +1,6 @@
 # VoidX
 
-一个基于 Go 语言开发的 LLMOps 平台，类似于 [Dify](https://dify.ai) 和 [Coze](https://coze.com)，提供完整的大语言模型应用开发和运营解决方案。
+一个基于 Go 语言开发的 Agent Workflow 平台，类似于 [Dify](https://dify.ai) 和 [Coze](https://coze.com)，提供完整的大语言模型应用开发和运营解决方案。
 
 ## 项目结构
 
