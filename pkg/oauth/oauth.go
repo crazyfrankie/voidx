@@ -6,7 +6,6 @@ type OAuthUserInfo struct {
 	Email string `json:"email"`
 }
 
-// OAuth 接口对应Python中的抽象类OAuth
 type OAuth interface {
 	GetProvider() string
 	GetAuthorizationURL() string

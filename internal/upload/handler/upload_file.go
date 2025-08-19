@@ -42,6 +42,7 @@ func (h *UploadFileHandler) UploadFile() gin.HandlerFunc {
 		// 检查文件大小（15MB限制）
 		if header.Size > 15*1024*1024 {
 			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传文件最大不能超过15MB")))
+			return
 		}
 		data, err := io.ReadAll(file)
 		if err != nil {
