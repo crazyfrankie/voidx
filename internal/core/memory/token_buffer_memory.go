@@ -61,7 +61,7 @@ func (m *TokenBufferMemory) GetHistoryPromptMessages(maxTokenLimit int, messageL
 		m.conversationID,
 		false,
 		[]MessageStatus{MessageStatusNormal, MessageStatusStop, MessageStatusTimeout},
-	).Order("created_at desc").Limit(messageLimit).Find(&messages)
+	).Order("ctime desc").Limit(messageLimit).Find(&messages)
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to query messages: %w", result.Error)
