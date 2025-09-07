@@ -5,19 +5,19 @@ import (
 	"errors"
 	"strings"
 
-	consts2 "github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 	"github.com/silenceper/wechat/v2/officialaccount/message"
 	lcllms "github.com/tmc/langchaingo/llms"
-	"gorm.io/gorm"
 
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	agenteneity "github.com/crazyfrankie/voidx/internal/core/agent/entities"
 	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/internal/wechat/repository"
 	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/types/consts"
 )
 
 // handleResultQuery 处理结果查询（消息"1"）
@@ -25,7 +25,7 @@ func (s *WechatService) handleResultQuery(ctx context.Context, wechatEndUserID u
 	// 查询最新的微信消息记录
 	wechatMessage, err := s.repo.GetLatestWechatMessage(ctx, wechatEndUserID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, repository.ErrMessageNotFound) {
 			return ""
 		}
 		return "系统错误，请稍后重试"
@@ -44,7 +44,7 @@ func (s *WechatService) handleResultQuery(ctx context.Context, wechatEndUserID u
 
 	// 根据消息状态返回不同内容
 	switch msg.Status {
-	case consts2.MessageStatusNormal, consts2.MessageStatusStop:
+	case consts.MessageStatusNormal, consts.MessageStatusStop:
 		if strings.TrimSpace(msg.Answer) != "" {
 			// 标记消息已推送
 			if err := s.repo.UpdateWechatMessage(ctx, wechatMessage.ID, map[string]interface{}{
@@ -55,9 +55,9 @@ func (s *WechatService) handleResultQuery(ctx context.Context, wechatEndUserID u
 			return strings.TrimSpace(msg.Answer)
 		}
 		return "该Agent智能体任务正在处理中，请稍后重新回复`1`获取结果。"
-	case consts2.MessageStatusTimeout:
+	case consts.MessageStatusTimeout:
 		return "该Agent智能体处理任务超时，请重新发起提问。"
-	case consts2.MessageStatusError:
+	case consts.MessageStatusError:
 		return "该Agent智能体处理任务出错，请重新发起提问，错误信息: " + msg.Error + "。"
 	default:
 		return "该Agent智能体任务正在处理中，请稍后重新回复`1`获取结果。"
@@ -84,11 +84,11 @@ func (s *WechatService) handleNormalMessage(ctx context.Context, content string,
 		ID:             uuid.New(),
 		AppID:          app.ID,
 		ConversationID: convers.ID,
-		InvokeFrom:     consts2.InvokeFromServiceAPI,
+		InvokeFrom:     consts.InvokeFromServiceAPI,
 		CreatedBy:      wechatEndUser.EndUserID,
 		Query:          content,
 		ImageUrls:      []string{},
-		Status:         consts2.MessageStatusNormal,
+		Status:         consts.MessageStatusNormal,
 	}
 
 	if err := s.repo.CreateMessage(ctx, msg); err != nil {
@@ -159,7 +159,7 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 		}
 		// 5.构建LangChain知识库检索工具
 		datasetRetrieval, err := s.retrievalSvc.CreateLangchainToolFromSearch(ctx, app.AccountID,
-			datasetIDs, consts2.RetrievalSourceApp, appConfig.RetrievalConfig)
+			datasetIDs, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
 		if err != nil {
 			logs.Errorf("Failed to create dataset retrieval tool: %v", err)
 			return
@@ -185,7 +185,7 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 	// 7.根据LLM是否支持tool_call决定使用不同的Agent
 	agentCfg := agenteneity.AgentConfig{
 		UserID:               app.AccountID,
-		InvokeFrom:           consts2.InvokeFromDebugger,
+		InvokeFrom:           consts.InvokeFromDebugger,
 		PresetPrompt:         appConfig.PresetPrompt,
 		EnableLongTermMemory: appConfig.LongTermMemory["enabled"].(bool),
 		Tools:                tools,

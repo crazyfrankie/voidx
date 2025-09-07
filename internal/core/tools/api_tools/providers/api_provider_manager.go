@@ -10,10 +10,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/bytedance/sonic"
 	"github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/entities"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // ApiProviderManager API工具提供者管理器，能根据传递的工具配置信息生成自定义API工具

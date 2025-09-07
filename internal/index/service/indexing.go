@@ -8,9 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytedance/sonic"
-	consts2 "github.com/crazyfrankie/voidx/types/consts"
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 	milvusentity "github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/redis/go-redis/v9"
@@ -25,7 +22,10 @@ import (
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type IndexingService struct {
@@ -77,7 +77,7 @@ func (s *IndexingService) BuildDocuments(ctx context.Context, documentIDs []uuid
 			// 更新文档状态为错误
 			now := time.Now()
 			s.repo.UpdateDocument(ctx, document.ID, map[string]any{
-				"status":     consts2.DocumentStatusError,
+				"status":     consts.DocumentStatusError,
 				"error":      err.Error(),
 				"stopped_at": &now,
 			})
@@ -92,7 +92,7 @@ func (s *IndexingService) buildSingleDocument(ctx context.Context, document *ent
 	// 3. 更新当前状态为解析中，并记录开始处理的时间
 	now := time.Now().UnixMilli()
 	err := s.repo.UpdateDocument(ctx, document.ID, map[string]any{
-		"status":                consts2.DocumentStatusParsing,
+		"status":                consts.DocumentStatusParsing,
 		"processing_started_at": &now,
 	})
 	if err != nil {
@@ -129,7 +129,7 @@ func (s *IndexingService) buildSingleDocument(ctx context.Context, document *ent
 // UpdateDocumentEnabled 根据传递的文档id更新文档状态，同时修改向量数据库中的记录
 func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID uuid.UUID) error {
 	// 1. 构建缓存键
-	cacheKey := fmt.Sprintf(consts2.LockDocumentUpdateEnabled, documentID)
+	cacheKey := fmt.Sprintf(consts.LockDocumentUpdateEnabled, documentID)
 
 	// 2. 根据传递的document_id获取文档记录
 	document, err := s.repo.GetDocumentByID(ctx, documentID)
@@ -149,7 +149,7 @@ func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID 
 	var segmentIDs []uuid.UUID
 	var nodeIDs []uuid.UUID
 	for _, segment := range segments {
-		if segment.Status == consts2.SegmentStatusCompleted {
+		if segment.Status == consts.SegmentStatusCompleted {
 			segmentIDs = append(segmentIDs, segment.ID)
 			if segment.NodeID != uuid.Nil {
 				nodeIDs = append(nodeIDs, segment.NodeID)
@@ -172,7 +172,7 @@ func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID 
 			now := time.Now().UnixMilli()
 			s.repo.UpdateSegmentByNodeID(ctx, nodeID, map[string]any{
 				"error":       err,
-				"status":      consts2.SegmentStatusError,
+				"status":      consts.SegmentStatusError,
 				"enabled":     false,
 				"disabled_at": &now,
 				"stopped_at":  &now,
@@ -300,7 +300,7 @@ func (s *IndexingService) parsing(ctx context.Context, document *entity.Document
 	now := time.Now().UnixMilli()
 	err = s.repo.UpdateDocument(ctx, document.ID, map[string]any{
 		"character_count":      characterCount,
-		"status":               consts2.DocumentStatusSplitting,
+		"status":               consts.DocumentStatusSplitting,
 		"parsing_completed_at": &now,
 	})
 	if err != nil {
@@ -376,7 +376,7 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 			CharacterCount: len(content),
 			TokenCount:     s.embeddingsService.CalculateTokenCount(content),
 			Hash:           util.GenerateHash(content),
-			Status:         consts2.SegmentStatusWaiting,
+			Status:         consts.SegmentStatusWaiting,
 		}
 
 		err = s.repo.CreateSegment(ctx, segment)
@@ -406,7 +406,7 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 	now := time.Now().UnixMilli()
 	err = s.repo.UpdateDocument(ctx, document.ID, map[string]any{
 		"token_count":            totalTokenCount,
-		"status":                 consts2.DocumentStatusIndexing,
+		"status":                 consts.DocumentStatusIndexing,
 		"splitting_completed_at": &now,
 	})
 	if err != nil {
@@ -429,7 +429,7 @@ func (s *IndexingService) indexing(ctx context.Context, document *entity.Documen
 
 		err := s.repo.UpdateSegment(ctx, segmentID, map[string]any{
 			"keywords":              string(keywordsJSON),
-			"status":                consts2.SegmentStatusIndexing,
+			"status":                consts.SegmentStatusIndexing,
 			"indexing_completed_at": &now,
 		})
 		if err != nil {
@@ -520,7 +520,7 @@ func (s *IndexingService) completed(ctx context.Context, document *entity.Docume
 			now := time.Now().UnixMilli()
 			for _, nodeID := range nodeIDs {
 				s.repo.UpdateSegmentByNodeID(ctx, nodeID, map[string]any{
-					"status":       consts2.SegmentStatusError,
+					"status":       consts.SegmentStatusError,
 					"completed_at": nil,
 					"stopped_at":   &now,
 					"enabled":      false,
@@ -532,7 +532,7 @@ func (s *IndexingService) completed(ctx context.Context, document *entity.Docume
 			now := time.Now().UnixMilli()
 			for _, nodeID := range nodeIDs {
 				s.repo.UpdateSegmentByNodeID(ctx, nodeID, map[string]any{
-					"status":       consts2.SegmentStatusCompleted,
+					"status":       consts.SegmentStatusCompleted,
 					"completed_at": &now,
 					"enabled":      true,
 				})
@@ -543,7 +543,7 @@ func (s *IndexingService) completed(ctx context.Context, document *entity.Docume
 	// 3. 更新文档的状态数据
 	now := time.Now().UnixMilli()
 	return s.repo.UpdateDocument(ctx, document.ID, map[string]any{
-		"status":       consts2.DocumentStatusCompleted,
+		"status":       consts.DocumentStatusCompleted,
 		"completed_at": &now,
 		"enabled":      true,
 	})

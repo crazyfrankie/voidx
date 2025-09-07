@@ -4,9 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/crazyfrankie/voidx/types/errno"
-
 	"mime"
 	"os"
 	"path/filepath"
@@ -14,6 +11,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/llm"
 	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type LLMService struct {

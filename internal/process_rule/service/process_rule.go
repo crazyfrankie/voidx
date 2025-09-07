@@ -6,11 +6,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/process_rule/repository"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type ProcessRuleService struct {

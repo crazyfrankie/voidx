@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"regexp"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
+
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 var WorkflowConfigNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)

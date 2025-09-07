@@ -5,13 +5,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/analysis/repository"
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type AnalysisService struct {

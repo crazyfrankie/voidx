@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/IBM/sarama"
-	"github.com/bytedance/sonic"
 
 	"github.com/crazyfrankie/voidx/internal/app/service"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/task"
 	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // AppConsumer 应用任务消费者

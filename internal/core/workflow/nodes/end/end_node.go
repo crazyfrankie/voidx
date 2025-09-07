@@ -3,10 +3,9 @@ package end
 import (
 	"time"
 
-	"github.com/bytedance/sonic"
-
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // EndNode 结束节点

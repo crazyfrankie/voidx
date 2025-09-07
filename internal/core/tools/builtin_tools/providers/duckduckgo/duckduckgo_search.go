@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // DuckDuckGoSearchTool represents a tool for DuckDuckGo search

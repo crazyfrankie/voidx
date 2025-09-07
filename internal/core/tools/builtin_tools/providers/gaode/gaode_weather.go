@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // GaodeWeatherTool represents a tool for Gaode weather query

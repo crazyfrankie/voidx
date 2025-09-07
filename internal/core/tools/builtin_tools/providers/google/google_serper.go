@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // GoogleSerperTool represents a tool for Google Serper search

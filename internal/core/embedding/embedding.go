@@ -6,11 +6,11 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/pkoukk/tiktoken-go"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/crazyfrankie/voidx/pkg/langchainx/embeddings"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 type EmbeddingService struct {

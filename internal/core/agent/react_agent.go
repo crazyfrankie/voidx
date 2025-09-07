@@ -7,12 +7,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/core/agent/entities"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 const pattern = "(?m)```json\\s*\\n([\\s\\S]+?)```"

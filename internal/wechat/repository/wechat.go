@@ -9,6 +9,11 @@ import (
 	"github.com/crazyfrankie/voidx/internal/wechat/repository/dao"
 )
 
+var (
+	ErrMessageNotFound = dao.ErrMessageNotFound
+	ErrEndUserNotFound = dao.ErrEndUserNotFound
+)
+
 type WechatRepository struct {
 	dao *dao.WechatDao
 }

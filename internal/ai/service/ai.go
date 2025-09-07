@@ -4,10 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-
-	"github.com/bytedance/sonic"
-	"github.com/crazyfrankie/voidx/types/errno"
-
 	"os"
 	"strings"
 
@@ -17,6 +13,8 @@ import (
 	"github.com/crazyfrankie/voidx/internal/ai/repository"
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 const OptimizePromptTemplate = `# 角色

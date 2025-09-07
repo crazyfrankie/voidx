@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // WikipediaSearchTool represents a tool for Wikipedia search

@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // RetrievalTool 检索工具接口

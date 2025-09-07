@@ -3,9 +3,9 @@ package handler
 import (
 	"net/http"
 
-	"github.com/crazyfrankie/voidx/internal/base/response"
 	"github.com/gin-gonic/gin"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
 	"github.com/crazyfrankie/voidx/internal/llm/service"
 )
 

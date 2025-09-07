@@ -9,10 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytedance/sonic"
-
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // HttpRequestNode HTTP请求节点

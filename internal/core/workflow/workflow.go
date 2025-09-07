@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
@@ -19,6 +18,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes/start"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes/template_transform"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes/tool"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // Workflow 工作流LangChain工具类

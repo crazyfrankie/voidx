@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // Dalle3Tool represents a tool for DALLE-3 image generation

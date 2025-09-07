@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/IBM/sarama"
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/document/task"
 	"github.com/crazyfrankie/voidx/internal/index/service"
 	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // DocumentConsumer 文档任务消费者

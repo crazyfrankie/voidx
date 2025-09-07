@@ -1,14 +1,14 @@
 package handler
 
 import (
-	"github.com/crazyfrankie/voidx/internal/base/response"
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type ConversationHandler struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 type AnalysisCache struct {

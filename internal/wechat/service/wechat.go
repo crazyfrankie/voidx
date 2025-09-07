@@ -6,11 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/crazyfrankie/voidx/internal/core/agent"
-	"github.com/crazyfrankie/voidx/internal/core/memory"
-	consts2 "github.com/crazyfrankie/voidx/types/consts"
-	"gorm.io/gorm"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/silenceper/wechat/v2"
@@ -20,10 +15,13 @@ import (
 
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation"
+	"github.com/crazyfrankie/voidx/internal/core/agent"
+	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/wechat/repository"
+	"github.com/crazyfrankie/voidx/types/consts"
 )
 
 type WechatService struct {
@@ -60,7 +58,7 @@ func (s *WechatService) Wechat(c *gin.Context, appID uuid.UUID) (string, error) 
 		return "", err
 	}
 
-	if app == nil || app.Status != consts2.AppStatusPublished {
+	if app == nil || app.Status != consts.AppStatusPublished {
 		if c.Request.Method == http.MethodGet {
 			return "", errors.New("该应用未发布或不存在，无法使用，请核实后重试")
 		}
@@ -69,7 +67,7 @@ func (s *WechatService) Wechat(c *gin.Context, appID uuid.UUID) (string, error) 
 
 	// 2. 获取微信配置
 	wechatConfig, err := s.repo.GetWechatConfig(c.Request.Context(), appID)
-	if wechatConfig == nil || wechatConfig.Status != consts2.WechatConfigStatusConfigured {
+	if wechatConfig == nil || wechatConfig.Status != consts.WechatConfigStatusConfigured {
 		if c.Request.Method == http.MethodGet {
 			return "", errors.New("该应用未发布到微信公众号，无法使用，请核实后重试")
 		}
@@ -158,7 +156,7 @@ func (s *WechatService) handleMessage(c *gin.Context, oa *officialaccount.Offici
 func (s *WechatService) getOrCreateWechatEndUser(ctx context.Context, openID string, appID, accountID uuid.UUID) (*entity.WechatEndUser, error) {
 	// 查询现有用户
 	wechatEndUser, err := s.repo.GetWechatEndUser(ctx, openID, appID)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+	if err != nil && !errors.Is(err, repository.ErrEndUserNotFound) {
 		return nil, err
 	}
 

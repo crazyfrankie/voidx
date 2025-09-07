@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	"github.com/IBM/sarama"
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
+
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // DocumentTaskType 文档任务类型

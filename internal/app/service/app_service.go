@@ -12,9 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bytedance/sonic"
-	consts2 "github.com/crazyfrankie/voidx/types/consts"
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/chains"
 	"github.com/tmc/langchaingo/llms"
@@ -38,8 +35,11 @@ import (
 	"github.com/crazyfrankie/voidx/internal/upload"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/pkg/langchainx/dalle"
-	"github.com/crazyfrankie/voidx/pkg/util"
 	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type AppService struct {
@@ -86,7 +86,7 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 	// 创建DallEApiWrapper包装器
 	dalleCli := dalle.NewClient(os.Getenv("OPENAI_API_KEY"))
 
-	iconPrompt := fmt.Sprintf(consts2.GenerateIconPromptTemplate, name, description)
+	iconPrompt := fmt.Sprintf(consts.GenerateIconPromptTemplate, name, description)
 
 	var iconURL string
 	var generatedPresetPrompt string
@@ -101,7 +101,7 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 	iconURL = res[0].URL
 
 	prompt := prompts.NewChatPromptTemplate([]prompts.MessageFormatter{
-		prompts.NewSystemMessagePromptTemplate(consts2.OptimizePromptTemplate, nil),
+		prompts.NewSystemMessagePromptTemplate(consts.OptimizePromptTemplate, nil),
 		prompts.NewHumanMessagePromptTemplate("应用名称: {{.name}}\n\n应用描述: {{.description}}",
 			[]string{"name", "description"}),
 	})
@@ -146,7 +146,7 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 		Name:        name,
 		Icon:        iconURL,
 		Description: description,
-		Status:      consts2.AppStatusDraft,
+		Status:      consts.AppStatusDraft,
 	}
 
 	_, err = s.repo.CreateApp(ctx, app)
@@ -155,7 +155,7 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 	}
 
 	// 添加草稿记录
-	defaultConfig := consts2.DefaultAppConfig
+	defaultConfig := consts.DefaultAppConfig
 	if generatedPresetPrompt != "" {
 		defaultConfig["preset_prompt"] = generatedPresetPrompt
 	}
@@ -164,7 +164,7 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 		ID:           uuid.New(),
 		AppID:        app.ID,
 		Version:      0,
-		ConfigType:   consts2.AppConfigTypeDraft,
+		ConfigType:   consts.AppConfigTypeDraft,
 		ModelConfig:  defaultConfig,
 		PresetPrompt: generatedPresetPrompt,
 	}
@@ -190,7 +190,7 @@ func (s *AppService) CreateApp(ctx context.Context, accountID uuid.UUID, req req
 		Name:        req.Name,
 		Icon:        req.Icon,
 		Description: req.Description,
-		Status:      consts2.AppStatusDraft,
+		Status:      consts.AppStatusDraft,
 	}
 
 	_, err := s.repo.CreateApp(ctx, app)
@@ -203,8 +203,8 @@ func (s *AppService) CreateApp(ctx context.Context, accountID uuid.UUID, req req
 		ID:          uuid.New(),
 		AppID:       app.ID,
 		Version:     0,
-		ConfigType:  consts2.AppConfigTypeDraft,
-		ModelConfig: consts2.DefaultAppConfig,
+		ConfigType:  consts.AppConfigTypeDraft,
+		ModelConfig: consts.DefaultAppConfig,
 	}
 
 	_, err = s.repo.CreateAppConfigVersion(ctx, appConfigVersion)
@@ -341,7 +341,7 @@ func (s *AppService) CopyApp(ctx context.Context, appID uuid.UUID, accountID uui
 		Name:        app.Name,
 		Icon:        app.Icon,
 		Description: app.Description,
-		Status:      consts2.AppStatusDraft,
+		Status:      consts.AppStatusDraft,
 	}
 
 	_, err = s.repo.CreateApp(ctx, newApp)
@@ -355,7 +355,7 @@ func (s *AppService) CopyApp(ctx context.Context, appID uuid.UUID, accountID uui
 			ID:                   uuid.New(),
 			AppID:                newApp.ID,
 			Version:              0,
-			ConfigType:           consts2.AppConfigTypeDraft,
+			ConfigType:           consts.AppConfigTypeDraft,
 			ModelConfig:          draftAppConfig.ModelConfig,
 			DialogRound:          draftAppConfig.DialogRound,
 			PresetPrompt:         draftAppConfig.PresetPrompt,
@@ -437,7 +437,7 @@ func (s *AppService) getAppConfigs(ctx context.Context, apps []*entity.App) ([]*
 	for _, app := range apps {
 		var appCfg *resp.AppDraftConfigResp
 		var err error
-		if app.Status == consts2.AppStatusDraft {
+		if app.Status == consts.AppStatusDraft {
 			appCfg, err = s.appConfigService.GetDraftAppConfig(ctx, app)
 			if err != nil {
 				continue
@@ -571,7 +571,7 @@ func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID,
 	// 3. 更新应用关联的运行时配置以及状态
 	err = s.repo.UpdateApp(ctx, appID, map[string]any{
 		"app_config_id": appConfig.ID,
-		"status":        consts2.AppStatusPublished,
+		"status":        consts.AppStatusPublished,
 	})
 	if err != nil {
 		return err
@@ -618,7 +618,7 @@ func (s *AppService) PublishDraftAppConfig(ctx context.Context, appID uuid.UUID,
 		ID:                   uuid.New(),
 		AppID:                appID,
 		Version:              maxVersion + 1,
-		ConfigType:           consts2.AppConfigTypePublished,
+		ConfigType:           consts.AppConfigTypePublished,
 		ModelConfig:          draftAppConfigCopy.ModelConfig,
 		DialogRound:          draftAppConfigCopy.DialogRound,
 		PresetPrompt:         draftAppConfigCopy.PresetPrompt,
@@ -652,13 +652,13 @@ func (s *AppService) CancelPublishAppConfig(ctx context.Context, appID uuid.UUID
 	}
 
 	// 2. 检测下当前应用的状态是否为已发布
-	if app.Status != consts2.AppStatusPublished {
+	if app.Status != consts.AppStatusPublished {
 		return errno.ErrValidate.AppendBizMessage(errors.New("当前应用未发布，请核实后重试"))
 	}
 
 	// 3. 修改账号的发布状态，并清空关联配置id
 	err = s.repo.UpdateApp(ctx, appID, map[string]any{
-		"status":        consts2.AppStatusDraft,
+		"status":        consts.AppStatusDraft,
 		"app_config_Id": uuid.Nil,
 	})
 	if err != nil {
@@ -893,11 +893,11 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 		ID:             uuid.New(),
 		AppID:          appID,
 		ConversationID: debugConversation.ID,
-		InvokeFrom:     consts2.InvokeFromDebugger,
+		InvokeFrom:     consts.InvokeFromDebugger,
 		CreatedBy:      accountID,
 		Query:          chatReq.Query,
 		ImageUrls:      chatReq.ImageUrls,
-		Status:         consts2.MessageStatusNormal,
+		Status:         consts.MessageStatusNormal,
 	})
 	if err != nil {
 		return nil, err
@@ -928,7 +928,7 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 		for _, dataset := range draftAppConfig.Datasets {
 			datasets = append(datasets, dataset["id"].(uuid.UUID))
 		}
-		datasetRetrieval, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, accountID, datasets, consts2.RetrievalSourceApp, draftAppConfig.ReviewConfig)
+		datasetRetrieval, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, accountID, datasets, consts.RetrievalSourceApp, draftAppConfig.ReviewConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -951,7 +951,7 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 	// 10. 根据LLM是否支持tool_call决定使用不同的Agent
 	agentCfg := agenteneity.AgentConfig{
 		UserID:               accountID,
-		InvokeFrom:           consts2.InvokeFromDebugger,
+		InvokeFrom:           consts.InvokeFromDebugger,
 		PresetPrompt:         draftAppConfig.PresetPrompt,
 		EnableLongTermMemory: draftAppConfig.LongTermMemory["enabled"].(bool),
 		Tools:                tools,
@@ -1091,7 +1091,7 @@ func (s *AppService) StopDebugChat(ctx context.Context, appID, taskID uuid.UUID,
 
 	// 2. 调用智能体队列管理器停止特定任务
 
-	return s.agentManager.SetStopFlag(taskID, consts2.InvokeFromDebugger, accountID)
+	return s.agentManager.SetStopFlag(taskID, consts.InvokeFromDebugger, accountID)
 }
 
 // GetDebugConversationMessagesWithPage 根据传递的应用id+请求数据，获取调试会话消息列表分页数据
@@ -1189,7 +1189,7 @@ func (s *AppService) RegenerateWebAppToken(ctx context.Context, appID uuid.UUID,
 	}
 
 	// 2. 判断应用是否已发布
-	if app.Status != consts2.AppStatusPublished {
+	if app.Status != consts.AppStatusPublished {
 		return "", errno.ErrValidate.AppendBizMessage(errors.New("应用未发布，无法生成WebApp凭证标识"))
 	}
 
@@ -1457,7 +1457,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 		}
 
 		// 7.5 校验关联工作流的权限
-		workflowRecords, err := s.repo.GetWorkflows(context.Background(), workflowIDs, accountID, consts2.WorkflowStatusPublished)
+		workflowRecords, err := s.repo.GetWorkflows(context.Background(), workflowIDs, accountID, consts.WorkflowStatusPublished)
 		if err != nil {
 			return nil, errno.ErrNotFound.AppendBizMessage(errors.New("查询工作流失败"))
 		}
@@ -1652,7 +1652,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 		}
 
 		voice, ok := tts["voice"].(string)
-		if !ok || !util.Contains(consts2.AllowedAudioVoices, voice) {
+		if !ok || !util.Contains(consts.AllowedAudioVoices, voice) {
 			return nil, errno.ErrValidate.AppendBizMessage(errors.New("文本转语音设置格式错误"))
 		}
 
@@ -1775,7 +1775,7 @@ func (s *AppService) generateDefaultToken(ctx context.Context, appID uuid.UUID) 
 		return "", err
 	}
 	var token string
-	if app.Status != consts2.AppStatusPublished {
+	if app.Status != consts.AppStatusPublished {
 		if app.Token != "" {
 			token = ""
 		}

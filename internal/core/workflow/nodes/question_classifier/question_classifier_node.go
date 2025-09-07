@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bytedance/sonic"
-
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // QuestionClassifierNode 问题分类器节点

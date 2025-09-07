@@ -13,6 +13,11 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 )
 
+var (
+	ErrMessageNotFound = errors.New("message not found")
+	ErrEndUserNotFound = errors.New("end user not found")
+)
+
 type WechatDao struct {
 	db *gorm.DB
 }
@@ -53,6 +58,9 @@ func (d *WechatDao) GetWechatEndUser(ctx context.Context, openid string, appID u
 	if err != nil {
 		return nil, err
 	}
+	if wechatEndUser.ID == uuid.Nil {
+		return nil, ErrEndUserNotFound
+	}
 	return &wechatEndUser, nil
 }
 
@@ -62,6 +70,9 @@ func (d *WechatDao) GetLatestWechatMessage(ctx context.Context, wechatEndUserID 
 		Order("ctime DESC").First(&wechatMessage).Error
 	if err != nil {
 		return nil, err
+	}
+	if wechatMessage.ID == uuid.Nil {
+		return nil, ErrMessageNotFound
 	}
 	return &wechatMessage, nil
 }

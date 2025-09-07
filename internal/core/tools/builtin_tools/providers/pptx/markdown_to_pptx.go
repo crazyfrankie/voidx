@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // MarkdownToPptxTool represents a tool for converting Markdown to PPTX

@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"github.com/crazyfrankie/voidx/internal/base/response"
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/analysis/service"
+	"github.com/crazyfrankie/voidx/internal/base/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type AnalysisHandler struct {

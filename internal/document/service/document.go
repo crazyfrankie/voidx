@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/document/repository"
@@ -15,8 +14,9 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/util"
 	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type DocumentService struct {

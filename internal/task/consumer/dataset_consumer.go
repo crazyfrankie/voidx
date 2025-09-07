@@ -4,11 +4,11 @@ import (
 	"context"
 
 	"github.com/IBM/sarama"
-	"github.com/bytedance/sonic"
 
 	datasetService "github.com/crazyfrankie/voidx/internal/dataset/service"
 	"github.com/crazyfrankie/voidx/internal/index/service"
 	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // DatasetConsumer 数据集任务消费者

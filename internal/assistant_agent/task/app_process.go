@@ -2,11 +2,12 @@ package task
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/IBM/sarama"
 	"github.com/google/uuid"
+
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 // AppTaskType 应用任务类型
@@ -65,7 +66,7 @@ func (p *AppProducer) PublishAutoCreateAppTask(ctx context.Context, name, descri
 
 // publishTask 发布任务到Kafka
 func (p *AppProducer) publishTask(ctx context.Context, topic string, task AppTask) error {
-	data, err := json.Marshal(task)
+	data, err := sonic.Marshal(task)
 	if err != nil {
 		return fmt.Errorf("failed to marshal task: %w", err)
 	}

@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/crazyfrankie/voidx/types/consts"
-	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/dataset/repository"
@@ -17,6 +15,8 @@ import (
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type DatasetService struct {
