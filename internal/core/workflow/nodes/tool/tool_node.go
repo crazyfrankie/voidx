@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/tmc/langchaingo/tools"
 	"gorm.io/gorm"
 
@@ -15,7 +16,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 // ToolNode 扩展插件节点
@@ -43,7 +44,7 @@ func NewToolNode(nodeData *ToolNodeData,
 	// 初始化工具
 	if err := node.initializeTool(); err != nil {
 		// 在实际应用中，这里应该记录错误日志
-		fmt.Printf("初始化工具失败: %v\n", err)
+		logs.Errorf("Failed to initialize tool: %v", err)
 	}
 
 	return node

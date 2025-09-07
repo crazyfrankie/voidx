@@ -7,18 +7,18 @@
 package upload
 
 import (
+	"github.com/crazyfrankie/voidx/infra/contract/storage"
 	"github.com/crazyfrankie/voidx/internal/upload/handler"
 	"github.com/crazyfrankie/voidx/internal/upload/repository"
 	"github.com/crazyfrankie/voidx/internal/upload/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/upload/service"
 	"github.com/google/wire"
-	"github.com/minio/minio-go/v7"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitUploadModule(db *gorm.DB, minioCli *minio.Client) *UploadModule {
+func InitUploadModule(db *gorm.DB, minioCli storage.Storage) *UploadModule {
 	uploadFileDao := dao.NewUploadFileDao(db)
 	uploadFileRepo := repository.NewUploadFileRepo(uploadFileDao)
 	ossService := service.NewOssService(uploadFileRepo, minioCli)

@@ -2,12 +2,12 @@ package task
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/index"
 	"github.com/crazyfrankie/voidx/internal/task/consumer"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 // TaskManager 任务管理器
@@ -52,7 +52,7 @@ func (m *TaskManager) Start(ctx context.Context) error {
 	go func() {
 		defer m.wg.Done()
 		if err := m.documentConsumer.Start(ctx); err != nil {
-			log.Printf("Document consumer error: %v", err)
+			logs.Errorf("Document consumer error: %v", err)
 		}
 	}()
 
@@ -61,7 +61,7 @@ func (m *TaskManager) Start(ctx context.Context) error {
 	go func() {
 		defer m.wg.Done()
 		if err := m.appConsumer.Start(ctx); err != nil {
-			log.Printf("App consumer error: %v", err)
+			logs.Errorf("App consumer error: %v", err)
 		}
 	}()
 
@@ -70,11 +70,11 @@ func (m *TaskManager) Start(ctx context.Context) error {
 	go func() {
 		defer m.wg.Done()
 		if err := m.datasetConsumer.Start(ctx); err != nil {
-			log.Printf("Dataset consumer error: %v", err)
+			logs.Errorf("Dataset consumer error: %v", err)
 		}
 	}()
 
-	log.Println("All task consumers started successfully")
+	logs.Info("All task consumers started successfully")
 	return nil
 }
 
@@ -82,24 +82,24 @@ func (m *TaskManager) Start(ctx context.Context) error {
 func (m *TaskManager) Stop() error {
 	if m.documentConsumer != nil {
 		if err := m.documentConsumer.Close(); err != nil {
-			log.Printf("Failed to close document consumer: %v", err)
+			logs.Errorf("Failed to close document consumer: %v", err)
 		}
 	}
 
 	if m.appConsumer != nil {
 		if err := m.appConsumer.Close(); err != nil {
-			log.Printf("Failed to close app consumer: %v", err)
+			logs.Errorf("Failed to close app consumer: %v", err)
 		}
 	}
 
 	if m.datasetConsumer != nil {
 		if err := m.datasetConsumer.Close(); err != nil {
-			log.Printf("Failed to close dataset consumer: %v", err)
+			logs.Errorf("Failed to close dataset consumer: %v", err)
 		}
 	}
 
 	// 等待所有消费者停止
 	m.wg.Wait()
-	log.Println("All task consumers stopped")
+	logs.Info("All task consumers stopped")
 	return nil
 }

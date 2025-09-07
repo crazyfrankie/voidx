@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/platform/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -34,25 +34,25 @@ func (h *PlatformHandler) GetWechatConfig() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		// 获取当前用户ID
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		// 调用服务获取微信配置
 		wechatConfig, err := h.svc.GetWechatConfig(c.Request.Context(), appID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, wechatConfig)
+		response.Data(c, wechatConfig)
 	}
 }
 
@@ -63,28 +63,28 @@ func (h *PlatformHandler) UpdateWechatConfig() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		// 绑定请求参数
 		var updateReq req.UpdateWechatConfigReq
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		// 获取当前用户ID
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		// 调用服务更新微信配置
 		err = h.svc.UpdateWechatConfig(c.Request.Context(), appID, userID, updateReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

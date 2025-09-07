@@ -6,13 +6,13 @@ import (
 	"encoding/base64"
 	"errors"
 
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/api_key/repository"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 )
 
 type ApiKeyService struct {

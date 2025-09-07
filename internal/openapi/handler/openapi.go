@@ -6,12 +6,12 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/openapi/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -35,13 +35,13 @@ func (h *OpenAPIHandler) Chat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var chatReq req.OpenAPIChatReq
 		if err := c.ShouldBindJSON(&chatReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
+			response.InvalidParamRequestResponse(c, errno.ErrValidate.AppendBizMessage(errors.New("请求参数验证失败")))
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -56,7 +56,7 @@ func (h *OpenAPIHandler) Chat() gin.HandlerFunc {
 			// 获取流式响应
 			eventChan, err := h.svc.ProcessStreamChat(c.Request.Context(), userID, chatReq)
 			if err != nil {
-				response.Error(c, err)
+				response.InternalServerErrorResponse(c, err)
 				return
 			}
 
@@ -83,11 +83,11 @@ func (h *OpenAPIHandler) Chat() gin.HandlerFunc {
 			// 块内容输出
 			chatResp, err := h.svc.Chat(c.Request.Context(), userID, chatReq)
 			if err != nil {
-				response.Error(c, err)
+				response.InternalServerErrorResponse(c, err)
 				return
 			}
 
-			response.SuccessWithData(c, chatResp)
+			response.Data(c, chatResp)
 		}
 	}
 }

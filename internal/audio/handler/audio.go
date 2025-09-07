@@ -6,13 +6,13 @@ import (
 	"net/http"
 
 	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/audio/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -38,38 +38,38 @@ func (h *AudioHandler) AudioToText() gin.HandlerFunc {
 		// 获取上传的文件
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 		defer file.Close()
 
 		// 检查文件大小（25MB限制）
 		if header.Size > 25*1024*1024 {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		// 读取文件内容
 		fileContent, err := io.ReadAll(file)
 		if err != nil {
-			response.Error(c, errno.ErrInternalServer)
+			response.InvalidParamRequestResponse(c, errno.ErrInternalServer)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		// 调用服务转换语音
 		text, err := h.svc.AudioToText(c.Request.Context(), userID, fileContent, header.Filename)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, resp.AudioToTextResp{Text: text})
+		response.Data(c, resp.AudioToTextResp{Text: text})
 	}
 }
 
@@ -78,13 +78,13 @@ func (h *AudioHandler) MessageToAudio() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var audioReq req.MessageToAudioReq
 		if err := c.ShouldBindUri(&audioReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -97,7 +97,7 @@ func (h *AudioHandler) MessageToAudio() gin.HandlerFunc {
 		// 获取流式响应
 		eventChan, err := h.svc.MessageToAudio(c.Request.Context(), userID, audioReq.MessageID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

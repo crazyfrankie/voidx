@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"errors"
-	"log"
 	"strings"
 
+	consts2 "github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 	"github.com/silenceper/wechat/v2/officialaccount/message"
 	lcllms "github.com/tmc/langchaingo/llms"
@@ -16,7 +16,7 @@ import (
 	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/consts"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -44,7 +44,7 @@ func (s *WechatService) handleResultQuery(ctx context.Context, wechatEndUserID u
 
 	// 根据消息状态返回不同内容
 	switch msg.Status {
-	case consts.MessageStatusNormal, consts.MessageStatusStop:
+	case consts2.MessageStatusNormal, consts2.MessageStatusStop:
 		if strings.TrimSpace(msg.Answer) != "" {
 			// 标记消息已推送
 			if err := s.repo.UpdateWechatMessage(ctx, wechatMessage.ID, map[string]interface{}{
@@ -55,9 +55,9 @@ func (s *WechatService) handleResultQuery(ctx context.Context, wechatEndUserID u
 			return strings.TrimSpace(msg.Answer)
 		}
 		return "该Agent智能体任务正在处理中，请稍后重新回复`1`获取结果。"
-	case consts.MessageStatusTimeout:
+	case consts2.MessageStatusTimeout:
 		return "该Agent智能体处理任务超时，请重新发起提问。"
-	case consts.MessageStatusError:
+	case consts2.MessageStatusError:
 		return "该Agent智能体处理任务出错，请重新发起提问，错误信息: " + msg.Error + "。"
 	default:
 		return "该Agent智能体任务正在处理中，请稍后重新回复`1`获取结果。"
@@ -84,11 +84,11 @@ func (s *WechatService) handleNormalMessage(ctx context.Context, content string,
 		ID:             uuid.New(),
 		AppID:          app.ID,
 		ConversationID: convers.ID,
-		InvokeFrom:     consts.InvokeFromServiceAPI,
+		InvokeFrom:     consts2.InvokeFromServiceAPI,
 		CreatedBy:      wechatEndUser.EndUserID,
 		Query:          content,
 		ImageUrls:      []string{},
-		Status:         consts.MessageStatusNormal,
+		Status:         consts2.MessageStatusNormal,
 	}
 
 	if err := s.repo.CreateMessage(ctx, msg); err != nil {
@@ -128,26 +128,26 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 	// 1. 加载语言模型
 	llm, err := s.llmSvc.LoadLanguageModel(appConfig.ModelConfig)
 	if err != nil {
-		log.Println(err)
+		logs.Errorf("Failed to load language model: %v", err)
 		return
 	}
 	// 2. 获取对话历史
 	conversation, err := s.repo.GetConversationByID(ctx, conversationID)
 	if err != nil {
-		log.Println(err)
+		logs.Errorf("Failed to get conversation by ID %s: %v", conversationID, err)
 		return
 	}
 	s.tokenBufMem = s.tokenBufMem.WithLLM(llm)
 	history, err := s.tokenBufMem.GetHistoryPromptMessages(2000, appConfig.DialogRound)
 	if err != nil {
-		log.Println(err)
+		logs.Errorf("Failed to get conversation history: %v", err)
 		return
 	}
 
 	// 3. 构建工具链
 	tools, err := s.appConfigSvc.GetLangchainToolsByToolsConfig(ctx, appConfig.Tools)
 	if err != nil {
-		log.Println(err)
+		logs.Errorf("Failed to get langchain tools by config: %v", err)
 		return
 	}
 
@@ -159,9 +159,9 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 		}
 		// 5.构建LangChain知识库检索工具
 		datasetRetrieval, err := s.retrievalSvc.CreateLangchainToolFromSearch(ctx, app.AccountID,
-			datasetIDs, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
+			datasetIDs, consts2.RetrievalSourceApp, appConfig.RetrievalConfig)
 		if err != nil {
-			log.Println(err)
+			logs.Errorf("Failed to create dataset retrieval tool: %v", err)
 			return
 		}
 		tools = append(tools, datasetRetrieval)
@@ -176,7 +176,7 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 		// 5.构建LangChain知识库检索工具
 		workflowTool, err := s.appConfigSvc.GetLangchainToolsByWorkflowIDs(ctx, workflowIDs)
 		if err != nil {
-			log.Println(err)
+			logs.Errorf("Failed to get workflow tools: %v", err)
 			return
 		}
 		tools = append(tools, workflowTool...)
@@ -185,13 +185,13 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 	// 7.根据LLM是否支持tool_call决定使用不同的Agent
 	agentCfg := agenteneity.AgentConfig{
 		UserID:               app.AccountID,
-		InvokeFrom:           consts.InvokeFromDebugger,
+		InvokeFrom:           consts2.InvokeFromDebugger,
 		PresetPrompt:         appConfig.PresetPrompt,
 		EnableLongTermMemory: appConfig.LongTermMemory["enabled"].(bool),
 		Tools:                tools,
 	}
 	if err := util.ConvertViaJSON(&agentCfg.ReviewConfig, appConfig.ReviewConfig); err != nil {
-		log.Println(err)
+		logs.Errorf("Failed to convert review config: %v", err)
 		return
 	}
 	agentIns := agent.NewFunctionCallAgent(llm, agentCfg, s.agentManager)
@@ -212,13 +212,13 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 	// 9.调用智能体获取执行结果
 	agentResult, err := agentIns.Invoke(ctx, agentState)
 	if err != nil {
-		log.Println(err)
+		logs.Errorf("Agent invocation failed: %v", err)
 		return
 	}
 
 	// 10.将数据存储到数据库中，包含会话、消息、推理过程
 	err = s.conversationSvc.SaveAgentThoughts(ctx, app.AccountID, app.ID, conversationID, messageID, agentResult.AgentThoughts)
 	if err != nil {
-		log.Println(err)
+		logs.Errorf("Failed to save agent thoughts: %v", err)
 	}
 }

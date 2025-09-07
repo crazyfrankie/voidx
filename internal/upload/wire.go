@@ -4,8 +4,8 @@
 package upload
 
 import (
+	"github.com/crazyfrankie/voidx/infra/contract/storage"
 	"github.com/google/wire"
-	"github.com/minio/minio-go/v7"
 	"gorm.io/gorm"
 
 	"github.com/crazyfrankie/voidx/internal/upload/handler"
@@ -28,7 +28,7 @@ var ProviderSet = wire.NewSet(
 	handler.NewUploadFileHandler,
 )
 
-func InitUploadModule(db *gorm.DB, minioCli *minio.Client) *UploadModule {
+func InitUploadModule(db *gorm.DB, minioCli storage.Storage) *UploadModule {
 	wire.Build(
 		ProviderSet,
 

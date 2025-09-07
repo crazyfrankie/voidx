@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/bytedance/sonic"
+	consts2 "github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/tools"
@@ -22,8 +23,8 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/openapi/repository"
 	"github.com/crazyfrankie/voidx/internal/retriever"
-	"github.com/crazyfrankie/voidx/pkg/consts"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 type OpenAPIService struct {
@@ -61,7 +62,7 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 	}
 
 	// 判断应用是否已发布
-	if app.Status != consts.AppStatusPublished {
+	if app.Status != consts2.AppStatusPublished {
 		return nil, fmt.Errorf("该应用不存在或未发布，请核实后重试")
 	}
 
@@ -82,11 +83,11 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 		ID:             uuid.New(),
 		AppID:          app.ID,
 		ConversationID: conversation.ID,
-		InvokeFrom:     consts.InvokeFromServiceAPI,
+		InvokeFrom:     consts2.InvokeFromServiceAPI,
 		CreatedBy:      endUser.ID,
 		Query:          chatReq.Query,
 		ImageUrls:      chatReq.ImageUrls,
-		Status:         consts.MessageStatusNormal,
+		Status:         consts2.MessageStatusNormal,
 	})
 	if err != nil {
 		return nil, err
@@ -125,7 +126,7 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 			}
 		}
 		if len(datasets) > 0 {
-			datasetTool, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, userID, datasets, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
+			datasetTool, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, userID, datasets, consts2.RetrievalSourceApp, appConfig.RetrievalConfig)
 			if err == nil {
 				tools = append(tools, datasetTool)
 			}
@@ -175,7 +176,7 @@ func (s *OpenAPIService) ProcessStreamChat(ctx context.Context, userID uuid.UUID
 	}
 
 	// 判断应用是否已发布
-	if app.Status != consts.AppStatusPublished {
+	if app.Status != consts2.AppStatusPublished {
 		return nil, fmt.Errorf("该应用不存在或未发布，请核实后重试")
 	}
 
@@ -196,11 +197,11 @@ func (s *OpenAPIService) ProcessStreamChat(ctx context.Context, userID uuid.UUID
 		ID:             uuid.New(),
 		AppID:          app.ID,
 		ConversationID: conversation.ID,
-		InvokeFrom:     consts.InvokeFromServiceAPI,
+		InvokeFrom:     consts2.InvokeFromServiceAPI,
 		CreatedBy:      endUser.ID,
 		Query:          chatReq.Query,
 		ImageUrls:      chatReq.ImageUrls,
-		Status:         consts.MessageStatusNormal,
+		Status:         consts2.MessageStatusNormal,
 	})
 	if err != nil {
 		return nil, err
@@ -239,7 +240,7 @@ func (s *OpenAPIService) ProcessStreamChat(ctx context.Context, userID uuid.UUID
 			}
 		}
 		if len(datasets) > 0 {
-			datasetTool, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, userID, datasets, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
+			datasetTool, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, userID, datasets, consts2.RetrievalSourceApp, appConfig.RetrievalConfig)
 			if err == nil {
 				tools = append(tools, datasetTool)
 			}
@@ -302,7 +303,7 @@ func (s *OpenAPIService) getOrCreateConversation(ctx context.Context, conversati
 		if err == nil && conversation != nil &&
 			conversation.AppID == appID &&
 			conversation.CreatedBy == endUserID &&
-			conversation.InvokeFrom == consts.InvokeFromServiceAPI {
+			conversation.InvokeFrom == consts2.InvokeFromServiceAPI {
 			return conversation, nil
 		}
 	}
@@ -330,7 +331,7 @@ func (s *OpenAPIService) processStreamChatAsync(
 	// 创建Agent配置
 	agentConfig := agenteneity.AgentConfig{
 		UserID:               endUser.TenantID,
-		InvokeFrom:           consts.InvokeFromServiceAPI,
+		InvokeFrom:           consts2.InvokeFromServiceAPI,
 		PresetPrompt:         appConfig.PresetPrompt,
 		EnableLongTermMemory: appConfig.LongTermMemory["enabled"].(bool),
 		Tools:                tools,
@@ -450,6 +451,6 @@ func (s *OpenAPIService) processStreamChatAsync(
 	err = s.conversationService.SaveAgentThoughts(ctx, endUser.TenantID, app.ID, conversation.ID, message.ID, agentThoughtsList)
 	if err != nil {
 		// 记录错误但不中断流程
-		fmt.Printf("Failed to save agent thoughts: %v\n", err)
+		logs.Errorf("Failed to save agent thoughts: %v", err)
 	}
 }

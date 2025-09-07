@@ -7,21 +7,21 @@
 package auth
 
 import (
+	"github.com/crazyfrankie/voidx/infra/contract/token"
 	"github.com/crazyfrankie/voidx/internal/auth/handler"
 	"github.com/crazyfrankie/voidx/internal/auth/repository"
 	"github.com/crazyfrankie/voidx/internal/auth/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/auth/service"
-	"github.com/crazyfrankie/voidx/pkg/jwt"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitAuthModule(db *gorm.DB, cmd redis.Cmdable, token *jwt.TokenService) *AuthModule {
+func InitAuthModule(db *gorm.DB, cmd redis.Cmdable, token2 token.Token) *AuthModule {
 	authDao := dao.NewAuthDao(db)
 	authRepo := repository.NewAuthRepo(authDao)
-	authService := service.NewAuthService(authRepo, token)
+	authService := service.NewAuthService(authRepo, token2)
 	authHandler := handler.NewAuthHandler(authService)
 	authModule := &AuthModule{
 		Handler: authHandler,

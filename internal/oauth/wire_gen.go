@@ -7,20 +7,20 @@
 package oauth
 
 import (
+	"github.com/crazyfrankie/voidx/infra/contract/token"
 	"github.com/crazyfrankie/voidx/internal/oauth/handler"
 	"github.com/crazyfrankie/voidx/internal/oauth/repository"
 	"github.com/crazyfrankie/voidx/internal/oauth/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/oauth/service"
-	"github.com/crazyfrankie/voidx/pkg/jwt"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitOAuthModule(db *gorm.DB, token *jwt.TokenService) *OAuthModule {
+func InitOAuthModule(db *gorm.DB, token2 token.Token) *OAuthModule {
 	oAuthDao := dao.NewOAuthDao(db)
 	oAuthRepo := repository.NewOAuthRepo(oAuthDao)
-	oAuthService := service.NewOAuthService(oAuthRepo, token)
+	oAuthService := service.NewOAuthService(oAuthRepo, token2)
 	oAuthHandler := handler.NewOAuthHandler(oAuthService)
 	oAuthModule := &OAuthModule{
 		Handler: oAuthHandler,

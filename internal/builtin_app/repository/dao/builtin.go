@@ -3,11 +3,11 @@ package dao
 import (
 	"context"
 
+	"github.com/crazyfrankie/voidx/types/consts"
 	"gorm.io/gorm"
 
 	"github.com/crazyfrankie/voidx/internal/core/builtin_apps/entities"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
-	"github.com/crazyfrankie/voidx/pkg/consts"
 )
 
 type BuiltinDao struct {

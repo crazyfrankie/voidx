@@ -2,13 +2,13 @@ package consumer
 
 import (
 	"context"
-	"log"
 
 	"github.com/IBM/sarama"
 	"github.com/bytedance/sonic"
 
 	"github.com/crazyfrankie/voidx/internal/app/service"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/task"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 // AppConsumer 应用任务消费者
@@ -48,7 +48,7 @@ func (c *AppConsumer) Start(ctx context.Context) error {
 			return ctx.Err()
 		default:
 			if err := c.consumerGroup.Consume(ctx, c.topics, handler); err != nil {
-				log.Printf("Error from consumer: %v", err)
+				logs.Errorf("Error from consumer: %v", err)
 				return err
 			}
 		}
@@ -86,7 +86,7 @@ func (h *appConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSessi
 
 			err := h.handleMessage(message)
 			if err != nil {
-				log.Printf("Failed to handle message: %v", err)
+				logs.Errorf("Failed to handle message: %v", err)
 			}
 
 			session.MarkMessage(message, "")
@@ -101,7 +101,7 @@ func (h *appConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupSessi
 func (h *appConsumerGroupHandler) handleMessage(message *sarama.ConsumerMessage) error {
 	var appTask task.AppTask
 	if err := sonic.Unmarshal(message.Value, &appTask); err != nil {
-		log.Printf("Failed to unmarshal app task: %v", err)
+		logs.Errorf("Failed to unmarshal app task: %v", err)
 		return err
 	}
 
@@ -111,7 +111,7 @@ func (h *appConsumerGroupHandler) handleMessage(message *sarama.ConsumerMessage)
 	case "app.auto_create":
 		return h.handleAutoCreateAppTask(ctx, appTask)
 	default:
-		log.Printf("Unknown topic: %s", message.Topic)
+		logs.Errorf("Unknown topic: %s", message.Topic)
 		return nil
 	}
 }
@@ -124,10 +124,10 @@ func (h *appConsumerGroupHandler) handleAutoCreateAppTask(ctx context.Context, a
 
 	err := h.appService.AutoCreateApp(ctx, appTask.Name, appTask.Description, appTask.AccountID)
 	if err != nil {
-		log.Printf("Failed to auto create app %s: %v", appTask.Name, err)
+		logs.Errorf("Failed to auto create app %s: %v", appTask.Name, err)
 		return err
 	}
 
-	log.Printf("Successfully auto created app: %s", appTask.Name)
+	logs.Errorf("Successfully auto created app: %s", appTask.Name)
 	return nil
 }

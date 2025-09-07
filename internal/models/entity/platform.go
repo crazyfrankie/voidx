@@ -1,7 +1,7 @@
 package entity
 
 import (
-	"github.com/crazyfrankie/voidx/pkg/consts"
+	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 )
 

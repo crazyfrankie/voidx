@@ -2,23 +2,24 @@ package middlewares
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
 	"github.com/gin-gonic/gin"
 
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/jwt"
-	"github.com/crazyfrankie/voidx/pkg/response"
+	"github.com/crazyfrankie/voidx/infra/contract/token"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type AuthnHandler struct {
 	ignore map[string]struct{}
-	token  *jwt.TokenService
+	token  token.Token
 }
 
-func NewAuthnHandler(t *jwt.TokenService) *AuthnHandler {
+func NewAuthnHandler(t token.Token) *AuthnHandler {
 	return &AuthnHandler{token: t, ignore: make(map[string]struct{})}
 }
 
@@ -33,9 +34,9 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		access, err := h.token.GetAccessToken(c)
+		access, err := getAccessToken(c)
 		if err != nil {
-			response.Abort(c, errno.ErrUnauthorized)
+			response.InternalServerErrorResponse(c, errno.ErrUnauthorized)
 			return
 		}
 		if claims, err := h.token.ParseToken(access); err == nil {
@@ -46,12 +47,12 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 
 		refresh, err := c.Cookie("llmops_refresh")
 		if err != nil {
-			response.Abort(c, errno.ErrUnauthorized)
+			response.InternalServerErrorResponse(c, errno.ErrUnauthorized)
 			return
 		}
 		tokens, uid, err := h.token.TryRefresh(refresh, c.Request.UserAgent())
 		if err != nil {
-			response.Abort(c, errno.ErrUnauthorized)
+			response.InternalServerErrorResponse(c, errno.ErrUnauthorized)
 			return
 		}
 		c.Request = c.Request.WithContext(context.WithValue(c.Request.Context(), "user_id", uid))
@@ -62,4 +63,22 @@ func (h *AuthnHandler) Auth() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+func getAccessToken(c *gin.Context) (string, error) {
+	tokenHeader := c.GetHeader("Authorization")
+	if tokenHeader == "" {
+		return "", errors.New("no auth")
+	}
+
+	strs := strings.Split(tokenHeader, " ")
+	if len(strs) != 2 || strs[0] != "Bearer" {
+		return "", errors.New("header is invalid")
+	}
+
+	if strs[1] == "" {
+		return "", errors.New("jwt is empty")
+	}
+
+	return strs[1], nil
 }

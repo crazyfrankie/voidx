@@ -2,7 +2,6 @@ package consumer
 
 import (
 	"context"
-	"log"
 
 	"github.com/IBM/sarama"
 	"github.com/bytedance/sonic"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/crazyfrankie/voidx/internal/document/task"
 	"github.com/crazyfrankie/voidx/internal/index/service"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 // DocumentConsumer 文档任务消费者
@@ -49,7 +49,7 @@ func (c *DocumentConsumer) Start(ctx context.Context) error {
 			return ctx.Err()
 		default:
 			if err := c.consumerGroup.Consume(ctx, c.topics, handler); err != nil {
-				log.Printf("Error from consumer: %v", err)
+				logs.Errorf("Error from consumer: %v", err)
 				return err
 			}
 		}
@@ -87,7 +87,7 @@ func (h *documentConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroup
 
 			err := h.handleMessage(message)
 			if err != nil {
-				log.Printf("Failed to handle message: %v", err)
+				logs.Errorf("Failed to handle message: %v", err)
 			}
 
 			session.MarkMessage(message, "")
@@ -102,7 +102,7 @@ func (h *documentConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroup
 func (h *documentConsumerGroupHandler) handleMessage(message *sarama.ConsumerMessage) error {
 	var documentTask task.DocumentTask
 	if err := sonic.Unmarshal(message.Value, &documentTask); err != nil {
-		log.Printf("Failed to unmarshal document task: %v", err)
+		logs.Errorf("Failed to unmarshal document task: %v", err)
 		return err
 	}
 
@@ -116,7 +116,7 @@ func (h *documentConsumerGroupHandler) handleMessage(message *sarama.ConsumerMes
 	case "document.delete":
 		return h.handleDeleteDocumentTask(ctx, documentTask)
 	default:
-		log.Printf("Unknown topic: %s", message.Topic)
+		logs.Errorf("Unknown topic: %s", message.Topic)
 		return nil
 	}
 }
@@ -129,11 +129,11 @@ func (h *documentConsumerGroupHandler) handleBuildDocumentTask(ctx context.Conte
 
 	err := h.indexingService.BuildDocuments(ctx, []uuid.UUID{documentTask.DocumentID})
 	if err != nil {
-		log.Printf("Failed to build document %s: %v", documentTask.DocumentID, err)
+		logs.Errorf("Failed to build document %s: %v", documentTask.DocumentID, err)
 		return err
 	}
 
-	log.Printf("Successfully built document: %s", documentTask.DocumentID)
+	logs.Errorf("Successfully built document: %s", documentTask.DocumentID)
 	return nil
 }
 
@@ -145,11 +145,11 @@ func (h *documentConsumerGroupHandler) handleUpdateDocumentEnabledTask(ctx conte
 
 	err := h.indexingService.UpdateDocumentEnabled(ctx, documentTask.DocumentID)
 	if err != nil {
-		log.Printf("Failed to update document enabled status %s: %v", documentTask.DocumentID, err)
+		logs.Errorf("Failed to update document enabled status %s: %v", documentTask.DocumentID, err)
 		return err
 	}
 
-	log.Printf("Successfully updated document enabled status: %s", documentTask.DocumentID)
+	logs.Errorf("Successfully updated document enabled status: %s", documentTask.DocumentID)
 	return nil
 }
 
@@ -161,10 +161,10 @@ func (h *documentConsumerGroupHandler) handleDeleteDocumentTask(ctx context.Cont
 
 	err := h.indexingService.DeleteDocument(ctx, documentTask.DatasetID, documentTask.DocumentID)
 	if err != nil {
-		log.Printf("Failed to delete document %s: %v", documentTask.DocumentID, err)
+		logs.Errorf("Failed to delete document %s: %v", documentTask.DocumentID, err)
 		return err
 	}
 
-	log.Printf("Successfully deleted document: %s", documentTask.DocumentID)
+	logs.Errorf("Successfully deleted document: %s", documentTask.DocumentID)
 	return nil
 }

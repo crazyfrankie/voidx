@@ -7,20 +7,20 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/crazyfrankie/voidx/infra/contract/token"
 	"github.com/crazyfrankie/voidx/internal/auth/repository"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/jwt"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type AuthService struct {
 	repo  *repository.AuthRepo
-	token *jwt.TokenService
+	token token.Token
 }
 
-func NewAuthService(repo *repository.AuthRepo, token *jwt.TokenService) *AuthService {
+func NewAuthService(repo *repository.AuthRepo, token token.Token) *AuthService {
 	return &AuthService{repo: repo, token: token}
 }
 

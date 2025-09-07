@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 )
 
 type SegmentDao struct {

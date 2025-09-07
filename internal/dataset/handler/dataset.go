@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/dataset/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
 type DatasetHandler struct {
@@ -35,13 +35,13 @@ func (h *DatasetHandler) CreateDataset() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateDatasetReq
 		if err := c.ShouldBind(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err := h.svc.CreateDataset(c.Request.Context(), createReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -53,17 +53,17 @@ func (h *DatasetHandler) GetDatasetsWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetDatasetsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		datasets, paginator, err := h.svc.GetDatasetsWithPage(c.Request.Context(), pageReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, gin.H{
+		response.Data(c, gin.H{
 			"list":      datasets,
 			"paginator": paginator,
 		})
@@ -75,17 +75,17 @@ func (h *DatasetHandler) GetDataset() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		dataset, err := h.svc.GetDataset(c.Request.Context(), datasetID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, dataset)
+		response.Data(c, dataset)
 	}
 }
 
@@ -94,19 +94,19 @@ func (h *DatasetHandler) UpdateDataset() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateDatasetReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.UpdateDataset(c.Request.Context(), datasetID, updateReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -119,13 +119,13 @@ func (h *DatasetHandler) DeleteDataset() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.DeleteDataset(c.Request.Context(), datasetID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -138,23 +138,23 @@ func (h *DatasetHandler) Hit() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var hitReq req.HitReq
 		if err := c.ShouldBind(&hitReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		result, err := h.svc.Hit(c.Request.Context(), datasetID, hitReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, result)
+		response.Data(c, result)
 	}
 }
 
@@ -163,16 +163,16 @@ func (h *DatasetHandler) GetDatasetQueries() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		queries, err := h.svc.GetDatasetQueries(c.Request.Context(), datasetID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, queries)
+		response.Data(c, queries)
 	}
 }

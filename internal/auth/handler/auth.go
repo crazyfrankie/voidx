@@ -4,12 +4,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/auth/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -33,13 +33,13 @@ func (h *AuthHandler) Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var loginReq req.LoginReq
 		if err := c.ShouldBind(&loginReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		tokens, err := h.svc.Login(c.Request.Context(), c.Request.UserAgent(), loginReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -53,7 +53,7 @@ func (h *AuthHandler) Logout() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		err := h.svc.Logout(c.Request.Context(), c.Request.UserAgent())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

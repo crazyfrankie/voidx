@@ -1,14 +1,15 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"io"
+
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
+	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -35,20 +36,20 @@ func (h *AssistantAgentHandler) Chat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var chatReq req.AssistantAgentChatReq
 		if err := c.ShouldBindJSON(&chatReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		// 获取流式响应
 		eventChan, err := h.svc.Chat(c.Request.Context(), userID, chatReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -74,19 +75,19 @@ func (h *AssistantAgentHandler) StopChat() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var stopReq req.StopAssistantAgentChatReq
 		if err := c.ShouldBindUri(&stopReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.StopChat(c.Request.Context(), stopReq.TaskID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -99,7 +100,7 @@ func (h *AssistantAgentHandler) GetMessagesWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetAssistantAgentMessagesWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
@@ -113,13 +114,13 @@ func (h *AssistantAgentHandler) GetMessagesWithPage() gin.HandlerFunc {
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		messages, agentsThoughts, paginator, err := h.svc.GetMessagesWithPage(c.Request.Context(), userID, pageReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -158,7 +159,7 @@ func (h *AssistantAgentHandler) GetMessagesWithPage() gin.HandlerFunc {
 			"paginator": paginator,
 		}
 
-		response.SuccessWithData(c, result)
+		response.Data(c, result)
 	}
 }
 
@@ -167,13 +168,13 @@ func (h *AssistantAgentHandler) DeleteConversation() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.DeleteConversation(c.Request.Context(), userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/document/repository"
@@ -14,8 +15,8 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/util"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 type DocumentService struct {
@@ -125,7 +126,7 @@ func (s *DocumentService) CreateDocuments(ctx context.Context, datasetID uuid.UU
 		err = s.taskProducer.PublishBuildDocumentTask(ctx, documentID)
 		if err != nil {
 			// 记录错误但不中断整个流程
-			fmt.Printf("Failed to publish build task for document %s: %v\n", documentID, err)
+			logs.Errorf("Failed to publish build task for document %s: %v", documentID, err)
 		}
 	}
 

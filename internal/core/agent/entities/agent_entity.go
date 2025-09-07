@@ -1,11 +1,10 @@
 package entities
 
 import (
+	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/tools"
-
-	"github.com/crazyfrankie/voidx/pkg/consts"
 )
 
 // AgentConfig represents the configuration for an agent

@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 func SetAuthorization(c *gin.Context, access string, refresh string) {

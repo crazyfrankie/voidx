@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/crazyfrankie/voidx/pkg/errno"
+
+	"github.com/crazyfrankie/voidx/types/errno"
+
 	"mime"
 	"os"
 	"path/filepath"

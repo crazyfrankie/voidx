@@ -5,6 +5,8 @@ import (
 	"errors"
 	"reflect"
 
+	consts2 "github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 	langchaintool "github.com/tmc/langchaingo/tools"
 
@@ -17,8 +19,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/workflow"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 )
 
 type AppConfigService struct {
@@ -294,7 +294,7 @@ func (s *AppConfigService) GetLangchainToolsByWorkflowIDs(ctx context.Context, w
 		}
 
 		// 检查工作流状态
-		if workflowRecord.Status != consts.WorkflowStatusPublished {
+		if workflowRecord.Status != consts2.WorkflowStatusPublished {
 			continue
 		}
 
@@ -508,21 +508,21 @@ func (s *AppConfigService) processAndValidateModelConfig(modelConfigMap map[stri
 	// 2. 判断provider是否存在、类型是否正确，如果不符合规则则返回默认值
 	provider, ok := modelConfig["provider"].(string)
 	if !ok || provider == "" {
-		return consts.DefaultAppConfig["model_config"].(map[string]any)
+		return consts2.DefaultAppConfig["model_config"].(map[string]any)
 	}
 
 	if _, err := s.llmMgr.GetProvider(provider); err != nil {
-		return consts.DefaultAppConfig["model_config"].(map[string]any)
+		return consts2.DefaultAppConfig["model_config"].(map[string]any)
 	}
 
 	// 3. 判断model是否存在、类型是否正确，如果不符合则返回默认值
 	model, ok := modelConfig["model"].(string)
 	if !ok || model == "" {
-		return consts.DefaultAppConfig["model_config"].(map[string]any)
+		return consts2.DefaultAppConfig["model_config"].(map[string]any)
 	}
 
 	if _, err := s.llmMgr.GetProvider(provider); err != nil {
-		return consts.DefaultAppConfig["model_config"].(map[string]any)
+		return consts2.DefaultAppConfig["model_config"].(map[string]any)
 	}
 
 	// 4. 判断parameters信息类型是否错误，如果错误则设置为默认值
@@ -555,7 +555,7 @@ func (s *AppConfigService) processAndValidateWorkflows(ctx context.Context, work
 		}
 
 		// 检查工作流状态
-		if wf.Status != consts.WorkflowStatusPublished {
+		if wf.Status != consts2.WorkflowStatusPublished {
 			continue
 		}
 

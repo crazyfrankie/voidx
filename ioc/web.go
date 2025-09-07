@@ -1,12 +1,14 @@
 package ioc
 
 import (
+	"github.com/crazyfrankie/voidx/infra/contract/token"
 	"github.com/crazyfrankie/voidx/internal/ai"
 	"github.com/crazyfrankie/voidx/internal/analysis"
 	"github.com/crazyfrankie/voidx/internal/api_key"
 	"github.com/crazyfrankie/voidx/internal/apitool"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent"
 	"github.com/crazyfrankie/voidx/internal/audio"
+	"github.com/crazyfrankie/voidx/internal/base/middlewares"
 	"github.com/crazyfrankie/voidx/internal/builtin_app"
 	"github.com/crazyfrankie/voidx/internal/builtin_tools"
 	"github.com/crazyfrankie/voidx/internal/conversation"
@@ -26,8 +28,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/auth"
 	"github.com/crazyfrankie/voidx/internal/llm"
-	"github.com/crazyfrankie/voidx/pkg/jwt"
-	"github.com/crazyfrankie/voidx/pkg/middlewares"
 )
 
 func InitWeb(mws []gin.HandlerFunc, account *account.Handler, ai *ai.Handler, analysis *analysis.Handler,
@@ -70,7 +70,7 @@ func InitWeb(mws []gin.HandlerFunc, account *account.Handler, ai *ai.Handler, an
 	return srv
 }
 
-func InitMiddlewares(jwt *jwt.TokenService) []gin.HandlerFunc {
+func InitMiddlewares(jwt token.Token) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		middlewares.CORS(),
 

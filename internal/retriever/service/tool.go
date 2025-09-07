@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/consts"
 )
 
 type DatasetRetrievalInput struct {

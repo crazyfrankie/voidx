@@ -2,7 +2,9 @@ package dao
 
 import (
 	"context"
-	"github.com/crazyfrankie/voidx/pkg/consts"
+
+	"github.com/crazyfrankie/voidx/types/consts"
+
 	"time"
 
 	"github.com/google/uuid"

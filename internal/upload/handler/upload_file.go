@@ -4,11 +4,11 @@ import (
 	"errors"
 	"io"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/upload/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -34,35 +34,35 @@ func (h *UploadFileHandler) UploadFile() gin.HandlerFunc {
 		// 获取上传的文件
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传图片不能为空")))
+			response.InvalidParamRequestResponse(c, errno.ErrValidate.AppendBizMessage(errors.New("上传图片不能为空")))
 			return
 		}
 		defer file.Close()
 
 		// 检查文件大小（15MB限制）
 		if header.Size > 15*1024*1024 {
-			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传文件最大不能超过15MB")))
+			response.InvalidParamRequestResponse(c, errno.ErrValidate.AppendBizMessage(errors.New("上传文件最大不能超过15MB")))
 			return
 		}
 		data, err := io.ReadAll(file)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, errno.ErrUnauthorized)
+			response.InvalidParamRequestResponse(c, errno.ErrUnauthorized)
 			return
 		}
 
 		res, err := h.svc.UploadFile(c.Request.Context(), data, false, header.Filename, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, res)
+		response.Data(c, res)
 	}
 }
 
@@ -72,33 +72,33 @@ func (h *UploadFileHandler) UploadImage() gin.HandlerFunc {
 		// 获取上传的文件
 		file, header, err := c.Request.FormFile("file")
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传图片不能为空")))
+			response.InvalidParamRequestResponse(c, errno.ErrValidate.AppendBizMessage(errors.New("上传图片不能为空")))
 			return
 		}
 		defer file.Close()
 
 		// 检查文件大小（15MB限制）
 		if header.Size > 15*1024*1024 {
-			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("上传文件最大不能超过15MB")))
+			response.InvalidParamRequestResponse(c, errno.ErrValidate.AppendBizMessage(errors.New("上传文件最大不能超过15MB")))
 		}
 		data, err := io.ReadAll(file)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, errno.ErrUnauthorized)
+			response.InvalidParamRequestResponse(c, errno.ErrUnauthorized)
 			return
 		}
 
 		res, err := h.svc.UploadFile(c.Request.Context(), data, true, header.Filename, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, gin.H{"image_url": res.URL})
+		response.Data(c, gin.H{"image_url": res.URL})
 	}
 }

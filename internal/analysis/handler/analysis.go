@@ -1,12 +1,12 @@
 package handler
 
 import (
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/analysis/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -32,24 +32,24 @@ func (h *AnalysisHandler) GetAppAnalysis() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		// 获取当前用户ID
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		// 调用服务获取应用分析数据
 		analysis, err := h.svc.GetAppAnalysis(c.Request.Context(), appID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, analysis)
+		response.Data(c, analysis)
 	}
 }

@@ -2,7 +2,8 @@ package repository
 
 import (
 	"context"
-	"github.com/crazyfrankie/voidx/pkg/consts"
+
+	"github.com/crazyfrankie/voidx/types/consts"
 
 	"github.com/google/uuid"
 

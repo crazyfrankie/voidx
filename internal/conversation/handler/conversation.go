@@ -1,14 +1,14 @@
 package handler
 
 import (
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
 type ConversationHandler struct {
@@ -36,19 +36,19 @@ func (h *ConversationHandler) GetConversationMessagesWithPage() gin.HandlerFunc 
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var pageReq req.GetConversationMessagesWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		messages, paginator, err := h.svc.GetConversationMessagesWithPage(c.Request.Context(), conversationID, pageReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -86,7 +86,7 @@ func (h *ConversationHandler) GetConversationMessagesWithPage() gin.HandlerFunc 
 
 		}
 
-		response.SuccessWithData(c, gin.H{
+		response.Data(c, gin.H{
 			"list":      res,
 			"paginator": paginator,
 		})
@@ -98,13 +98,13 @@ func (h *ConversationHandler) DeleteConversation() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.DeleteConversation(c.Request.Context(), conversationID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -117,20 +117,20 @@ func (h *ConversationHandler) DeleteMessage() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		messageIDStr := c.Param("message_id")
 		messageID, err := uuid.Parse(messageIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.DeleteMessage(c.Request.Context(), conversationID, messageID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -143,17 +143,17 @@ func (h *ConversationHandler) GetConversationName() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		name, err := h.svc.GetConversationName(c.Request.Context(), conversationID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, gin.H{"name": name})
+		response.Data(c, gin.H{"name": name})
 	}
 }
 
@@ -162,19 +162,19 @@ func (h *ConversationHandler) UpdateConversationName() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateConversationNameReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.UpdateConversationName(c.Request.Context(), conversationID, updateReq.Name)
 		if err != nil {
-			response.Error(c, err)
+			response.InvalidParamRequestResponse(c, err)
 			return
 		}
 
@@ -187,19 +187,19 @@ func (h *ConversationHandler) UpdateConversationIsPinned() gin.HandlerFunc {
 		conversationIDStr := c.Param("conversation_id")
 		conversationID, err := uuid.Parse(conversationIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateConversationIsPinnedReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.UpdateConversationIsPinned(c.Request.Context(), conversationID, updateReq.IsPinned)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

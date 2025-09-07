@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/crazyfrankie/voidx/pkg/util"
+	consts2 "github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
+
 	"sync"
 
 	"github.com/bytedance/sonic"
@@ -19,12 +23,11 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	agenteneity "github.com/crazyfrankie/voidx/internal/core/agent/entities"
 	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 )
 
 type AssistantAgentService struct {
@@ -53,7 +56,7 @@ func NewAssistantAgentService(repo *repository.AssistantAgentRepo, conversationS
 
 // Chat 与辅助智能体进行对话聊天
 func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chatReq req.AssistantAgentChatReq) (<-chan string, error) {
-	assistantAgentID, _ := uuid.Parse(consts.AssistantAgentID)
+	assistantAgentID, _ := uuid.Parse(consts2.AssistantAgentID)
 
 	// 1. 获取或创建辅助Agent会话
 	conversation, err := s.getOrCreateAssistantConversation(ctx, userID)
@@ -68,8 +71,8 @@ func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chat
 		CreatedBy:      userID,
 		Query:          chatReq.Query,
 		ImageUrls:      chatReq.ImageUrls,
-		InvokeFrom:     consts.InvokeFromAssistantAgent,
-		Status:         consts.MessageStatusNormal,
+		InvokeFrom:     consts2.InvokeFromAssistantAgent,
+		Status:         consts2.MessageStatusNormal,
 	})
 	if err != nil {
 		return nil, err
@@ -85,7 +88,7 @@ func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chat
 
 	agentCfg := agenteneity.AgentConfig{
 		UserID:               userID,
-		InvokeFrom:           consts.InvokeFromDebugger,
+		InvokeFrom:           consts2.InvokeFromDebugger,
 		EnableLongTermMemory: true,
 		Tools:                []tools.Tool{tool},
 	}
@@ -195,7 +198,7 @@ func (s *AssistantAgentService) processChat(ctx context.Context,
 	err = s.conversationService.SaveAgentThoughts(ctx, userID, appID, conversation.ID, message.ID, agentThoughtsList)
 	if err != nil {
 		// 记录错误但不中断流程
-		fmt.Printf("Failed to save agent thoughts: %v\n", err)
+		logs.Errorf("Failed to save agent thoughts: %v", err)
 	}
 }
 
@@ -212,7 +215,7 @@ func (s *AssistantAgentService) StopChat(ctx context.Context, taskID, userID uui
 		return errno.ErrValidate.AppendBizMessage(errors.New("没有正在进行的对话"))
 	}
 
-	return s.agentManager.SetStopFlag(taskID, consts.InvokeFromWebApp, userID)
+	return s.agentManager.SetStopFlag(taskID, consts2.InvokeFromWebApp, userID)
 }
 
 // GetMessagesWithPage 获取辅助智能体消息分页列表
@@ -289,11 +292,11 @@ func (s *AssistantAgentService) getOrCreateAssistantConversation(ctx context.Con
 	}
 
 	// 3. 创建新的辅助Agent会话
-	assistantAppID, _ := uuid.Parse(consts.AssistantAgentID)
+	assistantAppID, _ := uuid.Parse(consts2.AssistantAgentID)
 	conversation, err := s.conversationService.CreateConversation(ctx, userID, req.CreateConversationReq{
 		AppID:      assistantAppID,
 		Name:       "Assistant Agent Conversation",
-		InvokeFrom: string(consts.InvokeFromAssistantAgent),
+		InvokeFrom: string(consts2.InvokeFromAssistantAgent),
 	})
 	if err != nil {
 		return nil, err

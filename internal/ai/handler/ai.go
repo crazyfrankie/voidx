@@ -1,13 +1,14 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"io"
+
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
+	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/ai/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -32,14 +33,14 @@ func (h *AIHandler) OptimizePrompt() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var optimizeReq req.OptimizePromptReq
 		if err := c.ShouldBindJSON(&optimizeReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		// 获取流式响应
 		eventChan, err := h.svc.OptimizePrompt(c.Request.Context(), optimizeReq.Prompt)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -64,23 +65,23 @@ func (h *AIHandler) GenerateSuggestedQuestions() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var suggestedReq req.GenerateSuggestedQuestionsReq
 		if err := c.ShouldBindJSON(&suggestedReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		// 调用服务生成建议问题列表
 		suggestedQuestions, err := h.svc.GenerateSuggestedQuestions(c.Request.Context(), suggestedReq.MessageID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, suggestedQuestions)
+		response.Data(c, suggestedQuestions)
 	}
 }

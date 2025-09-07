@@ -2,12 +2,13 @@ package handler
 
 import (
 	"errors"
+
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/wechat/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
 type WechatHandler struct {
@@ -30,16 +31,16 @@ func (h *WechatHandler) Wechat() gin.HandlerFunc {
 		appIDStr := c.Param("app_id")
 		appID, err := uuid.Parse(appIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("无效的应用ID格式")))
+			response.InvalidParamRequestResponse(c, errno.ErrValidate.AppendBizMessage(errors.New("无效的应用ID格式")))
 			return
 		}
 
 		res, err := h.svc.Wechat(c, appID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, res)
+		response.Data(c, res)
 	}
 }

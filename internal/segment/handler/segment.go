@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/segment/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
 type SegmentHandler struct {
@@ -35,30 +35,30 @@ func (h *SegmentHandler) CreateSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var createReq req.CreateSegmentReq
 		if err := c.ShouldBind(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		segment, err := h.svc.CreateSegment(c.Request.Context(), datasetID, documentID, createReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, segment)
+		response.Data(c, segment)
 	}
 }
 
@@ -67,30 +67,30 @@ func (h *SegmentHandler) GetSegmentsWithPage() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var pageReq req.GetSegmentsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		segments, paginator, err := h.svc.GetSegmentsWithPage(c.Request.Context(), datasetID, documentID, pageReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, gin.H{
+		response.Data(c, gin.H{
 			"list":      segments,
 			"paginator": paginator,
 		})
@@ -102,31 +102,31 @@ func (h *SegmentHandler) GetSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		segment, err := h.svc.GetSegment(c.Request.Context(), datasetID, documentID, segmentID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, segment)
+		response.Data(c, segment)
 	}
 }
 
@@ -135,33 +135,33 @@ func (h *SegmentHandler) UpdateSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateSegmentReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.UpdateSegment(c.Request.Context(), datasetID, documentID, segmentID, updateReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -174,27 +174,27 @@ func (h *SegmentHandler) DeleteSegment() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.DeleteSegment(c.Request.Context(), datasetID, documentID, segmentID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -207,21 +207,21 @@ func (h *SegmentHandler) UpdateSegmentEnabled() gin.HandlerFunc {
 		datasetIDStr := c.Param("dataset_id")
 		datasetID, err := uuid.Parse(datasetIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		documentIDStr := c.Param("document_id")
 		documentID, err := uuid.Parse(documentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		segmentIDStr := c.Param("segment_id")
 		segmentID, err := uuid.Parse(segmentIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
@@ -229,13 +229,13 @@ func (h *SegmentHandler) UpdateSegmentEnabled() gin.HandlerFunc {
 			Enabled bool `json:"enabled"`
 		}
 		if err := c.ShouldBind(&enabledReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.UpdateSegmentEnabled(c.Request.Context(), datasetID, documentID, segmentID, enabledReq.Enabled)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/schema"
 	"github.com/tmc/langchaingo/tools"
@@ -11,7 +12,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/consts"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 // RetrievalService 检索服务，提供统一的检索接口
@@ -236,7 +237,7 @@ func (s *RetrievalService) recordSearchHistory(ctx context.Context, userID uuid.
 	for datasetID := range uniqueDatasetIDs {
 		err := s.RetrieverFactory.RecordDatasetQuery(userID, datasetID, searchReq.Query, "hit_testing")
 		if err != nil {
-			fmt.Printf("Failed to record search history for dataset %s: %v\n", datasetID, err)
+			logs.Errorf("Failed to record search history for dataset %s: %v", datasetID, err)
 		}
 	}
 
@@ -249,7 +250,7 @@ func (s *RetrievalService) recordSearchHistory(ctx context.Context, userID uuid.
 	if len(segmentIDs) > 0 {
 		err := s.RetrieverFactory.UpdateSegmentHitCount(segmentIDs)
 		if err != nil {
-			fmt.Printf("Failed to update segment hit count: %v\n", err)
+			logs.Errorf("Failed to update segment hit count: %v", err)
 		}
 	}
 }

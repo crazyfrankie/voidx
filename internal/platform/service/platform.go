@@ -6,14 +6,14 @@ import (
 	"fmt"
 	"os"
 
+	consts2 "github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/platform/repository"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 )
 
 type PlatformService struct {
@@ -85,14 +85,14 @@ func (s *PlatformService) UpdateWechatConfig(ctx context.Context, appID, userID 
 	}
 
 	// 3. 根据传递的请求判断app_id/app_secret/token是否齐全并计算状态
-	status := consts.WechatConfigStatusUnconfigured
+	status := consts2.WechatConfigStatusUnconfigured
 	if updateReq.WechatAppID != "" && updateReq.WechatAppSecret != "" && updateReq.WechatToken != "" {
-		status = consts.WechatConfigStatusConfigured
+		status = consts2.WechatConfigStatusConfigured
 	}
 
 	// 4. 根据应用的发布状态修正状态数据
-	if app.Status == consts.AppStatusDraft && status == consts.WechatConfigStatusConfigured {
-		status = consts.WechatConfigStatusUnconfigured
+	if app.Status == consts2.AppStatusDraft && status == consts2.WechatConfigStatusConfigured {
+		status = consts2.WechatConfigStatusUnconfigured
 	}
 
 	// 5. 更新微信配置
@@ -120,7 +120,7 @@ func (s *PlatformService) getOrCreateWechatConfig(ctx context.Context, appID uui
 		WechatAppID:     "",
 		WechatAppSecret: "",
 		WechatToken:     "",
-		Status:          consts.WechatConfigStatusUnconfigured,
+		Status:          consts2.WechatConfigStatusUnconfigured,
 	}
 
 	err = s.repo.CreateWechatConfig(ctx, newConfig)

@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/bytedance/sonic"
+	consts2 "github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 	milvusentity "github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/redis/go-redis/v9"
@@ -23,8 +24,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -72,12 +72,12 @@ func (s *IndexingService) BuildDocuments(ctx context.Context, documentIDs []uuid
 	// 2. 执行循环遍历所有文档完成对每个文档的构建
 	for _, document := range documents {
 		if err := s.buildSingleDocument(ctx, document); err != nil {
-			log.Printf("构建文档发生错误, 文档ID: %s, 错误信息: %v", document.ID, err)
+			logs.Errorf("Failed to build document %s: %v", document.ID, err)
 
 			// 更新文档状态为错误
 			now := time.Now()
 			s.repo.UpdateDocument(ctx, document.ID, map[string]any{
-				"status":     consts.DocumentStatusError,
+				"status":     consts2.DocumentStatusError,
 				"error":      err.Error(),
 				"stopped_at": &now,
 			})
@@ -92,7 +92,7 @@ func (s *IndexingService) buildSingleDocument(ctx context.Context, document *ent
 	// 3. 更新当前状态为解析中，并记录开始处理的时间
 	now := time.Now().UnixMilli()
 	err := s.repo.UpdateDocument(ctx, document.ID, map[string]any{
-		"status":                consts.DocumentStatusParsing,
+		"status":                consts2.DocumentStatusParsing,
 		"processing_started_at": &now,
 	})
 	if err != nil {
@@ -129,7 +129,7 @@ func (s *IndexingService) buildSingleDocument(ctx context.Context, document *ent
 // UpdateDocumentEnabled 根据传递的文档id更新文档状态，同时修改向量数据库中的记录
 func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID uuid.UUID) error {
 	// 1. 构建缓存键
-	cacheKey := fmt.Sprintf(consts.LockDocumentUpdateEnabled, documentID)
+	cacheKey := fmt.Sprintf(consts2.LockDocumentUpdateEnabled, documentID)
 
 	// 2. 根据传递的document_id获取文档记录
 	document, err := s.repo.GetDocumentByID(ctx, documentID)
@@ -149,7 +149,7 @@ func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID 
 	var segmentIDs []uuid.UUID
 	var nodeIDs []uuid.UUID
 	for _, segment := range segments {
-		if segment.Status == consts.SegmentStatusCompleted {
+		if segment.Status == consts2.SegmentStatusCompleted {
 			segmentIDs = append(segmentIDs, segment.ID)
 			if segment.NodeID != uuid.Nil {
 				nodeIDs = append(nodeIDs, segment.NodeID)
@@ -172,7 +172,7 @@ func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID 
 			now := time.Now().UnixMilli()
 			s.repo.UpdateSegmentByNodeID(ctx, nodeID, map[string]any{
 				"error":       err,
-				"status":      consts.SegmentStatusError,
+				"status":      consts2.SegmentStatusError,
 				"enabled":     false,
 				"disabled_at": &now,
 				"stopped_at":  &now,
@@ -191,13 +191,13 @@ func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID 
 		}
 		err = s.keywordTableService.AddKeywords(ctx, document.DatasetID, enabledSegmentIDs)
 		if err != nil {
-			log.Printf("添加关键词表失败: %v", err)
+			logs.Errorf("Failed to add keywords to table: %v", err)
 		}
 	} else {
 		// 7. 从启用改为禁用，需要剔除关键词
 		err = s.keywordTableService.RemoveSegmentIDs(ctx, document.DatasetID, segmentIDs)
 		if err != nil {
-			log.Printf("删除关键词表失败: %v", err)
+			logs.Errorf("Failed to remove keywords from table: %v", err)
 		}
 	}
 
@@ -220,7 +220,7 @@ func (s *IndexingService) DeleteDocument(ctx context.Context, datasetID, documen
 	// 2. 调用向量数据库删除其关联记录
 	err = s.vectorDatabaseService.DeleteDocumentsByID(ctx, "document_id", documentID.String())
 	if err != nil {
-		log.Printf("删除向量数据库记录失败: %v", err)
+		logs.Errorf("Failed to delete vector database records: %v", err)
 	}
 
 	// 3. 删除postgres关联的segment记录
@@ -232,7 +232,7 @@ func (s *IndexingService) DeleteDocument(ctx context.Context, datasetID, documen
 	// 4. 删除片段id对应的关键词记录
 	err = s.keywordTableService.RemoveSegmentIDs(ctx, datasetID, segmentIDs)
 	if err != nil {
-		log.Printf("删除关键词表记录失败: %v", err)
+		logs.Errorf("Failed to delete keyword table records: %v", err)
 	}
 
 	return nil
@@ -243,31 +243,31 @@ func (s *IndexingService) DeleteDataset(ctx context.Context, datasetID uuid.UUID
 	// 1. 删除关联的文档记录
 	err := s.repo.DeleteDocumentsByDatasetID(ctx, datasetID)
 	if err != nil {
-		log.Printf("删除文档记录失败: %v", err)
+		logs.Errorf("Failed to delete document records: %v", err)
 	}
 
 	// 2. 删除关联的片段记录
 	err = s.repo.DeleteSegmentsByDatasetID(ctx, datasetID)
 	if err != nil {
-		log.Printf("删除片段记录失败: %v", err)
+		logs.Errorf("Failed to delete segment records: %v", err)
 	}
 
 	// 3. 删除关联的关键词表记录
 	err = s.repo.DeleteKeywordTablesByDatasetID(ctx, datasetID)
 	if err != nil {
-		log.Printf("删除关键词表记录失败: %v", err)
+		logs.Errorf("Failed to delete keyword table records: %v", err)
 	}
 
 	// 4. 删除知识库查询记录
 	err = s.repo.DeleteDatasetQueriesByDatasetID(ctx, datasetID)
 	if err != nil {
-		log.Printf("删除知识库查询记录失败: %v", err)
+		logs.Errorf("Failed to delete dataset query records: %v", err)
 	}
 
 	// 5. 调用向量数据库删除知识库的关联记录
 	err = s.vectorDatabaseService.DeleteDocumentsByID(ctx, "dataset_id", datasetID.String())
 	if err != nil {
-		log.Printf("删除向量数据库知识库记录失败: %v", err)
+		logs.Errorf("Failed to delete vector database dataset records: %v", err)
 	}
 
 	return nil
@@ -300,7 +300,7 @@ func (s *IndexingService) parsing(ctx context.Context, document *entity.Document
 	now := time.Now().UnixMilli()
 	err = s.repo.UpdateDocument(ctx, document.ID, map[string]any{
 		"character_count":      characterCount,
-		"status":               consts.DocumentStatusSplitting,
+		"status":               consts2.DocumentStatusSplitting,
 		"parsing_completed_at": &now,
 	})
 	if err != nil {
@@ -376,7 +376,7 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 			CharacterCount: len(content),
 			TokenCount:     s.embeddingsService.CalculateTokenCount(content),
 			Hash:           util.GenerateHash(content),
-			Status:         consts.SegmentStatusWaiting,
+			Status:         consts2.SegmentStatusWaiting,
 		}
 
 		err = s.repo.CreateSegment(ctx, segment)
@@ -406,7 +406,7 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 	now := time.Now().UnixMilli()
 	err = s.repo.UpdateDocument(ctx, document.ID, map[string]any{
 		"token_count":            totalTokenCount,
-		"status":                 consts.DocumentStatusIndexing,
+		"status":                 consts2.DocumentStatusIndexing,
 		"splitting_completed_at": &now,
 	})
 	if err != nil {
@@ -429,18 +429,18 @@ func (s *IndexingService) indexing(ctx context.Context, document *entity.Documen
 
 		err := s.repo.UpdateSegment(ctx, segmentID, map[string]any{
 			"keywords":              string(keywordsJSON),
-			"status":                consts.SegmentStatusIndexing,
+			"status":                consts2.SegmentStatusIndexing,
 			"indexing_completed_at": &now,
 		})
 		if err != nil {
-			log.Printf("更新片段关键词失败: %v", err)
+			logs.Errorf("Failed to update segment keywords: %v", err)
 			continue
 		}
 
 		// 3. 获取当前知识库的关键词表
 		keywordTableRecord, err := s.keywordTableService.GetKeywordByDateSet(ctx, document.DatasetID)
 		if err != nil {
-			log.Printf("获取关键词表失败: %v", err)
+			logs.Errorf("Failed to get keyword table: %v", err)
 			continue
 		}
 
@@ -473,7 +473,7 @@ func (s *IndexingService) indexing(ctx context.Context, document *entity.Documen
 			"keyword_table": string(updatedKeywordTableJSON),
 		})
 		if err != nil {
-			log.Printf("更新关键词表失败: %v", err)
+			logs.Errorf("Failed to update keyword table: %v", err)
 		}
 	}
 
@@ -514,13 +514,13 @@ func (s *IndexingService) completed(ctx context.Context, document *entity.Docume
 		// 存储到向量数据库
 		_, err := s.vectorDatabaseService.AddDocument(ctx, documents)
 		if err != nil {
-			log.Printf("构建文档片段索引发生异常, 错误信息: %v", err)
+			logs.Errorf("Failed to build document segment index: %v", err)
 
 			// 更新片段状态为错误
 			now := time.Now().UnixMilli()
 			for _, nodeID := range nodeIDs {
 				s.repo.UpdateSegmentByNodeID(ctx, nodeID, map[string]any{
-					"status":       consts.SegmentStatusError,
+					"status":       consts2.SegmentStatusError,
 					"completed_at": nil,
 					"stopped_at":   &now,
 					"enabled":      false,
@@ -532,7 +532,7 @@ func (s *IndexingService) completed(ctx context.Context, document *entity.Docume
 			now := time.Now().UnixMilli()
 			for _, nodeID := range nodeIDs {
 				s.repo.UpdateSegmentByNodeID(ctx, nodeID, map[string]any{
-					"status":       consts.SegmentStatusCompleted,
+					"status":       consts2.SegmentStatusCompleted,
 					"completed_at": &now,
 					"enabled":      true,
 				})
@@ -543,7 +543,7 @@ func (s *IndexingService) completed(ctx context.Context, document *entity.Docume
 	// 3. 更新文档的状态数据
 	now := time.Now().UnixMilli()
 	return s.repo.UpdateDocument(ctx, document.ID, map[string]any{
-		"status":       consts.DocumentStatusCompleted,
+		"status":       consts2.DocumentStatusCompleted,
 		"completed_at": &now,
 		"enabled":      true,
 	})

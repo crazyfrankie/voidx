@@ -6,20 +6,20 @@ import (
 	"os"
 	"time"
 
+	"github.com/crazyfrankie/voidx/infra/contract/token"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/oauth/repository"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/jwt"
 	"github.com/crazyfrankie/voidx/pkg/oauth"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type OAuthService struct {
 	repo     *repository.OAuthRepo
-	token    *jwt.TokenService
+	token    token.Token
 	oauthMap map[string]oauth.OAuth
 }
 
-func NewOAuthService(repo *repository.OAuthRepo, token *jwt.TokenService) *OAuthService {
+func NewOAuthService(repo *repository.OAuthRepo, token token.Token) *OAuthService {
 	return &OAuthService{
 		repo:  repo,
 		token: token,

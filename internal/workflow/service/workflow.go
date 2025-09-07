@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bytedance/sonic"
 	"github.com/google/uuid"
 
 	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
@@ -28,8 +27,10 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/workflow/repository"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type WorkflowService struct {
@@ -278,7 +279,7 @@ func (s *WorkflowService) DebugWorkflow(ctx context.Context, workflowID, userID 
 	eventChan := make(chan resp.WorkflowDebugEvent, 100)
 
 	// 启动异步处理
-	go s.processWorkflowDebug(ctx, workflow, inputs, eventChan)
+	go s.processWorkflowDebug(ctx, workflow, workflowTool, inputs, eventChan)
 
 	return eventChan, nil
 }
@@ -349,9 +350,11 @@ func (s *WorkflowService) CancelPublishWorkflow(ctx context.Context, workflowID,
 }
 
 // processWorkflowDebug 处理工作流调试
-func (s *WorkflowService) processWorkflowDebug(ctx context.Context, workflow *entity.Workflow,
+func (s *WorkflowService) processWorkflowDebug(ctx context.Context, workflow *entity.Workflow, workflowTool *corewf.Workflow,
 	inputs map[string]any, eventChan chan<- resp.WorkflowDebugEvent) {
 	defer close(eventChan)
+
+	var nodeResults []map[string]any
 
 	// 创建工作流运行结果记录
 	workflowResult := &entity.WorkflowResult{
@@ -361,9 +364,45 @@ func (s *WorkflowService) processWorkflowDebug(ctx context.Context, workflow *en
 		Status:     consts.WorkflowResultStatusRunning,
 	}
 
-	s.repo.CreateWorkflowResult(ctx, workflowResult)
+	if err := s.repo.CreateWorkflowResult(ctx, workflowResult); err != nil {
+		eventChan <- resp.WorkflowDebugEvent{
+			Error: errno.ErrInternalServer.AppendBizMessage(errors.New("创建工作流结果记录失败")).Error(),
+		}
+		return
+	}
 
 	startTime := time.Now()
+
+	defer func() {
+		// 在函数结束时更新工作流结果和工作流状态
+		latency := time.Since(startTime).Milliseconds()
+
+		updateFields := map[string]any{
+			"state":   nodeResults,
+			"latency": latency,
+		}
+
+		if err := s.repo.UpdateWorkflowResult(ctx, workflowResult.ID, updateFields); err != nil {
+			logs.CtxErrorf(ctx, "更新工作流结果失败")
+		}
+
+		if err := s.repo.UpdateWorkflow(ctx, workflow.ID, map[string]any{
+			"is_debug_passed": workflowResult.Status == consts.WorkflowResultStatusSucceeded,
+		}); err != nil {
+			logs.CtxErrorf(ctx, "更新工作流调试状态失败")
+		}
+	}()
+
+	// 调用stream服务获取工具信息
+	inputStr, _ := sonic.MarshalString(inputs)
+	streamChan, err := workflowTool.Stream(ctx, inputStr)
+	if err != nil {
+		workflowResult.Status = consts.WorkflowResultStatusFailed
+		eventChan <- resp.WorkflowDebugEvent{
+			Error: errno.ErrInternalServer.AppendBizMessage(errors.New("创建工作流流式处理失败")).Error(),
+		}
+		return
+	}
 
 	// 模拟工作流执行过程
 	events := []resp.WorkflowDebugEvent{

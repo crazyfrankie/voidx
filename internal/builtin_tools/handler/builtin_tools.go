@@ -2,11 +2,11 @@ package handler
 
 import (
 	"net/http"
-	
+
+	"github.com/crazyfrankie/voidx/internal/base/response"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/builtin_tools/service"
-	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
 type BuiltinToolsHandler struct {
@@ -31,7 +31,7 @@ func (h *BuiltinToolsHandler) GetBuiltinTools() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		res := h.svc.GetBuiltinTools(c.Request.Context())
 
-		response.SuccessWithData(c, res)
+		response.Data(c, res)
 	}
 }
 
@@ -42,11 +42,11 @@ func (h *BuiltinToolsHandler) GetProviderTool() gin.HandlerFunc {
 
 		res, err := h.svc.GetProviderTool(c.Request.Context(), providerName, toolName)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, res)
+		response.Data(c, res)
 	}
 }
 
@@ -56,7 +56,7 @@ func (h *BuiltinToolsHandler) GetProviderIcon() gin.HandlerFunc {
 
 		iconData, mimeType, err := h.svc.GetProviderIcon(c.Request.Context(), providerName)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -70,6 +70,6 @@ func (h *BuiltinToolsHandler) GetCategories() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		res := h.svc.GetCategories(c.Request.Context())
 
-		response.SuccessWithData(c, res)
+		response.Data(c, res)
 	}
 }

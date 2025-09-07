@@ -5,6 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/schema"
 
@@ -16,8 +18,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment/repository"
 	"github.com/crazyfrankie/voidx/internal/vecstore"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 

@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/apitool/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
 type ApiToolHandler struct {
@@ -35,13 +35,13 @@ func (h *ApiToolHandler) CreateApiTool() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateApiToolReq
 		if err := c.ShouldBind(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err := h.svc.CreateApiTool(c.Request.Context(), createReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -53,17 +53,17 @@ func (h *ApiToolHandler) GetApiToolProvidersWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetApiToolProvidersWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		res, err := h.svc.GetApiToolProvidersWithPage(c.Request.Context(), pageReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, res)
+		response.Data(c, res)
 	}
 }
 
@@ -72,17 +72,17 @@ func (h *ApiToolHandler) GetApiToolProvider() gin.HandlerFunc {
 		providerIDStr := c.Param("provider_id")
 		providerID, err := uuid.Parse(providerIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		provider, err := h.svc.GetApiToolProvider(c.Request.Context(), providerID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, provider)
+		response.Data(c, provider)
 	}
 }
 
@@ -91,19 +91,19 @@ func (h *ApiToolHandler) UpdateApiToolProvider() gin.HandlerFunc {
 		providerIDStr := c.Param("provider_id")
 		providerID, err := uuid.Parse(providerIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateApiToolProviderReq
 		if err := c.ShouldBind(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.UpdateApiToolProvider(c.Request.Context(), providerID, updateReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -116,13 +116,13 @@ func (h *ApiToolHandler) DeleteApiToolProvider() gin.HandlerFunc {
 		providerIDStr := c.Param("provider_id")
 		providerID, err := uuid.Parse(providerIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err = h.svc.DeleteApiToolProvider(c.Request.Context(), providerID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -136,17 +136,17 @@ func (h *ApiToolHandler) GetApiTool() gin.HandlerFunc {
 		toolName := c.Param("tool_name")
 		providerId, err := uuid.Parse(providerIdStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		tool, err := h.svc.GetApiTool(c.Request.Context(), providerId, toolName)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, tool)
+		response.Data(c, tool)
 	}
 }
 
@@ -154,13 +154,13 @@ func (h *ApiToolHandler) ValidateOpenApiSchema() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var validateReq req.ValidateOpenApiSchemaReq
 		if err := c.ShouldBind(&validateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		err := h.svc.ValidateOpenapiSchema(c.Request.Context(), validateReq.OpenApiSchema)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

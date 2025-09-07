@@ -15,7 +15,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/audio/repository"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type AudioService struct {

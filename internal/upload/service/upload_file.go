@@ -1,10 +1,8 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,29 +10,23 @@ import (
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 
-	"github.com/crazyfrankie/voidx/conf"
+	"github.com/crazyfrankie/voidx/infra/contract/storage"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/upload/repository"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
-
-const urlPrefix = "http://"
 
 type OssService struct {
 	repo        *repository.UploadFileRepo
-	minioClient *minio.Client
-	endpoint    string
-	bucketName  string
+	minioClient storage.Storage
 }
 
-func NewOssService(repo *repository.UploadFileRepo, minioClient *minio.Client) *OssService {
+func NewOssService(repo *repository.UploadFileRepo, minioClient storage.Storage) *OssService {
 	return &OssService{
 		repo:        repo,
 		minioClient: minioClient,
-		endpoint:    conf.GetConf().MinIO.Endpoint[0],
-		bucketName:  conf.GetConf().MinIO.BucketName["user"],
 	}
 }
 
@@ -75,22 +67,28 @@ func (s *OssService) UploadFile(ctx context.Context, data []byte, onlyImage bool
 	err = s.repo.CreateUploadFile(ctx, uploadFile)
 	if err != nil {
 		// 如果数据库保存失败，尝试删除已上传的文件
-		if err := s.minioClient.RemoveObject(ctx, s.bucketName, key, minio.RemoveObjectOptions{}); err != nil {
+		if err := s.minioClient.DeleteObject(ctx, key); err != nil {
 			return resp.UploadFileResp{}, err
 		}
 		return resp.UploadFileResp{}, err
 	}
 
-	return resp.UploadFileResp{
+	res := resp.UploadFileResp{
 		ID:        uploadFile.ID,
 		AccountID: uploadFile.AccountID,
 		Name:      uploadFile.Name,
 		Key:       uploadFile.Key,
 		Size:      uploadFile.Size,
 		Extension: uploadFile.Extension,
-		URL:       s.getURL(uploadFile.Key),
 		Ctime:     uploadFile.Ctime,
-	}, nil
+	}
+
+	url, err := s.minioClient.GetObjectUrl(ctx, uploadFile.Key)
+	if err == nil {
+		res.URL = url
+	}
+
+	return res, nil
 }
 
 // DownloadFile 下载文件
@@ -99,16 +97,10 @@ func (s *OssService) DownloadFile(ctx context.Context, key string, targetPath st
 		return fmt.Errorf("目标目录创建失败: %w", err)
 	}
 
-	object, err := s.minioClient.GetObject(
-		ctx,
-		s.bucketName,
-		key,
-		minio.GetObjectOptions{},
-	)
+	data, err := s.minioClient.GetObject(ctx, key)
 	if err != nil {
 		return fmt.Errorf("获取文件对象失败: %w", err)
 	}
-	defer object.Close()
 
 	file, err := os.Create(targetPath)
 	if err != nil {
@@ -116,7 +108,7 @@ func (s *OssService) DownloadFile(ctx context.Context, key string, targetPath st
 	}
 	defer file.Close()
 
-	if _, err := io.Copy(file, object); err != nil {
+	if _, err := file.Write(data); err != nil {
 		_ = os.Remove(targetPath)
 		return fmt.Errorf("文件下载失败: %w", err)
 	}
@@ -135,10 +127,10 @@ func ensureDirExists(path string) error {
 }
 
 // uploadToStorage 上传文件到存储服务
-func (s *OssService) uploadToStorage(ctx context.Context, key string, data []byte) (minio.UploadInfo, error) {
-	info, err := s.minioClient.PutObject(ctx, s.bucketName, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{})
+func (s *OssService) uploadToStorage(ctx context.Context, key string, data []byte) (*minio.UploadInfo, error) {
+	info, err := s.minioClient.PutObject(ctx, key, data)
 	if err != nil {
-		return minio.UploadInfo{}, err
+		return nil, err
 	}
 
 	return info, nil
@@ -152,8 +144,4 @@ func (s *OssService) isAllowedExtension(extension string, allowedExtensions []st
 		}
 	}
 	return false
-}
-
-func (s *OssService) getURL(key string) string {
-	return urlPrefix + s.endpoint + "/" + s.bucketName + "/" + key
 }

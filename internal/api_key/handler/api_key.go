@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/api_key/service"
 	"github.com/crazyfrankie/voidx/internal/models/req"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -35,19 +35,19 @@ func (h *ApiKeyHandler) CreateApiKey() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateApiKeyReq
 		if err := c.ShouldBindJSON(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.CreateApiKey(c.Request.Context(), userID, createReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -60,7 +60,7 @@ func (h *ApiKeyHandler) GetApiKeysWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetApiKeysWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
@@ -74,13 +74,13 @@ func (h *ApiKeyHandler) GetApiKeysWithPage() gin.HandlerFunc {
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		apiKeys, paginator, err := h.svc.GetApiKeysWithPage(c.Request.Context(), userID, pageReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -89,7 +89,7 @@ func (h *ApiKeyHandler) GetApiKeysWithPage() gin.HandlerFunc {
 			"paginator": paginator,
 		}
 
-		response.SuccessWithData(c, result)
+		response.Data(c, result)
 	}
 }
 
@@ -99,25 +99,25 @@ func (h *ApiKeyHandler) UpdateApiKey() gin.HandlerFunc {
 		apiKeyIDStr := c.Param("api_key_id")
 		apiKeyID, err := uuid.Parse(apiKeyIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateApiKeyReq
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.UpdateApiKey(c.Request.Context(), apiKeyID, userID, updateReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -131,25 +131,25 @@ func (h *ApiKeyHandler) UpdateApiKeyIsActive() gin.HandlerFunc {
 		apiKeyIDStr := c.Param("api_key_id")
 		apiKeyID, err := uuid.Parse(apiKeyIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var activeReq req.UpdateApiKeyIsActiveReq
 		if err := c.ShouldBindJSON(&activeReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.UpdateApiKeyIsActive(c.Request.Context(), apiKeyID, userID, activeReq.IsActive)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -163,19 +163,19 @@ func (h *ApiKeyHandler) DeleteApiKey() gin.HandlerFunc {
 		apiKeyIDStr := c.Param("api_key_id")
 		apiKeyID, err := uuid.Parse(apiKeyIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.DeleteApiKey(c.Request.Context(), apiKeyID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

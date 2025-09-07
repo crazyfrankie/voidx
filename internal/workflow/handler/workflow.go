@@ -6,13 +6,13 @@ import (
 	"net/http"
 
 	"github.com/bytedance/sonic"
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/workflow/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -45,23 +45,23 @@ func (h *WorkflowHandler) CreateWorkflow() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var createReq req.CreateWorkflowReq
 		if err := c.ShouldBindJSON(&createReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		workflow, err := h.svc.CreateWorkflow(c.Request.Context(), userID, createReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, map[string]any{"id": workflow.ID})
+		response.Data(c, map[string]any{"id": workflow.ID})
 	}
 }
 
@@ -70,7 +70,7 @@ func (h *WorkflowHandler) GetWorkflowsWithPage() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var pageReq req.GetWorkflowsWithPageReq
 		if err := c.ShouldBindQuery(&pageReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
@@ -84,13 +84,13 @@ func (h *WorkflowHandler) GetWorkflowsWithPage() gin.HandlerFunc {
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		workflows, paginator, err := h.svc.GetWorkflowsWithPage(c.Request.Context(), userID, pageReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -99,7 +99,7 @@ func (h *WorkflowHandler) GetWorkflowsWithPage() gin.HandlerFunc {
 			"paginator": paginator,
 		}
 
-		response.SuccessWithData(c, result)
+		response.Data(c, result)
 	}
 }
 
@@ -109,23 +109,23 @@ func (h *WorkflowHandler) GetWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		workflow, err := h.svc.GetWorkflow(c.Request.Context(), workflowID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, workflow)
+		response.Data(c, workflow)
 	}
 }
 
@@ -135,25 +135,25 @@ func (h *WorkflowHandler) UpdateWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var updateReq req.UpdateWorkflowReq
 		if err := c.ShouldBindJSON(&updateReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.UpdateWorkflow(c.Request.Context(), workflowID, userID, updateReq)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -167,19 +167,19 @@ func (h *WorkflowHandler) DeleteWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.DeleteWorkflow(c.Request.Context(), workflowID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -193,19 +193,19 @@ func (h *WorkflowHandler) UpdateDraftGraph() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var draftGraphReq req.UpdateDraftGraphReq
 		if err := c.ShouldBindJSON(&draftGraphReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -216,7 +216,7 @@ func (h *WorkflowHandler) UpdateDraftGraph() gin.HandlerFunc {
 
 		err = h.svc.UpdateDraftGraph(c.Request.Context(), workflowID, userID, draftGraph)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -230,23 +230,23 @@ func (h *WorkflowHandler) GetDraftGraph() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		draftGraph, err := h.svc.GetDraftGraph(c.Request.Context(), workflowID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, draftGraph)
+		response.Data(c, draftGraph)
 	}
 }
 
@@ -256,19 +256,19 @@ func (h *WorkflowHandler) DebugWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		var debugReq req.DebugWorkflowReq
 		if err := c.ShouldBindJSON(&debugReq); err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -281,7 +281,7 @@ func (h *WorkflowHandler) DebugWorkflow() gin.HandlerFunc {
 		// 获取流式响应
 		eventChan, err := h.svc.DebugWorkflow(c.Request.Context(), workflowID, userID, debugReq.Inputs)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -314,19 +314,19 @@ func (h *WorkflowHandler) PublishWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.PublishWorkflow(c.Request.Context(), workflowID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
@@ -340,19 +340,19 @@ func (h *WorkflowHandler) CancelPublishWorkflow() gin.HandlerFunc {
 		workflowIDStr := c.Param("workflow_id")
 		workflowID, err := uuid.Parse(workflowIDStr)
 		if err != nil {
-			response.Error(c, errno.ErrValidate)
+			response.InvalidParamRequestResponse(c, errno.ErrValidate)
 			return
 		}
 
 		userID, err := util.GetCurrentUserID(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
 		err = h.svc.CancelPublishWorkflow(c.Request.Context(), workflowID, userID)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

@@ -1,4 +1,4 @@
-package jwt
+package token
 
 import (
 	"context"
@@ -6,13 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
+
+	"github.com/crazyfrankie/voidx/infra/contract/token"
 )
 
 type TokenService struct {
@@ -21,12 +21,7 @@ type TokenService struct {
 	secretKey []byte
 }
 
-type Claims struct {
-	UID uuid.UUID `json:"uid"`
-	jwt.RegisteredClaims
-}
-
-func NewTokenService(cmd redis.Cmdable, signAlgo string, secret string) *TokenService {
+func NewTokenService(cmd redis.Cmdable, signAlgo string, secret string) token.Token {
 	return &TokenService{cmd: cmd, signAlgo: signAlgo, secretKey: []byte(secret)}
 }
 
@@ -56,28 +51,28 @@ func (s *TokenService) GenerateToken(uid uuid.UUID, ua string) ([]string, error)
 
 func (s *TokenService) newToken(uid uuid.UUID, duration time.Duration) (string, error) {
 	now := time.Now()
-	claims := &Claims{
+	claims := &token.Claims{
 		UID: uid,
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(duration)),
 		},
 	}
-	token := jwt.NewWithClaims(jwt.GetSigningMethod(s.signAlgo), claims)
-	str, err := token.SignedString(s.secretKey)
+	tk := jwt.NewWithClaims(jwt.GetSigningMethod(s.signAlgo), claims)
+	str, err := tk.SignedString(s.secretKey)
 
 	return str, err
 }
 
-func (s *TokenService) ParseToken(token string) (*Claims, error) {
-	t, err := jwt.ParseWithClaims(token, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+func (s *TokenService) ParseToken(tk string) (*token.Claims, error) {
+	t, err := jwt.ParseWithClaims(tk, &token.Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return s.secretKey, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	claims, ok := t.Claims.(*Claims)
+	claims, ok := t.Claims.(*token.Claims)
 	if ok {
 		return claims, nil
 	}
@@ -118,24 +113,6 @@ func (s *TokenService) TryRefresh(refresh string, ua string) ([]string, uuid.UUI
 
 func (s *TokenService) CleanToken(ctx context.Context, uid uuid.UUID, ua string) error {
 	return s.cmd.Del(ctx, tokenKey(uid, ua)).Err()
-}
-
-func (s *TokenService) GetAccessToken(c *gin.Context) (string, error) {
-	tokenHeader := c.GetHeader("Authorization")
-	if tokenHeader == "" {
-		return "", errors.New("no auth")
-	}
-
-	strs := strings.Split(tokenHeader, " ")
-	if len(strs) != 2 || strs[0] != "Bearer" {
-		return "", errors.New("header is invalid")
-	}
-
-	if strs[1] == "" {
-		return "", errors.New("jwt is empty")
-	}
-
-	return strs[1], nil
 }
 
 func tokenKey(uid uuid.UUID, ua string) string {

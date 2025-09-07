@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/crazyfrankie/voidx/internal/core/agent/entities"
-	"github.com/crazyfrankie/voidx/pkg/consts"
 )
 
 // AgentQueueManager manages the agent's event queue

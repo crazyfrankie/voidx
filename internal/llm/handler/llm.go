@@ -3,10 +3,10 @@ package handler
 import (
 	"net/http"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/llm/service"
-	"github.com/crazyfrankie/voidx/pkg/response"
 )
 
 type LLMHandler struct {
@@ -33,11 +33,11 @@ func (h *LLMHandler) GetProviders() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		providers, err := h.llmService.GetProviders(c.Request.Context())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, providers)
+		response.Data(c, providers)
 	}
 }
 
@@ -49,11 +49,11 @@ func (h *LLMHandler) GetModelEntity() gin.HandlerFunc {
 
 		entity, err := h.llmService.GetModelEntity(c.Request.Context(), provider, modelName)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, entity)
+		response.Data(c, entity)
 	}
 }
 
@@ -64,7 +64,7 @@ func (h *LLMHandler) GetProviderIcon() gin.HandlerFunc {
 
 		iconData, mimeType, err := h.llmService.GetProviderIcon(c.Request.Context(), providerName)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

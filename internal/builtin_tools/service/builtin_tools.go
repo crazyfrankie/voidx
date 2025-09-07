@@ -11,7 +11,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/categories"
 	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/entities"
 	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
-	"github.com/crazyfrankie/voidx/pkg/errno"
+	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type BuiltinToolsService struct {

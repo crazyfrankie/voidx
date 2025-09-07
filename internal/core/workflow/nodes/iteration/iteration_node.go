@@ -2,7 +2,6 @@ package iteration
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/bytedance/sonic"
@@ -10,6 +9,7 @@ import (
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 // WorkflowInterface 工作流接口
@@ -34,7 +34,7 @@ func NewIterationNode(nodeData *IterationNodeData) *IterationNode {
 
 	// 初始化工作流
 	if err := node.initializeWorkflow(); err != nil {
-		log.Printf("迭代节点子工作流构建失败: %v", err)
+		logs.Errorf("Failed to build iteration node sub-workflow: %v", err)
 		node.workflow = nil
 	}
 
@@ -133,14 +133,14 @@ func (i *IterationNode) Invoke(state *entities.WorkflowState) (*entities.Workflo
 		// 6. 调用工作流获取结果
 		iterationResult, err := i.workflow.Invoke(data)
 		if err != nil {
-			log.Printf("迭代工作流调用失败: %v", err)
+			logs.Errorf("Failed to invoke iteration workflow: %v", err)
 			continue
 		}
 
 		// 转换成JSON字符串
 		jsonBytes, err := sonic.Marshal(iterationResult)
 		if err != nil {
-			log.Printf("序列化迭代结果失败: %v", err)
+			logs.Errorf("Failed to serialize iteration results: %v", err)
 			continue
 		}
 

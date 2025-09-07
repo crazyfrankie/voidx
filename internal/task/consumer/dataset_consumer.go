@@ -2,13 +2,13 @@ package consumer
 
 import (
 	"context"
-	"log"
 
 	"github.com/IBM/sarama"
 	"github.com/bytedance/sonic"
 
 	datasetService "github.com/crazyfrankie/voidx/internal/dataset/service"
 	"github.com/crazyfrankie/voidx/internal/index/service"
+	"github.com/crazyfrankie/voidx/pkg/logs"
 )
 
 // DatasetConsumer 数据集任务消费者
@@ -48,7 +48,7 @@ func (c *DatasetConsumer) Start(ctx context.Context) error {
 			return ctx.Err()
 		default:
 			if err := c.consumerGroup.Consume(ctx, c.topics, handler); err != nil {
-				log.Printf("Error from consumer: %v", err)
+				logs.Errorf("Error from consumer: %v", err)
 				return err
 			}
 		}
@@ -86,7 +86,7 @@ func (h *datasetConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupS
 
 			err := h.handleMessage(message)
 			if err != nil {
-				log.Printf("Failed to handle message: %v", err)
+				logs.Errorf("Failed to handle message: %v", err)
 			}
 
 			session.MarkMessage(message, "")
@@ -101,7 +101,7 @@ func (h *datasetConsumerGroupHandler) ConsumeClaim(session sarama.ConsumerGroupS
 func (h *datasetConsumerGroupHandler) handleMessage(message *sarama.ConsumerMessage) error {
 	var datasetTask datasetService.DatasetTask
 	if err := sonic.Unmarshal(message.Value, &datasetTask); err != nil {
-		log.Printf("Failed to unmarshal dataset task: %v", err)
+		logs.Errorf("Failed to unmarshal dataset task: %v", err)
 		return err
 	}
 
@@ -111,7 +111,7 @@ func (h *datasetConsumerGroupHandler) handleMessage(message *sarama.ConsumerMess
 	case "dataset.delete":
 		return h.handleDeleteDatasetTask(ctx, datasetTask)
 	default:
-		log.Printf("Unknown topic: %s", message.Topic)
+		logs.Errorf("Unknown topic: %s", message.Topic)
 		return nil
 	}
 }
@@ -124,10 +124,10 @@ func (h *datasetConsumerGroupHandler) handleDeleteDatasetTask(ctx context.Contex
 
 	err := h.indexingService.DeleteDataset(ctx, datasetTask.DatasetID)
 	if err != nil {
-		log.Printf("Failed to delete dataset %s: %v", datasetTask.DatasetID, err)
+		logs.Errorf("Failed to delete dataset %s: %v", datasetTask.DatasetID, err)
 		return err
 	}
 
-	log.Printf("Successfully deleted dataset: %s", datasetTask.DatasetID)
+	logs.Errorf("Successfully deleted dataset: %s", datasetTask.DatasetID)
 	return nil
 }

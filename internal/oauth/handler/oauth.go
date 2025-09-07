@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
+	"github.com/crazyfrankie/voidx/internal/base/response"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/gin-gonic/gin"
 
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/oauth/service"
-	"github.com/crazyfrankie/voidx/pkg/errno"
-	"github.com/crazyfrankie/voidx/pkg/response"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -35,11 +35,11 @@ func (h *OAuthHandler) Provider() gin.HandlerFunc {
 
 		oauth, err := h.svc.GetOAuthByProviderName(c.Request.Context(), providerName)
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 
-		response.SuccessWithData(c, gin.H{"redirect_url": oauth.GetAuthorizationURL()})
+		response.Data(c, gin.H{"redirect_url": oauth.GetAuthorizationURL()})
 	}
 }
 
@@ -49,14 +49,14 @@ func (h *OAuthHandler) Authorize() gin.HandlerFunc {
 
 		var authReq req.AuthorizeReq
 		if err := c.ShouldBind(&authReq); err != nil {
-			response.Error(c, errno.ErrValidate.AppendBizMessage(errors.New("code代码不能为空")))
+			response.InvalidParamRequestResponse(c, errno.ErrValidate.AppendBizMessage(errors.New("code代码不能为空")))
 			return
 		}
 
 		newCtx := context.WithValue(c.Request.Context(), "last_login_ip", c.Request.RemoteAddr)
 		tokens, err := h.svc.OAuthLogin(newCtx, providerName, authReq.Code, c.Request.UserAgent())
 		if err != nil {
-			response.Error(c, err)
+			response.InternalServerErrorResponse(c, err)
 			return
 		}
 

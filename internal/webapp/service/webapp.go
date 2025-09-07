@@ -5,6 +5,8 @@ import (
 	"errors"
 
 	"github.com/bytedance/sonic"
+	consts2 "github.com/crazyfrankie/voidx/types/consts"
+	"github.com/crazyfrankie/voidx/types/errno"
 	"github.com/google/uuid"
 	"github.com/tmc/langchaingo/llms"
 
@@ -21,8 +23,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/webapp/repository"
-	"github.com/crazyfrankie/voidx/pkg/consts"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
@@ -119,7 +119,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 		convers, err = s.repo.GetConversationByID(ctx, conversationID)
 		if err != nil || convers == nil ||
 			convers.AppID != app.ID ||
-			convers.InvokeFrom != consts.InvokeFromWebApp ||
+			convers.InvokeFrom != consts2.InvokeFromWebApp ||
 			convers.CreatedBy != accountID {
 			return nil, errno.ErrForbidden.AppendBizMessage(errors.New("该会话不存在，或者不属于当前应用/用户/调用方式"))
 		}
@@ -128,7 +128,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 		createConvReq := req.CreateConversationReq{
 			AppID:      app.ID,
 			Name:       "New Conversation",
-			InvokeFrom: string(consts.InvokeFromWebApp),
+			InvokeFrom: string(consts2.InvokeFromWebApp),
 		}
 		convers, err = s.conversationSvc.CreateConversation(ctx, accountID, createConvReq)
 		if err != nil {
@@ -188,7 +188,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 			datasetIDs = append(datasetIDs, dataset["id"].(uuid.UUID))
 		}
 
-		datasetTool, err := s.retrievalSvc.CreateLangchainToolFromSearch(ctx, accountID, datasetIDs, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
+		datasetTool, err := s.retrievalSvc.CreateLangchainToolFromSearch(ctx, accountID, datasetIDs, consts2.RetrievalSourceApp, appConfig.RetrievalConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -212,7 +212,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 	// 12. 根据LLM是否支持tool_call决定使用不同的Agent
 	agentConfig := &entities.AgentConfig{
 		UserID:               accountID,
-		InvokeFrom:           consts.InvokeFromWebApp,
+		InvokeFrom:           consts2.InvokeFromWebApp,
 		PresetPrompt:         appConfig.PresetPrompt,
 		EnableLongTermMemory: appConfig.LongTermMemory != nil && appConfig.LongTermMemory["enable"].(bool),
 		Tools:                tools,
@@ -255,7 +255,7 @@ func (s *WebAppService) StopWebAppChat(ctx context.Context, token, taskID string
 		return err
 	}
 
-	return s.agentManager.SetStopFlag(task, consts.InvokeFromWebApp, uid)
+	return s.agentManager.SetStopFlag(task, consts2.InvokeFromWebApp, uid)
 }
 
 func (s *WebAppService) GetConversations(ctx context.Context, token string, getReq req.GetWebAppConversationsReq) ([]resp.WebAppConversationResp, error) {

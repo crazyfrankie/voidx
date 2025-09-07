@@ -44,8 +44,8 @@ import (
 
 func InitApplication() *Application {
 	cmdable := InitCache()
-	tokenService := InitJWT(cmdable)
-	v := InitMiddlewares(tokenService)
+	token := InitJWT(cmdable)
+	v := InitMiddlewares(token)
 	db := InitDB()
 	accountModule := account.InitAccountModule(db)
 	accountHandler := accountModule.Handler
@@ -60,8 +60,8 @@ func InitApplication() *Application {
 	builtinProviderManager := InitBuiltinToolsManager()
 	apiProviderManager := InitApiToolsManager()
 	appConfigModule := app_config.InitAppConfigModule(db, languageModelManager, builtinProviderManager, apiProviderManager)
-	client := InitMinIO()
-	uploadModule := upload.InitUploadModule(db, client)
+	storage := InitMinIO()
+	uploadModule := upload.InitUploadModule(db, storage)
 	embeddingService := InitEmbeddingService(cmdable, openAI)
 	jiebaService := InitJiebaService()
 	retrieverModule := retriever.InitRetrieverModule(db, cmdable, store, embeddingService, jiebaService)
@@ -79,7 +79,7 @@ func InitApplication() *Application {
 	assistantAgentHandler := assistantModule.Handler
 	audioModule := audio.InitAudioModule(db)
 	audioHandler := audioModule.Handler
-	authModule := auth.InitAuthModule(db, cmdable, tokenService)
+	authModule := auth.InitAuthModule(db, cmdable, token)
 	authHandler := authModule.Handler
 	builtinAppManager := InitBuiltinAppManager()
 	builtinModule := builtin_app.InitBuiltinAppModule(db, builtinAppManager)
@@ -94,7 +94,7 @@ func InitApplication() *Application {
 	documentModule := document.InitDocumentModule(db)
 	documentHandler := documentModule.Handler
 	llmHandler := llmModule.Handler
-	oAuthModule := oauth.InitOAuthModule(db, tokenService)
+	oAuthModule := oauth.InitOAuthModule(db, token)
 	oAuthHandler := oAuthModule.Handler
 	openAPIModule := openapi.InitOpenAIModule(db, conversationModule, retrieverModule, llmModule, appConfigModule, appModule, agentQueueManager, tokenBufferMemory)
 	openAPIHandler := openAPIModule.Handler

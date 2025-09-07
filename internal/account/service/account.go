@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"github.com/crazyfrankie/voidx/types/errno"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/crazyfrankie/voidx/internal/account/repository"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
-	"github.com/crazyfrankie/voidx/pkg/errno"
 	"github.com/crazyfrankie/voidx/pkg/util"
 )
 
