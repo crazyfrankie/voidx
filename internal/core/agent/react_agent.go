@@ -2,34 +2,37 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
+
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 
 	"github.com/crazyfrankie/voidx/internal/core/agent/entities"
-	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 const pattern = "(?m)```json\\s*\\n([\\s\\S]+?)```"
 
-// ReACTAgent 基于ReACT推理的智能体，继承FunctionCallAgent，并重写long_term_memory_node和llm_node两个节点
-type ReACTAgent struct {
+// ReactAgent represents an agent that uses ReACT (Reasoning and Acting) methodology
+// It inherits from FunctionCallAgent but overrides key methods for models without native tool calling
+type ReactAgent struct {
 	*FunctionCallAgent
 }
 
-// NewReACTAgent creates a new ReACT agent
-func NewReACTAgent(llm llms.Model, config entities.AgentConfig, agentQueueManager *AgentQueueManager) BaseAgent {
-	functionCallAgent := NewFunctionCallAgent(llm, config, agentQueueManager).(*FunctionCallAgent)
-	return &ReACTAgent{FunctionCallAgent: functionCallAgent}
+// NewReactAgent creates a new ReACT agent
+func NewReactAgent(llm model.BaseChatModel, config *entities.AgentConfig, queueFactory *AgentQueueManagerFactory) BaseAgent {
+	functionCallAgent := NewFunctionCallAgent(llm, config, queueFactory).(*FunctionCallAgent)
+
+	return &ReactAgent{FunctionCallAgent: functionCallAgent}
 }
 
-// Stream implements the BaseAgent interface for ReACT Agent
-func (r *ReACTAgent) Stream(ctx context.Context, input entities.AgentState) (<-chan entities.AgentThought, error) {
+// Stream implements the BaseAgent interface for ReactAgent
+func (r *ReactAgent) Stream(ctx context.Context, input entities.AgentState) (<-chan *entities.AgentThought, error) {
 	// Ensure task ID is set
 	if input.TaskID == uuid.Nil {
 		input.TaskID = uuid.New()
@@ -37,11 +40,15 @@ func (r *ReACTAgent) Stream(ctx context.Context, input entities.AgentState) (<-c
 
 	// Initialize other fields if not set
 	if input.History == nil {
-		input.History = make([]llms.ChatMessage, 0)
+		input.History = make([]*schema.Message, 0)
 	}
 
+	// Create queue manager for this task
+	queueManager := r.queueFactory.CreateManager(r.agentConfig.UserID, r.agentConfig.InvokeFrom)
+	defer queueManager.Close()
+
 	// Create queue for this task
-	thoughtChan, err := r.queueManager.Listen(input.TaskID, r.agentConfig.UserID, r.agentConfig.InvokeFrom)
+	thoughtChan, err := queueManager.Listen(ctx, input.TaskID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue: %w", err)
 	}
@@ -49,40 +56,40 @@ func (r *ReACTAgent) Stream(ctx context.Context, input entities.AgentState) (<-c
 	// Start processing in background
 	go func() {
 		defer func() {
-			r.queueManager.Publish(input.TaskID, entities.AgentThought{
+			queueManager.Publish(input.TaskID, &entities.AgentThought{
 				ID:     uuid.New(),
 				TaskID: input.TaskID,
 				Event:  entities.EventAgentEnd,
 			})
 		}()
 
-		// Process through ReACT agent graph
-		if err := r.processReACTAgentGraph(ctx, input); err != nil {
-			r.queueManager.PublishError(input.TaskID, fmt.Sprintf("ReACT Agent processing failed: %v", err))
+		// Execute the agent processing pipeline
+		if err := r.processAgentPipeline(ctx, input, queueManager); err != nil {
+			queueManager.PublishError(input.TaskID, fmt.Errorf("Agent processing failed: %v", err))
 		}
 	}()
 
 	return thoughtChan, nil
 }
 
-// processReACTAgentGraph processes the input through the ReACT agent's execution graph
-func (r *ReACTAgent) processReACTAgentGraph(ctx context.Context, state entities.AgentState) error {
+// processAgentPipeline overrides the pipeline to use ReACT-specific logic
+func (r *ReactAgent) processAgentPipeline(ctx context.Context, state entities.AgentState, queueManager *AgentQueueManager) error {
 	// 1. Preset operation node
-	if shouldEnd, err := r.presetOperationNode(state); err != nil {
+	if shouldEnd, err := r.presetOperationNode(ctx, state, queueManager); err != nil {
 		return err
 	} else if shouldEnd {
 		return nil
 	}
 
-	// 2. Long term memory recall node (ReACT specific implementation)
-	if err := r.longTermMemoryRecallNodeReACT(&state); err != nil {
+	// 2. ReACT-specific long term memory recall node
+	if err := r.reactLongTermMemoryRecallNode(ctx, &state, queueManager); err != nil {
 		return err
 	}
 
-	// 3. Main processing loop
+	// 3. Main processing loop with ReACT logic
 	for state.IterationCount <= r.agentConfig.MaxIterationCount {
-		// LLM node (ReACT specific implementation)
-		shouldEnd, err := r.llmNodeReACT(ctx, &state)
+		// ReACT LLM node
+		shouldEnd, err := r.reactLLMNode(ctx, &state, queueManager)
 		if err != nil {
 			return err
 		}
@@ -90,39 +97,50 @@ func (r *ReACTAgent) processReACTAgentGraph(ctx context.Context, state entities.
 			return nil
 		}
 
-		// Tools node (ReACT specific implementation)
-		if err := r.toolsNodeReACT(&state); err != nil {
-			return err
+		// Tools node (if needed)
+		if len(state.Messages) > 0 {
+			lastMsg := state.Messages[len(state.Messages)-1]
+			if len(lastMsg.ToolCalls) > 0 {
+				if err := r.reactToolsNode(ctx, &state, queueManager); err != nil {
+					return err
+				}
+			} else {
+				// No tool calls, we're done
+				break
+			}
 		}
 
 		state.IterationCount++
 	}
 
 	// Max iteration reached
-	r.queueManager.Publish(state.TaskID, entities.AgentThought{
-		ID:      uuid.New(),
-		TaskID:  state.TaskID,
-		Event:   entities.EventAgentMessage,
-		Thought: entities.MaxIterationResponse,
-		Answer:  entities.MaxIterationResponse,
-		Latency: 0,
-	})
+	if state.IterationCount > r.agentConfig.MaxIterationCount {
+		queueManager.Publish(state.TaskID, &entities.AgentThought{
+			ID:      uuid.New(),
+			TaskID:  state.TaskID,
+			Event:   entities.EventAgentMessage,
+			Thought: entities.MaxIterationResponse,
+			Answer:  entities.MaxIterationResponse,
+			Latency: 0,
+		})
+	}
 
 	return nil
 }
 
-// longTermMemoryRecallNodeReACT 重写长期记忆召回节点，使用prompt实现工具调用及规范数据生成
-func (r *ReACTAgent) longTermMemoryRecallNodeReACT(state *entities.AgentState) error {
-	// 1.判断是否支持工具调用，如果支持工具调用，则可以直接使用工具智能体的长期记忆召回节点
-	if r.supportsToolCall() {
-		return r.longTermMemoryRecallNode(*state)
+// reactLongTermMemoryRecallNode handles long-term memory recall with ReACT-specific prompt
+func (r *ReactAgent) reactLongTermMemoryRecallNode(ctx context.Context, state *entities.AgentState, queueManager *AgentQueueManager) error {
+	// Check if model supports tool calling, if so use parent implementation
+	if toolCallingModel, ok := r.llm.(model.ToolCallingChatModel); ok && len(r.agentConfig.Tools) > 0 {
+		_ = toolCallingModel // Use parent implementation
+		return r.longTermMemoryRecallNode(ctx, state, queueManager)
 	}
 
-	// 2.根据传递的智能体配置判断是否需要召回长期记忆
+	// Handle long-term memory
 	longTermMemory := ""
-	if r.agentConfig.EnableLongTermMemory {
+	if r.agentConfig.EnableLongTermMemory && state.LongTermMemory != "" {
 		longTermMemory = state.LongTermMemory
-		r.queueManager.Publish(state.TaskID, entities.AgentThought{
+		queueManager.Publish(state.TaskID, &entities.AgentThought{
 			ID:          uuid.New(),
 			TaskID:      state.TaskID,
 			Event:       entities.EventLongTermMemoryRecall,
@@ -130,55 +148,48 @@ func (r *ReACTAgent) longTermMemoryRecallNodeReACT(state *entities.AgentState) e
 		})
 	}
 
-	// 3.检测是否支持AGENT_THOUGHT，如果不支持，则使用没有工具描述的prompt
-	var systemPrompt string
-	if !r.supportsAgentThought() {
-		systemPrompt = strings.ReplaceAll(entities.AgentSystemPromptTemplate, "{preset_prompt}", r.agentConfig.PresetPrompt)
-		systemPrompt = strings.ReplaceAll(systemPrompt, "{long_term_memory}", longTermMemory)
-	} else {
-		// 4.支持智能体推理，则使用REACT_AGENT_SYSTEM_PROMPT_TEMPLATE并添加工具描述
-		toolDescription := r.renderToolDescription()
-		systemPrompt = strings.ReplaceAll(entities.ReactAgentSystemPromptTemplate, "{preset_prompt}", r.agentConfig.PresetPrompt)
-		systemPrompt = strings.ReplaceAll(systemPrompt, "{long_term_memory}", longTermMemory)
-		systemPrompt = strings.ReplaceAll(systemPrompt, "{tool_description}", toolDescription)
+	// Build tool description for ReACT prompt
+	toolDescription := r.buildToolDescription(ctx)
+
+	// Use ReACT-specific system prompt with tool descriptions
+	systemPrompt := strings.ReplaceAll(entities.ReactAgentSystemPromptTemplate, "{preset_prompt}", r.agentConfig.PresetPrompt)
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{long_term_memory}", longTermMemory)
+	systemPrompt = strings.ReplaceAll(systemPrompt, "{tool_description}", toolDescription)
+
+	// Build message list
+	messages := []*schema.Message{schema.SystemMessage(systemPrompt)}
+
+	// Add history messages
+	if len(state.History) > 0 {
+		// Validate history format (should be alternating human/ai messages)
+		if len(state.History)%2 != 0 {
+			return fmt.Errorf("invalid history message format")
+		}
+		messages = append(messages, state.History...)
 	}
 
-	// 5.将短期历史消息添加到消息列表中
-	var presetMessages []llms.ChatMessage
-	presetMessages = append(presetMessages, llms.SystemChatMessage{Content: systemPrompt})
-
-	// 6.校验历史消息是不是复数形式，也就是[人类消息, AI消息, 人类消息, AI消息, ...]
-	if len(state.History)%2 != 0 {
-		r.queueManager.PublishError(state.TaskID, "智能体历史消息列表格式错误")
-		return fmt.Errorf("智能体历史消息列表格式错误, len(history)=%d", len(state.History))
-	}
-
-	// 7.拼接历史消息
-	presetMessages = append(presetMessages, state.History...)
-
-	// 8.拼接当前用户的提问消息
+	// Add current user message
 	if len(state.Messages) > 0 {
-		humanMessage := state.Messages[len(state.Messages)-1]
-		presetMessages = append(presetMessages, llms.HumanChatMessage{Content: humanMessage.GetContent()})
+		lastMsg := state.Messages[len(state.Messages)-1]
+		messages = append(messages, schema.UserMessage(lastMsg.Content))
 	}
 
-	// 9.处理预设消息，将预设消息添加到用户消息前，先去删除用户的原始消息，然后补充一个新的代替
-	// 在Go中，我们直接替换整个Messages数组
-	state.Messages = presetMessages
-
+	// Update state with prepared messages
+	state.Messages = messages
 	return nil
 }
 
-// llmNodeReACT 重写工具调用智能体的LLM节点
-func (r *ReACTAgent) llmNodeReACT(ctx context.Context, state *entities.AgentState) (bool, error) {
-	// 1.判断当前LLM是否支持tool_call，如果是则使用FunctionCallAgent的_llm_node
-	if r.supportsToolCall() {
-		return r.llmNode(ctx, *state)
+// reactLLMNode handles LLM processing with ReACT-specific logic
+func (r *ReactAgent) reactLLMNode(ctx context.Context, state *entities.AgentState, queueManager *AgentQueueManager) (bool, error) {
+	// Check if model supports tool calling, if so use parent implementation
+	if toolCallingModel, ok := r.llm.(model.ToolCallingChatModel); ok && len(r.agentConfig.Tools) > 0 {
+		_ = toolCallingModel // Use parent implementation
+		return r.llmNode(ctx, state, queueManager)
 	}
 
-	// 2.检测当前Agent迭代次数是否符合需求
+	// Check iteration count
 	if state.IterationCount > r.agentConfig.MaxIterationCount {
-		r.queueManager.Publish(state.TaskID, entities.AgentThought{
+		queueManager.Publish(state.TaskID, &entities.AgentThought{
 			ID:      uuid.New(),
 			TaskID:  state.TaskID,
 			Event:   entities.EventAgentMessage,
@@ -189,368 +200,275 @@ func (r *ReACTAgent) llmNodeReACT(ctx context.Context, state *entities.AgentStat
 		return true, nil
 	}
 
-	// 3.从智能体配置中提取大语言模型
 	id := uuid.New()
 	startTime := time.Now()
 
-	// 4.定义变量存储流式输出内容
-	var gathered strings.Builder
+	// Use streaming to detect tool calls vs regular messages
+	streamReader, err := r.llm.Stream(ctx, state.Messages)
+	if err != nil {
+		queueManager.PublishError(state.TaskID, fmt.Errorf("LLM streaming failed: %v", err))
+		return false, err
+	}
+
+	var gatheredContent strings.Builder
+	var generationType string // "thought" for tool calls, "message" for regular response
 	isFirstChunk := true
-	generationType := ""
 
-	// 5.转换ChatMessage到MessageContent
-	messageContents := r.convertChatMessagesToMessageContents(state.Messages)
-
-	// 6.流式输出调用LLM，并判断输出内容是否以"```json"为开头，用于区分工具调用和文本生成
-	response, err := r.llm.GenerateContent(ctx, messageContents, llms.WithStreamingFunc(func(ctx context.Context, chunk []byte) error {
-		content := string(chunk)
-
-		// 6.处理流式输出内容块叠加
-		if isFirstChunk {
-			gathered.WriteString(content)
-			isFirstChunk = false
-		} else {
-			gathered.WriteString(content)
+	// Process streaming chunks
+	for {
+		chunk, err := streamReader.Recv()
+		if err != nil {
+			break // End of stream
 		}
 
-		// 7.如果生成的是消息则提交智能体消息事件
-		if generationType == "message" {
-			// 8.提取片段内容并检测是否开启输出审核
-			reviewedContent := r.applyOutputReview(content)
+		gatheredContent.WriteString(chunk.Content)
 
-			r.queueManager.Publish(state.TaskID, entities.AgentThought{
+		// Determine generation type based on content
+		if generationType == "" && gatheredContent.Len() >= 7 {
+			content := strings.TrimSpace(gatheredContent.String())
+			if strings.HasPrefix(content, "```json") {
+				generationType = "thought"
+			} else {
+				generationType = "message"
+				// Publish the initial content to avoid missing first characters
+				r.publishMessageChunk(state.TaskID, id, content, startTime, queueManager)
+			}
+		}
+
+		// If it's a regular message, publish streaming chunks
+		if generationType == "message" && !isFirstChunk {
+			content := r.applyOutputReview(chunk.Content)
+			r.publishMessageChunk(state.TaskID, id, content, startTime, queueManager)
+		}
+
+		isFirstChunk = false
+	}
+
+	finalContent := gatheredContent.String()
+
+	// Handle tool calling (thought) generation
+	if generationType == "thought" {
+		toolCalls, err := r.parseToolCallFromContent(finalContent)
+		if err != nil {
+			// If parsing fails, treat as regular message
+			generationType = "message"
+			content := r.applyOutputReview(finalContent)
+			r.publishMessageChunk(state.TaskID, id, content, startTime, queueManager)
+		} else {
+			// Publish thought event
+			queueManager.Publish(state.TaskID, &entities.AgentThought{
 				ID:      id,
 				TaskID:  state.TaskID,
-				Event:   entities.EventAgentMessage,
-				Thought: reviewedContent,
-				Answer:  reviewedContent,
+				Event:   entities.EventAgentThought,
+				Thought: finalContent,
 				Latency: time.Since(startTime).Seconds(),
 			})
+
+			// Create AI message with tool calls
+			aiMessage := &schema.Message{
+				Role:      schema.Assistant,
+				Content:   "",
+				ToolCalls: toolCalls,
+			}
+			state.Messages = append(state.Messages, aiMessage)
+			state.IterationCount++
+			return false, nil // Continue processing (tools need to be executed)
+		}
+	}
+
+	// Handle regular message generation
+	if generationType == "message" {
+		// Publish final statistics
+		queueManager.Publish(state.TaskID, &entities.AgentThought{
+			ID:      id,
+			TaskID:  state.TaskID,
+			Event:   entities.EventAgentMessage,
+			Thought: "",
+			Answer:  "",
+			Latency: time.Since(startTime).Seconds(),
+		})
+
+		// Create AI message
+		aiMessage := &schema.Message{
+			Role:    schema.Assistant,
+			Content: r.applyOutputReview(finalContent),
+		}
+		state.Messages = append(state.Messages, aiMessage)
+		state.IterationCount++
+		return true, nil // End processing
+	}
+
+	return true, nil
+}
+
+// reactToolsNode handles tool execution with ReACT-specific message conversion
+func (r *ReactAgent) reactToolsNode(ctx context.Context, state *entities.AgentState, queueManager *AgentQueueManager) error {
+	// First execute tools using parent implementation
+	if err := r.toolsNode(ctx, state, queueManager); err != nil {
+		return err
+	}
+
+	// Find the AI message with tool calls and tool response messages
+	var toolCallMessage *schema.Message
+	var toolMessages []*schema.Message
+
+	// Find the last AI message with tool calls
+	for i := len(state.Messages) - 1; i >= 0; i-- {
+		msg := state.Messages[i]
+		if msg.Role == schema.Assistant && len(msg.ToolCalls) > 0 {
+			toolCallMessage = msg
+			break
+		}
+	}
+
+	// Find tool response messages after the tool call message
+	if toolCallMessage != nil {
+		for i := len(state.Messages) - 1; i >= 0; i-- {
+			msg := state.Messages[i]
+			if msg.Role == schema.Tool {
+				toolMessages = append([]*schema.Message{msg}, toolMessages...) // Prepend to maintain order
+			} else if msg == toolCallMessage {
+				break
+			}
+		}
+	}
+
+	if toolCallMessage != nil && len(toolMessages) > 0 {
+		// Remove the original AI tool call message from state
+		newMessages := make([]*schema.Message, 0, len(state.Messages))
+		for _, msg := range state.Messages {
+			if msg != toolCallMessage {
+				newMessages = append(newMessages, msg)
+			}
 		}
 
-		// 9.检测生成的类型是工具调用还是文本生成，同时赋值
-		if generationType == "" {
-			// 10.当生成内容的长度大于等于7(```json)长度时才可以判断出类型是什么
-			currentContent := strings.TrimSpace(gathered.String())
-			if len(currentContent) >= 7 {
-				if strings.HasPrefix(currentContent, "```json") {
-					generationType = "thought"
-				} else {
-					generationType = "message"
-					// 11.添加发布事件，避免前几个字符遗漏
-					r.queueManager.Publish(state.TaskID, entities.AgentThought{
-						ID:      id,
-						TaskID:  state.TaskID,
-						Event:   entities.EventAgentMessage,
-						Thought: currentContent,
-						Answer:  currentContent,
-						Latency: time.Since(startTime).Seconds(),
-					})
+		// Remove tool messages from state
+		for _, toolMsg := range toolMessages {
+			for i, msg := range newMessages {
+				if msg == toolMsg {
+					newMessages = append(newMessages[:i], newMessages[i+1:]...)
+					break
 				}
 			}
 		}
 
-		return nil
-	}))
-
-	if err != nil {
-		return false, fmt.Errorf("LLM generation failed: %w", err)
-	}
-
-	// 获取完整内容
-	content := gathered.String()
-	if response != nil && len(response.Choices) > 0 {
-		content = response.Choices[0].Content
-	}
-
-	// 8.计算LLM的输入+输出token总数 (简化实现)
-	inputTokenCount := r.estimateTokenCount(messageContents)
-	outputTokenCount := len(content) / 4 // 简化的token计算
-
-	// 9.获取输入/输出价格和单位 (简化实现)
-	inputPrice, outputPrice, unit := 0.0, 0.0, 1.0
-
-	// 10.计算总token+总成本
-	totalTokenCount := inputTokenCount + outputTokenCount
-	totalPrice := (float64(inputTokenCount)*inputPrice + float64(outputTokenCount)*outputPrice) * unit
-
-	// 12.如果类型为推理则解析json，并添加智能体消息
-	if generationType == "thought" {
-		toolCalls, err := r.parseToolCallFromContent(content)
-		if err != nil {
-			// 13.解析失败，当作普通消息处理
-			generationType = "message"
-			r.queueManager.Publish(state.TaskID, entities.AgentThought{
-				ID:      id,
-				TaskID:  state.TaskID,
-				Event:   entities.EventAgentMessage,
-				Thought: content,
-				Answer:  content,
-				Latency: time.Since(startTime).Seconds(),
-			})
-		} else {
-			r.queueManager.Publish(state.TaskID, entities.AgentThought{
-				ID:                id,
-				TaskID:            state.TaskID,
-				Event:             entities.EventAgentThought,
-				Thought:           content,
-				MessageTokenCount: inputTokenCount,
-				AnswerTokenCount:  outputTokenCount,
-				TotalTokenCount:   totalTokenCount,
-				TotalPrice:        totalPrice,
-				Latency:           time.Since(startTime).Seconds(),
-			})
-
-			// 创建工具调用消息
-			toolCallMsg := llms.AIChatMessage{
-				Content:   "",
-				ToolCalls: toolCalls,
+		// Create new AI message with JSON format (ReACT style)
+		if len(toolCallMessage.ToolCalls) > 0 {
+			toolCall := toolCallMessage.ToolCalls[0]
+			toolCallJSON := map[string]interface{}{
+				"name": toolCall.Function.Name,
+				"args": json.RawMessage(toolCall.Function.Arguments),
 			}
-			state.Messages = append(state.Messages, toolCallMsg)
-			state.IterationCount++
-			return false, nil
+			jsonBytes, _ := json.Marshal([]map[string]interface{}{toolCallJSON})
+			aiMessage := &schema.Message{
+				Role:    schema.Assistant,
+				Content: fmt.Sprintf("```json\n%s\n```", string(jsonBytes)),
+			}
+			newMessages = append(newMessages, aiMessage)
 		}
-	}
 
-	// 14.如果最终类型是message则表示已经拿到最终答案
-	if generationType == "message" {
-		r.queueManager.Publish(state.TaskID, entities.AgentThought{
-			ID:                id,
-			TaskID:            state.TaskID,
-			Event:             entities.EventAgentMessage,
-			Thought:           "",
-			Answer:            "",
-			MessageTokenCount: inputTokenCount,
-			AnswerTokenCount:  outputTokenCount,
-			TotalTokenCount:   totalTokenCount,
-			TotalPrice:        totalPrice,
-			Latency:           time.Since(startTime).Seconds(),
-		})
-
-		r.queueManager.Publish(state.TaskID, entities.AgentThought{
-			ID:     uuid.New(),
-			TaskID: state.TaskID,
-			Event:  entities.EventAgentEnd,
-		})
-
-		return true, nil
-	}
-
-	// 添加生成的消息到状态
-	aiMsg := llms.AIChatMessage{Content: content}
-	state.Messages = append(state.Messages, aiMsg)
-	state.IterationCount++
-
-	return false, nil
-}
-
-// toolsNodeReACT 重写工具节点，处理工具节点的`AI工具调用参数消息`与`工具消息转人类消息`
-func (r *ReACTAgent) toolsNodeReACT(state *entities.AgentState) error {
-	if len(state.Messages) == 0 {
-		return nil
-	}
-
-	lastMsg := state.Messages[len(state.Messages)-1]
-	aiMsg, ok := lastMsg.(llms.AIChatMessage)
-	if !ok || len(aiMsg.ToolCalls) == 0 {
-		return nil
-	}
-
-	// 1.调用工具节点执行并获取结果
-	toolResults := r.executeTools(aiMsg.ToolCalls, state.TaskID)
-
-	// 2.移除原始的AI工具调用参数消息，并创建新的ai消息
-	state.Messages = state.Messages[:len(state.Messages)-1]
-
-	// 3.提取工具调用的第1条消息还原原始AI消息(ReACTAgent一次最多只有一个工具调用)
-	if len(aiMsg.ToolCalls) > 0 {
-		toolCallJSON := map[string]any{
-			"name": aiMsg.ToolCalls[0].FunctionCall.Name,
-			"args": aiMsg.ToolCalls[0].FunctionCall.Arguments,
+		// Convert tool messages to human message
+		var contentBuilder strings.Builder
+		for _, toolMsg := range toolMessages {
+			contentBuilder.WriteString(fmt.Sprintf("工具: %s\n执行结果: %s\n==========\n\n",
+				toolMsg.ToolName, toolMsg.Content))
 		}
-		jsonBytes, _ := sonic.Marshal(toolCallJSON)
-		aiMessage := llms.AIChatMessage{Content: fmt.Sprintf("```json\n%s\n```", string(jsonBytes))}
-		state.Messages = append(state.Messages, aiMessage)
-	}
 
-	// 4.将ToolMessage转换成HumanMessage，提升LLM的兼容性
-	var content strings.Builder
-	for _, result := range toolResults {
-		content.WriteString(fmt.Sprintf("工具: %s\n执行结果: %s\n==========\n\n", result.Tool, result.Content))
-	}
+		humanMessage := &schema.Message{
+			Role:    schema.User,
+			Content: contentBuilder.String(),
+		}
+		newMessages = append(newMessages, humanMessage)
 
-	humanMessage := llms.HumanChatMessage{Content: content.String()}
-	state.Messages = append(state.Messages, humanMessage)
+		// Update state messages
+		state.Messages = newMessages
+	}
 
 	return nil
 }
 
-// Helper methods
-
-// convertChatMessagesToMessageContents 转换ChatMessage到MessageContent
-func (r *ReACTAgent) convertChatMessagesToMessageContents(messages []llms.ChatMessage) []llms.MessageContent {
-	var messageContents []llms.MessageContent
-
-	for _, msg := range messages {
-		var role llms.ChatMessageType
-		switch msg.GetType() {
-		case llms.ChatMessageTypeHuman:
-			role = llms.ChatMessageTypeHuman
-		case llms.ChatMessageTypeAI:
-			role = llms.ChatMessageTypeAI
-		case llms.ChatMessageTypeSystem:
-			role = llms.ChatMessageTypeSystem
-		case llms.ChatMessageTypeTool:
-			role = llms.ChatMessageTypeTool
-		default:
-			role = llms.ChatMessageTypeHuman
-		}
-
-		messageContent := llms.MessageContent{
-			Role:  role,
-			Parts: []llms.ContentPart{llms.TextPart(msg.GetContent())},
-		}
-
-		messageContents = append(messageContents, messageContent)
+// buildToolDescription builds tool description text for ReACT prompt
+func (r *ReactAgent) buildToolDescription(ctx context.Context) string {
+	if len(r.agentConfig.Tools) == 0 {
+		return ""
 	}
 
-	return messageContents
-}
-
-// supportsToolCall checks if the LLM supports tool calling
-func (r *ReACTAgent) supportsToolCall() bool {
-	// 这里需要根据你的LLM接口实现来判断
-	// 暂时返回false以使用ReACT模式
-	return false
-}
-
-// supportsAgentThought checks if the LLM supports agent thought
-func (r *ReACTAgent) supportsAgentThought() bool {
-	// 这里需要根据你的LLM接口实现来判断
-	return true
-}
-
-// renderToolDescription renders tool descriptions for the prompt
-func (r *ReACTAgent) renderToolDescription() string {
 	var descriptions []string
-	for _, tool := range r.agentConfig.Tools {
-		desc := fmt.Sprintf("%s - %s", tool.Name(), tool.Description())
-		descriptions = append(descriptions, desc)
+	for _, toolInterface := range r.agentConfig.Tools {
+		if tool, ok := toolInterface.(interface {
+			Info(context.Context) (*schema.ToolInfo, error)
+		}); ok {
+			toolInfo, err := tool.Info(ctx)
+			if err != nil {
+				continue
+			}
+
+			// Format: tool_name - description, args: {parameters}
+			argsJSON, _ := json.Marshal(toolInfo.ParamsOneOf)
+			description := fmt.Sprintf("%s - %s, args: %s",
+				toolInfo.Name, toolInfo.Desc, string(argsJSON))
+			descriptions = append(descriptions, description)
+		}
 	}
+
 	return strings.Join(descriptions, "\n")
 }
 
-// parseToolCallFromContent parses tool call information from LLM content
-func (r *ReACTAgent) parseToolCallFromContent(content string) ([]llms.ToolCall, error) {
-	// 13.使用正则解析信息，如果失败则当成普通消息返回
+// parseToolCallFromContent parses tool call information from ReACT-style content
+func (r *ReactAgent) parseToolCallFromContent(content string) ([]schema.ToolCall, error) {
+	// Use regex to extract JSON from ```json...``` blocks
 	re := regexp.MustCompile(pattern)
-	matches := re.FindStringSubmatch(content)
+	matches := re.FindStringSubmatch(strings.TrimSpace(content))
+
 	if len(matches) < 2 {
-		return nil, fmt.Errorf("no JSON found in content")
+		return nil, fmt.Errorf("no JSON block found in content")
 	}
 
-	var toolCallData map[string]any
-	jsonContent := strings.TrimSpace(matches[1])
-	if err := sonic.Unmarshal([]byte(jsonContent), &toolCallData); err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	// Parse the JSON
+	var toolCallData map[string]interface{}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(matches[1])), &toolCallData); err != nil {
+		return nil, fmt.Errorf("failed to parse tool call JSON: %w", err)
 	}
 
+	// Extract tool name and args
 	name, ok := toolCallData["name"].(string)
 	if !ok {
-		return nil, fmt.Errorf("tool name not found")
+		return nil, fmt.Errorf("tool name not found or not a string")
 	}
 
-	args, ok := toolCallData["args"].(map[string]any)
+	args, ok := toolCallData["args"]
 	if !ok {
-		args = make(map[string]any)
+		args = map[string]interface{}{}
 	}
 
-	argsJSON, _ := sonic.Marshal(args)
+	// Convert args to JSON string
+	argsJSON, err := json.Marshal(args)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tool args: %w", err)
+	}
 
-	toolCall := llms.ToolCall{
+	// Create tool call
+	toolCall := schema.ToolCall{
 		ID:   uuid.New().String(),
 		Type: "function",
-		FunctionCall: &llms.FunctionCall{
+		Function: schema.FunctionCall{
 			Name:      name,
 			Arguments: string(argsJSON),
 		},
 	}
 
-	return []llms.ToolCall{toolCall}, nil
+	return []schema.ToolCall{toolCall}, nil
 }
 
-// estimateTokenCount provides a simple token count estimation
-func (r *ReACTAgent) estimateTokenCount(messages []llms.MessageContent) int {
-	totalChars := 0
-	for _, msg := range messages {
-		for _, part := range msg.Parts {
-			if textPart, ok := part.(llms.TextContent); ok {
-				totalChars += len(textPart.Text)
-			}
-		}
-	}
-	// Rough estimation: 4 characters per token
-	return totalChars / 4
-}
-
-// executeTools executes the given tool calls
-func (r *ReACTAgent) executeTools(toolCalls []llms.ToolCall, taskID uuid.UUID) []ToolResult {
-	var results []ToolResult
-
-	// Convert tools to map for easy lookup
-	toolsMap := make(map[string]tools.Tool)
-	for _, tool := range r.agentConfig.Tools {
-		toolsMap[tool.Name()] = tool
-	}
-
-	for _, toolCall := range toolCalls {
-		id := uuid.New()
-		startTime := time.Now()
-
-		var result string
-		var toolName string
-
-		if toolCall.FunctionCall != nil {
-			toolName = toolCall.FunctionCall.Name
-			if tool, exists := toolsMap[toolName]; exists {
-				// Execute tool
-				if toolResult, err := tool.Call(context.Background(), toolCall.FunctionCall.Arguments); err == nil {
-					result = toolResult
-				} else {
-					result = fmt.Sprintf("工具执行出错: %s", err.Error())
-				}
-			} else {
-				result = fmt.Sprintf("工具不存在: %s", toolName)
-			}
-		}
-
-		// Publish tool execution event
-		event := entities.EventAgentAction
-		if toolName == entities.DatasetRetrievalToolName {
-			event = entities.EventDatasetRetrieval
-		}
-
-		r.queueManager.Publish(taskID, entities.AgentThought{
-			ID:          id,
-			TaskID:      taskID,
-			Event:       event,
-			Observation: result,
-			Tool:        toolName,
-			ToolInput:   map[string]any{"args": toolCall.FunctionCall.Arguments},
-			Latency:     time.Since(startTime).Seconds(),
-		})
-
-		results = append(results, ToolResult{
-			Tool:    toolName,
-			Content: result,
-		})
-	}
-
-	return results
-}
-
-// ToolResult represents the result of a tool execution
-type ToolResult struct {
-	Tool    string
-	Content string
+// publishMessageChunk publishes a message chunk for streaming
+func (r *ReactAgent) publishMessageChunk(taskID uuid.UUID, id uuid.UUID, content string, startTime time.Time, queueManager *AgentQueueManager) {
+	reviewedContent := r.applyOutputReview(content)
+	queueManager.Publish(taskID, &entities.AgentThought{
+		ID:      id,
+		TaskID:  taskID,
+		Event:   entities.EventAgentMessage,
+		Thought: reviewedContent,
+		Answer:  reviewedContent,
+		Latency: time.Since(startTime).Seconds(),
+	})
 }

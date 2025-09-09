@@ -1,13 +1,16 @@
 package retrievers
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/cloudwego/eino/components/embedding"
+	"github.com/cloudwego/eino/components/retriever"
+	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/vectorstores"
 	"gorm.io/gorm"
 
-	"github.com/crazyfrankie/voidx/internal/core/embedding"
+	"github.com/crazyfrankie/voidx/infra/contract/document/vecstore"
 )
 
 // RetrieverType 检索器类型
@@ -25,51 +28,69 @@ const (
 // RetrieverFactory 检索器工厂，负责创建不同类型的检索器
 type RetrieverFactory struct {
 	db           *gorm.DB
-	VectorStore  vectorstores.VectorStore
-	Embedder     *embedding.EmbeddingService
-	JiebaService *JiebaService
+	vectorStore  vecstore.SearchStore
+	embedder     embedding.Embedder
+	jiebaService *JiebaService
 }
 
 // NewRetrieverFactory 创建一个新的检索器工厂
-func NewRetrieverFactory(db *gorm.DB, vectorStore vectorstores.VectorStore, embedder *embedding.EmbeddingService, jiebaService *JiebaService) *RetrieverFactory {
+func NewRetrieverFactory(
+	db *gorm.DB,
+	vectorStore vecstore.SearchStore,
+	embedder embedding.Embedder,
+	jiebaService *JiebaService,
+) *RetrieverFactory {
 	return &RetrieverFactory{
 		db:           db,
-		VectorStore:  vectorStore,
-		Embedder:     embedder,
-		JiebaService: jiebaService,
+		vectorStore:  vectorStore,
+		embedder:     embedder,
+		jiebaService: jiebaService,
 	}
 }
 
-// CreateRetriever 根据类型创建检索器
-func (f *RetrieverFactory) CreateRetriever(retrieverType RetrieverType, datasetIDs []uuid.UUID,
-	options map[string]any) (any, error) {
+// CreateRetriever 根据类型创建检索器，支持多个数据集ID
+func (f *RetrieverFactory) CreateRetriever(ctx context.Context, retrieverType RetrieverType,
+	datasetIDs []uuid.UUID, options map[string]any) (retriever.Retriever, error) {
+	// 验证参数
+	if len(datasetIDs) == 0 {
+		return nil, fmt.Errorf("datasetIDs cannot be empty")
+	}
+
 	switch retrieverType {
 	case RetrieverTypeFullText:
-		return f.createFullTextRetriever(f.db, datasetIDs, options), nil
+		return f.createFullTextRetriever(ctx, datasetIDs)
 	case RetrieverTypeSemantic:
-		return f.createSemanticRetriever(datasetIDs, options), nil
+		return f.createSemanticRetriever(ctx, datasetIDs, options)
 	case RetrieverTypeHybrid:
-		return f.createHybridRetriever(f.db, datasetIDs, options), nil
+		return f.createHybridRetriever(ctx, datasetIDs, options)
 	default:
 		return nil, fmt.Errorf("unsupported retriever type: %s", retrieverType)
 	}
 }
 
-// createFullTextRetriever 创建全文检索器
-func (f *RetrieverFactory) createFullTextRetriever(db *gorm.DB, datasetIDs []uuid.UUID, options map[string]any) *FullTextRetriever {
-	return NewFullTextRetriever(db, datasetIDs, f.JiebaService, options)
+// createFullTextRetriever 创建全文检索器，支持多个数据集
+func (f *RetrieverFactory) createFullTextRetriever(ctx context.Context, datasetIDs []uuid.UUID) (retriever.Retriever, error) {
+	return NewFullTextRetriever(f.db, datasetIDs, f.jiebaService), nil
 }
 
-// createSemanticRetriever 创建语义检索器
-func (f *RetrieverFactory) createSemanticRetriever(datasetIDs []uuid.UUID, options map[string]any) *SemanticRetriever {
-	return NewSemanticRetriever(f.VectorStore, f.Embedder, datasetIDs, options)
+// createSemanticRetriever 创建语义检索器，支持多个数据集
+func (f *RetrieverFactory) createSemanticRetriever(ctx context.Context, datasetIDs []uuid.UUID, options map[string]any) (retriever.Retriever, error) {
+	return NewSemanticRetriever(f.db, f.embedder), nil
 }
 
-// createHybridRetriever 创建混合检索器
-func (f *RetrieverFactory) createHybridRetriever(db *gorm.DB, datasetIDs []uuid.UUID, options map[string]any) *HybridRetriever {
-	fullTextRetriever := f.createFullTextRetriever(db, datasetIDs, options)
-	semanticRetriever := f.createSemanticRetriever(datasetIDs, options)
-	return NewHybridRetriever(fullTextRetriever, semanticRetriever, datasetIDs, options)
+// createHybridRetriever 创建混合检索器，支持多个数据集
+func (f *RetrieverFactory) createHybridRetriever(ctx context.Context, datasetIDs []uuid.UUID, options map[string]any) (retriever.Retriever, error) {
+	fullTextRetriever, err := f.createFullTextRetriever(ctx, datasetIDs)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create full text retriever: %w", err)
+	}
+
+	semanticRetriever, err := f.createSemanticRetriever(ctx, datasetIDs, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create semantic retriever: %w", err)
+	}
+
+	return NewHybridRetriever(fullTextRetriever, semanticRetriever, datasetIDs, options), nil
 }
 
 // ValidateDatasetAccess 验证用户对数据集的访问权限
@@ -81,8 +102,11 @@ func (f *RetrieverFactory) ValidateDatasetAccess(userID uuid.UUID, datasetIDs []
 	var validDatasetIDs []uuid.UUID
 
 	// 查询用户有权限访问的数据集
-	query := `SELECT id FROM datasets WHERE id IN ? AND account_id = ?`
-	err := f.db.Raw(query, datasetIDs, userID).Scan(&validDatasetIDs).Error
+	err := f.db.Model(&entity.Dataset{}).
+		Select("id").
+		Where("id IN ? AND account_id = ?", datasetIDs, userID).
+		Scan(&validDatasetIDs).
+		Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate dataset access: %w", err)
 	}
@@ -92,13 +116,14 @@ func (f *RetrieverFactory) ValidateDatasetAccess(userID uuid.UUID, datasetIDs []
 
 // RecordDatasetQuery 记录数据集查询历史
 func (f *RetrieverFactory) RecordDatasetQuery(userID uuid.UUID, datasetID uuid.UUID, query string, source string) error {
-	// 插入查询记录
-	insertQuery := `
-		INSERT INTO dataset_queries (id, dataset_id, content, source, created_by, created_at) 
-		VALUES (gen_random_uuid(), ?, ?, ?, ?, NOW())
-	`
+	datasetQuery := &entity.DatasetQuery{
+		DatasetID: datasetID,
+		Query:     query,
+		Source:    source,
+		CreatedBy: userID,
+	}
 
-	err := f.db.Exec(insertQuery, datasetID, query, source, userID).Error
+	err := f.db.Create(datasetQuery).Error
 	if err != nil {
 		return fmt.Errorf("failed to record dataset query: %w", err)
 	}
@@ -112,9 +137,11 @@ func (f *RetrieverFactory) UpdateSegmentHitCount(segmentIDs []uuid.UUID) error {
 		return nil
 	}
 
-	// 批量更新片段命中次数
-	updateQuery := `UPDATE segments SET hit_count = hit_count + 1 WHERE id IN ?`
-	err := f.db.Exec(updateQuery, segmentIDs).Error
+	err := f.db.Model(&entity.Segment{}).
+		Where("id IN ?", segmentIDs).
+		Update("hit_count", gorm.Expr("hit_count + 1")).
+		Error
+
 	if err != nil {
 		return fmt.Errorf("failed to update segment hit count: %w", err)
 	}

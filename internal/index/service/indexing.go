@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
-	milvusentity "github.com/milvus-io/milvus-sdk-go/v2/entity"
 	"github.com/redis/go-redis/v9"
-	"github.com/tmc/langchaingo/schema"
 
+	"github.com/crazyfrankie/voidx/infra/contract/document/vecstore"
 	"github.com/crazyfrankie/voidx/internal/core/embedding"
 	"github.com/crazyfrankie/voidx/internal/core/file_extractor"
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
@@ -20,7 +20,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"github.com/crazyfrankie/voidx/internal/retriever"
-	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/pkg/sonic"
 	"github.com/crazyfrankie/voidx/pkg/util"
@@ -29,14 +28,14 @@ import (
 )
 
 type IndexingService struct {
-	repo                  *repository.IndexingRepo
-	redisClient           redis.Cmdable
-	fileExtractor         *file_extractor.FileExtractor
-	processRuleService    *process_rule.Service
-	embeddingsService     *embedding.EmbeddingService
-	jiebaService          *retrievers.JiebaService
-	keywordTableService   *retriever.KeyWordService
-	vectorDatabaseService *vecstore.VecStoreService
+	repo                *repository.IndexingRepo
+	redisClient         redis.Cmdable
+	fileExtractor       *file_extractor.FileExtractor
+	processRuleService  *process_rule.Service
+	embeddingsService   *embedding.EmbeddingService
+	jiebaService        *retrievers.JiebaService
+	keywordTableService *retriever.KeyWordService
+	vectorStore         vecstore.SearchStore
 }
 
 func NewIndexingService(
@@ -47,17 +46,17 @@ func NewIndexingService(
 	embeddingsService *embedding.EmbeddingService,
 	jiebaService *retrievers.JiebaService,
 	keywordTableService *retriever.KeyWordService,
-	vectorDatabaseService *vecstore.VecStoreService,
+	vectorStore vecstore.SearchStore,
 ) *IndexingService {
 	return &IndexingService{
-		repo:                  repo,
-		redisClient:           redisClient,
-		fileExtractor:         fileExtractor,
-		processRuleService:    processRuleService,
-		embeddingsService:     embeddingsService,
-		jiebaService:          jiebaService,
-		keywordTableService:   keywordTableService,
-		vectorDatabaseService: vectorDatabaseService,
+		repo:                repo,
+		redisClient:         redisClient,
+		fileExtractor:       fileExtractor,
+		processRuleService:  processRuleService,
+		embeddingsService:   embeddingsService,
+		jiebaService:        jiebaService,
+		keywordTableService: keywordTableService,
+		vectorStore:         vectorStore,
 	}
 }
 
@@ -164,9 +163,11 @@ func (s *IndexingService) UpdateDocumentEnabled(ctx context.Context, documentID 
 
 	// 4. 执行循环遍历所有node_ids并更新向量数据
 	for _, nodeID := range nodeIDs {
-		nodeIDColumn := milvusentity.NewColumnString("uuid", []string{nodeID.String()})
-		enabledColumn := milvusentity.NewColumnBool("document_enabled", []bool{document.Enabled})
-		err := s.vectorDatabaseService.UpdateDocument(ctx, nodeIDColumn, enabledColumn)
+		//enabledColumn := milvusentity.NewColumnBool("document_enabled", []bool{document.Enabled})
+		err := s.vectorStore.Delete(ctx, []string{nodeID.String()})
+		_, err = s.vectorStore.Store(ctx, []*schema.Document{{MetaData: map[string]any{
+			"document_enabled": document.Enabled,
+		}}})
 		if err != nil {
 			// 更新片段状态为错误
 			now := time.Now().UnixMilli()
@@ -218,7 +219,7 @@ func (s *IndexingService) DeleteDocument(ctx context.Context, datasetID, documen
 	}
 
 	// 2. 调用向量数据库删除其关联记录
-	err = s.vectorDatabaseService.DeleteDocumentsByID(ctx, "document_id", documentID.String())
+	err = s.vectorStore.Delete(ctx, []string{documentID.String()})
 	if err != nil {
 		logs.Errorf("Failed to delete vector database records: %v", err)
 	}
@@ -265,17 +266,19 @@ func (s *IndexingService) DeleteDataset(ctx context.Context, datasetID uuid.UUID
 	}
 
 	// 5. 调用向量数据库删除知识库的关联记录
-	err = s.vectorDatabaseService.DeleteDocumentsByID(ctx, "dataset_id", datasetID.String())
-	if err != nil {
-		logs.Errorf("Failed to delete vector database dataset records: %v", err)
-	}
+	// 需要根据实际的向量存储实现来删除知识库相关文档
+	// 这里暂时注释掉，因为SearchStore接口没有DeleteDocumentsByID方法
+	// err = s.vectorStore.Delete(ctx, datasetNodeIDs)
+	// if err != nil {
+	//	logs.Errorf("Failed to delete vector database dataset records: %v", err)
+	// }
 
 	return nil
 }
 
-// parsing 解析传递的文档为LangChain文档列表
-func (s *IndexingService) parsing(ctx context.Context, document *entity.Document) ([]schema.Document, error) {
-	// 1. 获取upload_file并加载LangChain文档
+// parsing 解析传递的文档为eino文档列表
+func (s *IndexingService) parsing(ctx context.Context, document *entity.Document) ([]*schema.Document, error) {
+	// 1. 获取upload_file并加载文档
 	uploadFile, err := s.repo.GetUploadFileByID(ctx, document.UploadFileID)
 	if err != nil {
 		return nil, err
@@ -286,15 +289,15 @@ func (s *IndexingService) parsing(ctx context.Context, document *entity.Document
 		return nil, err
 	}
 
-	// 2. 循环处理LangChain文档，并删除多余的空白字符串
+	// 2. 循环处理文档，并删除多余的空白字符串
 	for _, lcDocument := range lcDocuments {
-		lcDocument.PageContent = s.cleanExtraText(lcDocument.PageContent)
+		lcDocument.Content = s.cleanExtraText(lcDocument.Content)
 	}
 
 	// 3. 更新文档状态并记录时间
 	var characterCount int
 	for _, lcDocument := range lcDocuments {
-		characterCount += len(lcDocument.PageContent)
+		characterCount += len(lcDocument.Content)
 	}
 
 	now := time.Now().UnixMilli()
@@ -311,7 +314,7 @@ func (s *IndexingService) parsing(ctx context.Context, document *entity.Document
 }
 
 // splitting 根据传递的信息进行文档分割，拆分成小块片段
-func (s *IndexingService) splitting(ctx context.Context, document *entity.Document, lcDocuments []schema.Document) ([]schema.Document, error) {
+func (s *IndexingService) splitting(ctx context.Context, document *entity.Document, lcDocuments []*schema.Document) ([]*schema.Document, error) {
 	// 1. 根据process_rule获取文本分割器
 	processRule, err := s.repo.GetProcessRuleByID(ctx, document.ProcessRuleID)
 	if err != nil {
@@ -329,25 +332,25 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 
 	// 2. 按照process_rule规则清除多余的字符串
 	for _, lcDocument := range lcDocuments {
-		cleanedText, err := s.processRuleService.CleanTextByProcessRule(ctx, lcDocument.PageContent, processRule)
+		cleanedText, err := s.processRuleService.CleanTextByProcessRule(ctx, lcDocument.Content, processRule)
 		if err != nil {
 			return nil, err
 		}
-		lcDocument.PageContent = cleanedText
+		lcDocument.Content = cleanedText
 	}
 
 	// 3. 分割文档列表为片段列表
-	var lcSegments []schema.Document
+	var lcSegments []*schema.Document
 	for _, lcDocument := range lcDocuments {
-		chunks, err := textSplitter.SplitText(lcDocument.PageContent)
+		chunks, err := textSplitter.SplitText(lcDocument.Content)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, chunk := range chunks {
-			lcSegments = append(lcSegments, schema.Document{
-				PageContent: chunk,
-				Metadata:    lcDocument.Metadata,
+			lcSegments = append(lcSegments, &schema.Document{
+				Content:  chunk,
+				MetaData: lcDocument.MetaData,
 			})
 		}
 	}
@@ -362,7 +365,7 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 	var segments []*entity.Segment
 	for _, lcSegment := range lcSegments {
 		maxPosition++
-		content := lcSegment.PageContent
+		content := lcSegment.Content
 		nodeID := uuid.New()
 
 		segment := &entity.Segment{
@@ -384,7 +387,7 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 			return nil, err
 		}
 
-		lcSegment.Metadata = map[string]any{
+		lcSegment.MetaData = map[string]any{
 			"account_id":       document.AccountID.String(),
 			"dataset_id":       document.DatasetID.String(),
 			"document_id":      document.ID.String(),
@@ -417,13 +420,13 @@ func (s *IndexingService) splitting(ctx context.Context, document *entity.Docume
 }
 
 // indexing 根据传递的信息构建索引，涵盖关键词提取、词表构建
-func (s *IndexingService) indexing(ctx context.Context, document *entity.Document, lcSegments []schema.Document) error {
+func (s *IndexingService) indexing(ctx context.Context, document *entity.Document, lcSegments []*schema.Document) error {
 	for _, lcSegment := range lcSegments {
 		// 1. 提取每一个片段对应的关键词，关键词的数量最多不超过10个
-		keywords := s.jiebaService.ExtractKeywords(lcSegment.PageContent, 10)
+		keywords := s.jiebaService.ExtractKeywords(lcSegment.Content, 10)
 
 		// 2. 逐条更新文档片段的关键词
-		segmentID, _ := uuid.Parse(lcSegment.Metadata["segment_id"].(string))
+		segmentID, _ := uuid.Parse(lcSegment.MetaData["segment_id"].(string))
 		now := time.Now().UnixMilli()
 		keywordsJSON, _ := sonic.Marshal(keywords)
 
@@ -453,7 +456,7 @@ func (s *IndexingService) indexing(ctx context.Context, document *entity.Documen
 			}
 
 			// 检查是否已存在该片段ID
-			segmentIDStr := lcSegment.Metadata["segment_id"].(string)
+			segmentIDStr := lcSegment.MetaData["segment_id"].(string)
 			found := false
 			for _, existingID := range keywordTable[keyword] {
 				if existingID == segmentIDStr {
@@ -485,11 +488,11 @@ func (s *IndexingService) indexing(ctx context.Context, document *entity.Documen
 }
 
 // completed 存储文档片段到向量数据库，并完成状态更新
-func (s *IndexingService) completed(ctx context.Context, document *entity.Document, lcSegments []schema.Document) error {
+func (s *IndexingService) completed(ctx context.Context, document *entity.Document, lcSegments []*schema.Document) error {
 	// 1. 循环遍历片段列表数据，将文档状态及片段状态设置成True
 	for _, lcSegment := range lcSegments {
-		lcSegment.Metadata["document_enabled"] = true
-		lcSegment.Metadata["segment_enabled"] = true
+		lcSegment.MetaData["document_enabled"] = true
+		lcSegment.MetaData["segment_enabled"] = true
 	}
 
 	// 2. 调用向量数据库，每次存储10条数据，避免一次传递过多的数据
@@ -502,17 +505,17 @@ func (s *IndexingService) completed(ctx context.Context, document *entity.Docume
 
 		chunks := lcSegments[i:end]
 		var nodeIDs []uuid.UUID
-		var documents []schema.Document
+		var documents []*schema.Document
 
 		for _, chunk := range chunks {
-			documents = append(documents, schema.Document{
-				PageContent: chunk.PageContent,
-				Metadata:    chunk.Metadata,
+			documents = append(documents, &schema.Document{
+				Content:  chunk.Content,
+				MetaData: chunk.MetaData,
 			})
 		}
 
 		// 存储到向量数据库
-		_, err := s.vectorDatabaseService.AddDocument(ctx, documents)
+		_, err := s.vectorStore.Store(ctx, documents)
 		if err != nil {
 			logs.Errorf("Failed to build document segment index: %v", err)
 

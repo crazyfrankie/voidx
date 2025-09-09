@@ -6,184 +6,258 @@ import (
 	"sync"
 	"time"
 
-	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
 	"github.com/crazyfrankie/voidx/internal/core/agent/entities"
+	"github.com/crazyfrankie/voidx/types/consts"
 )
 
-// AgentQueueManager manages the agent's event queue
-type AgentQueueManager struct {
+// AgentQueueManagerFactory 智能体队列管理器工厂
+type AgentQueueManagerFactory struct {
 	redisClient redis.Cmdable
-	mu          sync.RWMutex
-	queues      map[uuid.UUID]chan entities.AgentThought
+	managers    sync.Map // key: string(userID-invokeFrom), value: *AgentQueueManager
 }
 
-// NewAgentQueueManager creates a new AgentQueueManager
-func NewAgentQueueManager(redisClient redis.Cmdable) *AgentQueueManager {
-	return &AgentQueueManager{
+// NewAgentQueueManagerFactory 创建队列管理器工厂
+func NewAgentQueueManagerFactory(redisClient redis.Cmdable) *AgentQueueManagerFactory {
+	return &AgentQueueManagerFactory{
 		redisClient: redisClient,
-		queues:      make(map[uuid.UUID]chan entities.AgentThought),
 	}
 }
 
-// Listen creates a new queue for the specified task and returns a channel for receiving thoughts
-func (m *AgentQueueManager) Listen(taskID uuid.UUID, userID uuid.UUID, invokeFrom consts.InvokeFrom) (<-chan entities.AgentThought, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+// GetOrCreateManager 获取或创建队列管理器（推荐用于长期任务）
+func (f *AgentQueueManagerFactory) GetOrCreateManager(userID uuid.UUID, invokeFrom consts.InvokeFrom) *AgentQueueManager {
+	key := fmt.Sprintf("%s-%s", userID.String(), invokeFrom)
 
-	if _, exists := m.queues[taskID]; exists {
-		return nil, fmt.Errorf("queue already exists for task %s", taskID)
+	if manager, exists := f.managers.Load(key); exists {
+		return manager.(*AgentQueueManager)
 	}
 
-	// Create queue channel
-	queue := make(chan entities.AgentThought, 100)
-	m.queues[taskID] = queue
-
-	// Set task belong cache key
-	userPrefix := "account"
-	if invokeFrom == consts.InvokeFromEndUser {
-		userPrefix = "end-user"
+	// 创建新的管理器
+	manager := &AgentQueueManager{
+		userID:      userID,
+		invokeFrom:  invokeFrom,
+		redisClient: f.redisClient,
+		queues:      make(map[string]chan *entities.AgentThought),
+		factory:     f, // 反向引用，用于清理
+		managerKey:  key,
 	}
 
-	ctx := context.Background()
-	belongKey := generateTaskBelongCacheKey(taskID)
-	err := m.redisClient.SetEx(ctx, belongKey, fmt.Sprintf("%s-%s", userPrefix, userID.String()), 30*time.Minute).Err()
-	if err != nil {
-		close(queue)
-		delete(m.queues, taskID)
-		return nil, fmt.Errorf("failed to set task belong cache: %w", err)
-	}
-
-	// Start listening goroutine
-	go m.listenLoop(taskID, queue)
-
-	return queue, nil
+	// 存储到 map 中
+	f.managers.Store(key, manager)
+	return manager
 }
 
-// listenLoop handles the listening loop with timeout and ping logic
-func (m *AgentQueueManager) listenLoop(taskID uuid.UUID, queue chan entities.AgentThought) {
-	defer func() {
-		m.mu.Lock()
-		close(queue)
-		delete(m.queues, taskID)
-		m.mu.Unlock()
+// CreateManager 为特定用户和调用来源创建临时队列管理器（用于一次性任务）
+func (f *AgentQueueManagerFactory) CreateManager(userID uuid.UUID, invokeFrom consts.InvokeFrom) *AgentQueueManager {
+	return &AgentQueueManager{
+		userID:      userID,
+		invokeFrom:  invokeFrom,
+		redisClient: f.redisClient,
+		queues:      make(map[string]chan *entities.AgentThought),
+	}
+}
+
+// RemoveManager 移除管理器（通常在用户会话结束时调用）
+func (f *AgentQueueManagerFactory) RemoveManager(userID uuid.UUID, invokeFrom consts.InvokeFrom) {
+	key := fmt.Sprintf("%s-%s", userID.String(), invokeFrom)
+	if manager, exists := f.managers.LoadAndDelete(key); exists {
+		manager.(*AgentQueueManager).Close()
+	}
+}
+
+// StopTask 停止特定任务（用于 StopDebug 等场景）
+func (f *AgentQueueManagerFactory) StopTask(ctx context.Context, taskID uuid.UUID, userID uuid.UUID, invokeFrom consts.InvokeFrom) error {
+	return SetStopFlag(ctx, f.redisClient, taskID, invokeFrom, userID)
+}
+
+// AgentQueueManager 智能体队列管理器
+type AgentQueueManager struct {
+	userID      uuid.UUID
+	invokeFrom  consts.InvokeFrom
+	redisClient redis.Cmdable
+	queues      map[string]chan *entities.AgentThought
+	mu          sync.RWMutex
+
+	// 用于持久化管理器的字段
+	factory    *AgentQueueManagerFactory // 反向引用工厂
+	managerKey string                    // 在工厂中的键
+}
+
+// Listen 监听队列返回的生成式数据
+func (aqm *AgentQueueManager) Listen(ctx context.Context, taskID uuid.UUID) (<-chan *entities.AgentThought, error) {
+	// 创建输出通道
+	outputChan := make(chan *entities.AgentThought, 100)
+
+	// 获取或创建任务队列
+	queue := aqm.getQueue(taskID)
+
+	// 启动监听协程
+	go func() {
+		defer close(outputChan)
+
+		// 定义基础数据记录超时时间、开始时间、最后一次ping通时间
+		listenTimeout := 600 * time.Second
+		startTime := time.Now()
+		lastPingTime := int64(0)
+
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		pingTicker := time.NewTicker(10 * time.Second)
+		defer pingTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case item := <-queue:
+				if item == nil {
+					return // 队列已关闭
+				}
+				select {
+				case outputChan <- item:
+				case <-ctx.Done():
+					return
+				}
+			case <-pingTicker.C:
+				// 每10秒发起一个ping请求
+				elapsed := time.Since(startTime)
+				currentPingTime := int64(elapsed.Seconds()) / 10
+				if currentPingTime > lastPingTime {
+					pingThought := &entities.AgentThought{
+						ID:        uuid.New(),
+						TaskID:    taskID,
+						Event:     entities.EventPing,
+						CreatedAt: time.Now(),
+					}
+					aqm.Publish(taskID, pingThought)
+					lastPingTime = currentPingTime
+				}
+
+				// 判断总耗时是否超时
+				if elapsed >= listenTimeout {
+					timeoutThought := &entities.AgentThought{
+						ID:        uuid.New(),
+						TaskID:    taskID,
+						Event:     entities.EventTimeout,
+						CreatedAt: time.Now(),
+					}
+					aqm.Publish(taskID, timeoutThought)
+				}
+
+				// 检测是否停止
+				if aqm.isStopped(ctx, taskID) {
+					stopThought := &entities.AgentThought{
+						ID:        uuid.New(),
+						TaskID:    taskID,
+						Event:     entities.EventStop,
+						CreatedAt: time.Now(),
+					}
+					aqm.Publish(taskID, stopThought)
+				}
+			}
+		}
 	}()
 
-	listenTimeout := 10 * time.Minute
-	startTime := time.Now()
-	lastPingTime := int64(0)
-	pingTicker := time.NewTicker(10 * time.Second)
-	defer pingTicker.Stop()
+	return outputChan, nil
+}
 
-	for {
-		select {
-		case <-pingTicker.C:
-			elapsed := time.Since(startTime)
-			currentPingTime := int64(elapsed.Seconds()) / 10
+// StopListen 停止监听队列信息
+func (aqm *AgentQueueManager) StopListen(taskID uuid.UUID) {
+	aqm.mu.Lock()
+	defer aqm.mu.Unlock()
 
-			// Send ping every 10 seconds
-			if currentPingTime > lastPingTime {
-				m.Publish(taskID, entities.AgentThought{
-					ID:     uuid.New(),
-					TaskID: taskID,
-					Event:  entities.EventPing,
-				})
-				lastPingTime = currentPingTime
-			}
-
-			// Check timeout
-			if elapsed >= listenTimeout {
-				m.Publish(taskID, entities.AgentThought{
-					ID:     uuid.New(),
-					TaskID: taskID,
-					Event:  entities.EventTimeout,
-				})
-				return
-			}
-
-			// Check if stopped
-			if m.isStopped(taskID) {
-				m.Publish(taskID, entities.AgentThought{
-					ID:     uuid.New(),
-					TaskID: taskID,
-					Event:  entities.EventStop,
-				})
-				return
-			}
-
-		default:
-			time.Sleep(100 * time.Millisecond)
-		}
+	taskIDStr := taskID.String()
+	if queue, exists := aqm.queues[taskIDStr]; exists {
+		close(queue)
+		delete(aqm.queues, taskIDStr)
 	}
 }
 
-// Publish publishes a thought to the specified task queue
-func (m *AgentQueueManager) Publish(taskID uuid.UUID, thought entities.AgentThought) error {
-	m.mu.RLock()
-	queue, exists := m.queues[taskID]
-	m.mu.RUnlock()
-
-	if !exists {
-		return fmt.Errorf("queue not found for task %s", taskID)
-	}
+// Publish 发布事件信息到队列
+func (aqm *AgentQueueManager) Publish(taskID uuid.UUID, agentThought *entities.AgentThought) {
+	// 将事件添加到队列中
+	queue := aqm.getQueue(taskID)
+	agentThought.CreatedAt = time.Now()
 
 	select {
-	case queue <- thought:
-		// Check if this is a terminating event
-		if thought.Event == entities.EventStop ||
-			thought.Event == entities.EventError ||
-			thought.Event == entities.EventTimeout ||
-			thought.Event == entities.EventAgentEnd {
-			m.stopListen(taskID)
-		}
-		return nil
+	case queue <- agentThought:
 	default:
-		return fmt.Errorf("queue is full for task %s", taskID)
+		// 队列已满，跳过此消息以防止阻塞
+	}
+
+	// 检测事件类型是否为需要停止的类型
+	if agentThought.Event == entities.EventStop ||
+		agentThought.Event == entities.EventError ||
+		agentThought.Event == entities.EventTimeout ||
+		agentThought.Event == entities.EventAgentEnd {
+		aqm.StopListen(taskID)
 	}
 }
 
-// PublishError publishes an error event to the specified task queue
-func (m *AgentQueueManager) PublishError(taskID uuid.UUID, errMsg string) error {
-	return m.Publish(taskID, entities.AgentThought{
+// PublishError 发布错误信息到队列
+func (aqm *AgentQueueManager) PublishError(taskID uuid.UUID, err error) {
+	agentThought := &entities.AgentThought{
 		ID:          uuid.New(),
 		TaskID:      taskID,
 		Event:       entities.EventError,
-		Observation: errMsg,
-	})
-}
-
-// stopListen stops listening for the specified task
-func (m *AgentQueueManager) stopListen(taskID uuid.UUID) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if queue, exists := m.queues[taskID]; exists {
-		close(queue)
-		delete(m.queues, taskID)
+		Observation: err.Error(),
+		CreatedAt:   time.Now(),
 	}
+	aqm.Publish(taskID, agentThought)
 }
 
-// isStopped checks if the task has been stopped
-func (m *AgentQueueManager) isStopped(taskID uuid.UUID) bool {
-	ctx := context.Background()
-	stoppedKey := generateTaskStoppedCacheKey(taskID)
-	result := m.redisClient.Get(ctx, stoppedKey)
+// isStopped 检测任务是否停止
+func (aqm *AgentQueueManager) isStopped(ctx context.Context, taskID uuid.UUID) bool {
+	taskStoppedCacheKey := aqm.generateTaskStoppedCacheKey(taskID)
+	result := aqm.redisClient.Get(ctx, taskStoppedCacheKey)
 	return result.Err() == nil
 }
 
-// SetStopFlag sets the stop flag for a task
-func (m *AgentQueueManager) SetStopFlag(taskID uuid.UUID, invokeFrom consts.InvokeFrom, userID uuid.UUID) error {
-	ctx := context.Background()
+// getQueue 根据传递的taskID获取对应的任务队列信息
+func (aqm *AgentQueueManager) getQueue(taskID uuid.UUID) chan *entities.AgentThought {
+	aqm.mu.Lock()
+	defer aqm.mu.Unlock()
 
-	// Check if task belongs to user
-	belongKey := generateTaskBelongCacheKey(taskID)
-	result := m.redisClient.Get(ctx, belongKey)
-	if result.Err() != nil {
-		return nil // Task doesn't exist, no need to stop
+	taskIDStr := taskID.String()
+	queue, exists := aqm.queues[taskIDStr]
+
+	if !exists {
+		// 添加缓存键标识
+		userPrefix := "account"
+		if aqm.invokeFrom == consts.InvokeFromEndUser {
+			userPrefix = "end-user"
+		}
+
+		// 设置任务对应的缓存键，代表这次任务已经开始了
+		ctx := context.Background()
+		aqm.redisClient.SetEx(ctx,
+			aqm.generateTaskBelongCacheKey(taskID),
+			fmt.Sprintf("%s-%s", userPrefix, aqm.userID.String()),
+			30*time.Minute,
+		)
+
+		// 创建新队列
+		queue = make(chan *entities.AgentThought, 1000)
+		aqm.queues[taskIDStr] = queue
 	}
 
+	return queue
+}
+
+// SetStopFlag 根据传递的任务id+调用来源停止某次会话（静态方法，保持向后兼容）
+func SetStopFlag(ctx context.Context, redisClient redis.Cmdable, taskID uuid.UUID, invokeFrom consts.InvokeFrom, userID uuid.UUID) error {
+	aqm := &AgentQueueManager{redisClient: redisClient}
+
+	// 获取当前任务的缓存键，如果任务没执行，则不需要停止
+	result := redisClient.Get(ctx, aqm.generateTaskBelongCacheKey(taskID))
+	if result.Err() != nil {
+		return nil // 任务不存在，无需停止
+	}
+
+	// 计算对应缓存键的结果
 	userPrefix := "account"
 	if invokeFrom == consts.InvokeFromEndUser {
 		userPrefix = "end-user"
@@ -191,20 +265,31 @@ func (m *AgentQueueManager) SetStopFlag(taskID uuid.UUID, invokeFrom consts.Invo
 
 	expectedValue := fmt.Sprintf("%s-%s", userPrefix, userID.String())
 	if result.Val() != expectedValue {
-		return nil // Task doesn't belong to this user
+		return fmt.Errorf("unauthorized to stop task %s", taskID)
 	}
 
-	// Set stop flag
-	stoppedKey := generateTaskStoppedCacheKey(taskID)
-	return m.redisClient.SetEx(ctx, stoppedKey, "1", 10*time.Minute).Err()
+	// 生成停止键标识
+	stoppedCacheKey := aqm.generateTaskStoppedCacheKey(taskID)
+	return redisClient.SetEx(ctx, stoppedCacheKey, "1", 10*time.Minute).Err()
 }
 
-// generateTaskBelongCacheKey generates the cache key for task ownership
-func generateTaskBelongCacheKey(taskID uuid.UUID) string {
+// generateTaskBelongCacheKey 生成任务专属的缓存键
+func (aqm *AgentQueueManager) generateTaskBelongCacheKey(taskID uuid.UUID) string {
 	return fmt.Sprintf("generate_task_belong:%s", taskID.String())
 }
 
-// generateTaskStoppedCacheKey generates the cache key for task stop status
-func generateTaskStoppedCacheKey(taskID uuid.UUID) string {
+// generateTaskStoppedCacheKey 生成任务已停止的缓存键
+func (aqm *AgentQueueManager) generateTaskStoppedCacheKey(taskID uuid.UUID) string {
 	return fmt.Sprintf("generate_task_stopped:%s", taskID.String())
+}
+
+// Close 关闭所有队列并清理资源
+func (aqm *AgentQueueManager) Close() {
+	aqm.mu.Lock()
+	defer aqm.mu.Unlock()
+
+	for taskID, queue := range aqm.queues {
+		close(queue)
+		delete(aqm.queues, taskID)
+	}
 }

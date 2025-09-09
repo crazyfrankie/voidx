@@ -2,145 +2,155 @@ package tool
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
-	"github.com/crazyfrankie/voidx/types/errno"
-	"github.com/tmc/langchaingo/tools"
-	"gorm.io/gorm"
+	"github.com/cloudwego/eino/components/tool"
 
-	toolsentity "github.com/crazyfrankie/voidx/internal/core/tools/api_tools/entities"
-	api "github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
-	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
-	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
-	"github.com/crazyfrankie/voidx/internal/models/entity"
-	"github.com/crazyfrankie/voidx/pkg/logs"
+	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
-// ToolNode 扩展插件节点
+// ToolNodeData represents the data structure for tool workflow nodes
+type ToolNodeData struct {
+	*entities.BaseNodeData
+	ToolName   string                     `json:"tool_name"`
+	ToolConfig map[string]interface{}     `json:"tool_config"`
+	Inputs     []*entities.VariableEntity `json:"inputs"`
+	Outputs    []*entities.VariableEntity `json:"outputs"`
+}
+
+// NewToolNodeData creates a new tool node data instance
+func NewToolNodeData() *ToolNodeData {
+	return &ToolNodeData{
+		BaseNodeData: &entities.BaseNodeData{NodeType: entities.NodeTypeTool},
+		Inputs:       make([]*entities.VariableEntity, 0),
+		Outputs:      make([]*entities.VariableEntity, 0),
+		ToolConfig:   make(map[string]interface{}),
+	}
+}
+
+// GetBaseNodeData returns the base node data (implements NodeDataInterface)
+func (t *ToolNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return t.BaseNodeData
+}
+
+// ToolNode represents a tool workflow node
 type ToolNode struct {
-	*nodes.BaseNodeImpl
-	nodeData            *ToolNodeData
-	tool                tools.Tool
-	builtinToolProvider *builtin.BuiltinProviderManager
-	apiToolProvider     *api.ApiProviderManager
-	db                  *gorm.DB
+	nodeData *ToolNodeData
+	tool     tool.InvokableTool
 }
 
-// NewToolNode 创建新的工具节点
-func NewToolNode(nodeData *ToolNodeData,
-	builtinToolProvider *builtin.BuiltinProviderManager,
-	apiToolProvider *api.ApiProviderManager, db *gorm.DB) *ToolNode {
-	node := &ToolNode{
-		BaseNodeImpl:        nodes.NewBaseNodeImpl(nodeData.BaseNodeData),
-		nodeData:            nodeData,
-		builtinToolProvider: builtinToolProvider,
-		apiToolProvider:     apiToolProvider,
-		db:                  db,
-	}
-
-	// 初始化工具
-	if err := node.initializeTool(); err != nil {
-		// 在实际应用中，这里应该记录错误日志
-		logs.Errorf("Failed to initialize tool: %v", err)
-	}
-
-	return node
-}
-
-// initializeTool 初始化工具
-func (t *ToolNode) initializeTool() error {
-	switch t.nodeData.ToolType {
-	case ToolTypeBuiltin:
-		return t.initializeBuiltinTool()
-	case ToolTypeAPI:
-		return t.initializeAPITool()
-	default:
-		return fmt.Errorf("不支持的工具类型: %s", t.nodeData.ToolType)
+// NewToolNode creates a new tool node instance
+func NewToolNode(nodeData *ToolNodeData, tool tool.InvokableTool) *ToolNode {
+	return &ToolNode{
+		nodeData: nodeData,
+		tool:     tool,
 	}
 }
 
-// initializeBuiltinTool 初始化内置工具
-func (t *ToolNode) initializeBuiltinTool() error {
-	tool := t.builtinToolProvider.GetTool(t.nodeData.ProviderID, t.nodeData.ToolID)
-	t.tool = tool.(tools.Tool)
+// Execute executes the tool node with the given workflow state
+func (n *ToolNode) Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error) {
+	startTime := time.Now()
 
-	return nil
-}
+	// Create node result
+	result := entities.NewNodeResult(n.nodeData.BaseNodeData)
+	result.StartTime = startTime.Unix()
 
-// initializeAPITool 初始化API工具
-func (t *ToolNode) initializeAPITool() error {
-	var apiTool *entity.ApiTool
-	if err := t.db.Model(&entity.ApiTool{}).
-		Where("provider_id = ? AND name = ?", t.nodeData.ProviderID, t.nodeData.ToolID).
-		Find(&apiTool).Error; err != nil {
-		return fmt.Errorf("获取API工具失败: %v", err)
-	}
-	if apiTool == nil {
-		return errno.ErrNotFound.AppendBizMessage(errors.New("该API扩展插件不存在，请核实重试"))
-	}
-
-	var apiToolProvider *entity.ApiToolProvider
-	if err := t.db.Model(&entity.ApiToolProvider{}).
-		Where("id = ?", t.nodeData.ProviderID).
-		Find(&apiToolProvider).Error; err != nil {
-		return fmt.Errorf("获取API提供者失败: %v", err)
-	}
-	if apiToolProvider == nil {
-		return errno.ErrNotFound.AppendBizMessage(errors.New("该API提供商不存在，请核实重试"))
-	}
-
-	t.tool = t.apiToolProvider.GetTool(&toolsentity.ToolEntity{
-		ID:          apiTool.ID.String(),
-		Name:        apiTool.Name,
-		URL:         apiTool.URL,
-		Method:      apiTool.Method,
-		Description: apiTool.Description,
-		Headers:     apiToolProvider.Headers,
-		Parameters:  apiTool.Parameters,
-	})
-
-	return nil
-}
-
-// Invoke 扩展插件执行节点，根据传递的信息调用预设的插件，涵盖内置插件及API插件
-func (t *ToolNode) Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error) {
-	startAt := time.Now()
-
-	// 调用插件并获取结果
-	result, err := t.tool.Call(context.Background(), state.Inputs)
+	// Extract input variables from state
+	inputsDict, err := n.extractVariablesFromState(state)
 	if err != nil {
-		nodeResult := entities.NewNodeResult(t.nodeData.BaseNodeData)
-		nodeResult.Status = entities.NodeStatusFailed
-		nodeResult.Error = fmt.Sprintf("扩展插件执行失败: %v", err)
-		nodeResult.Latency = time.Since(startAt)
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to extract input variables: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+	result.Inputs = inputsDict
 
-		newState := &entities.WorkflowState{
-			Inputs:      state.Inputs,
-			Outputs:     state.Outputs,
-			NodeResults: append(state.NodeResults, nodeResult),
+	// Prepare tool arguments
+	toolArgs, err := sonic.Marshal(inputsDict)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to marshal tool arguments: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	// Execute the tool
+	toolResult, err := n.tool.InvokableRun(ctx, string(toolArgs))
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("tool execution failed: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	// Build output data structure
+	outputs := make(map[string]interface{})
+	if len(n.nodeData.Outputs) > 0 {
+		outputs[n.nodeData.Outputs[0].Name] = toolResult
+	} else {
+		outputs["output"] = toolResult
+	}
+	result.Outputs = outputs
+
+	// Set success status
+	result.Status = entities.NodeStatusSucceeded
+	result.EndTime = time.Now().Unix()
+
+	return result, nil
+}
+
+// extractVariablesFromState extracts input variables from the workflow state
+func (n *ToolNode) extractVariablesFromState(state *entities.WorkflowState) (map[string]interface{}, error) {
+	inputsDict := make(map[string]interface{})
+
+	for _, input := range n.nodeData.Inputs {
+		var value interface{}
+		var found bool
+
+		// Check if it's a reference to another node's output
+		if input.Value.Type == entities.VariableValueTypeRef {
+			if content, ok := input.Value.Content.(*entities.VariableContent); ok {
+				if content.RefNodeID != nil {
+					// Find the referenced node's output in state
+					for _, nodeResult := range state.NodeResults {
+						if nodeResult.NodeID == *content.RefNodeID {
+							if refValue, exists := nodeResult.Outputs[content.RefVarName]; exists {
+								value = refValue
+								found = true
+								break
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// It's a constant value
+			value = input.Value.Content
+			found = true
 		}
 
-		return newState, err
+		if !found && input.Required {
+			return nil, fmt.Errorf("required input variable %s not found", input.Name)
+		}
+
+		if found {
+			inputsDict[input.Name] = value
+		}
 	}
 
-	state.Outputs = result
-
-	// 构建节点结果
-	nodeResult := entities.NewNodeResult(t.nodeData.BaseNodeData)
-	nodeResult.Status = entities.NodeStatusSucceeded
-	nodeResult.Inputs, _ = state.GetInputsAsMap()
-	nodeResult.Outputs, _ = state.GetOutputsAsMap()
-	nodeResult.Latency = time.Since(startAt)
-
-	// 构建新状态
-	newState := &entities.WorkflowState{
-		Inputs:      state.Inputs,
-		Outputs:     state.Outputs,
-		NodeResults: append(state.NodeResults, nodeResult),
+	// Also include workflow inputs
+	for key, value := range state.Inputs {
+		if _, exists := inputsDict[key]; !exists {
+			inputsDict[key] = value
+		}
 	}
 
-	return newState, nil
+	return inputsDict, nil
+}
+
+// GetNodeData returns the node data
+func (n *ToolNode) GetNodeData() *ToolNodeData {
+	return n.nodeData
 }

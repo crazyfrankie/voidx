@@ -5,9 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/schema"
 
+	"github.com/crazyfrankie/voidx/infra/contract/document/vecstore"
 	"github.com/crazyfrankie/voidx/internal/core/embedding"
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
@@ -15,7 +16,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/segment/repository"
-	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/pkg/util"
 	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/crazyfrankie/voidx/types/errno"
@@ -25,12 +25,12 @@ type SegmentService struct {
 	repo         *repository.SegmentRepo
 	embeddingSvc *embedding.EmbeddingService
 	jiebaSvc     *retrievers.JiebaService
-	vecSvc       *vecstore.VecStoreService
 	keywordSvc   *retriever.KeyWordService
+	vecSvc       vecstore.SearchStore
 }
 
 func NewSegmentService(repo *repository.SegmentRepo, embeddingSvc *embedding.EmbeddingService,
-	jiebaSvc *retrievers.JiebaService, vecSvc *vecstore.VecStoreService, keywordSvc *retriever.KeyWordService) *SegmentService {
+	jiebaSvc *retrievers.JiebaService, vecSvc vecstore.SearchStore, keywordSvc *retriever.KeyWordService) *SegmentService {
 	return &SegmentService{repo: repo, embeddingSvc: embeddingSvc, jiebaSvc: jiebaSvc, vecSvc: vecSvc, keywordSvc: keywordSvc}
 }
 
@@ -95,10 +95,10 @@ func (s *SegmentService) CreateSegment(ctx context.Context, datasetID, documentI
 	err = s.repo.CreateSegment(ctx, segment)
 
 	// 7.往向量数据库中新增数据
-	_, err = s.vecSvc.AddDocument(ctx, []schema.Document{
+	_, err = s.vecSvc.Store(ctx, []*schema.Document{
 		{
-			PageContent: createReq.Content,
-			Metadata: map[string]any{
+			Content: createReq.Content,
+			MetaData: map[string]any{
 				"account_id":       userID,
 				"dataset_id":       datasetID,
 				"document_id":      documentID,

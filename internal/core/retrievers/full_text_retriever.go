@@ -3,52 +3,45 @@ package retrievers
 import (
 	"context"
 	"fmt"
-	"sort"
 
-	"gorm.io/gorm"
-
+	"github.com/cloudwego/eino/components/retriever"
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/schema"
+	"gorm.io/gorm"
 
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 )
 
 // FullTextRetriever 全文检索器
 type FullTextRetriever struct {
-	db            *gorm.DB
-	DatasetIDs    []uuid.UUID
-	JiebaService  *JiebaService
-	SearchOptions map[string]any
+	db           *gorm.DB
+	datasetIDs   []uuid.UUID
+	jiebaService *JiebaService
 }
 
-// NewFullTextRetriever 创建一个新的全文检索器
-func NewFullTextRetriever(
-	db *gorm.DB,
-	datasetIDs []uuid.UUID,
-	jiebaService *JiebaService,
-	options map[string]any,
-) *FullTextRetriever {
+// NewFullTextRetriever 创建一个新的全文检索器，支持多个数据集
+func NewFullTextRetriever(db *gorm.DB, datasetIDs []uuid.UUID, jiebaService *JiebaService) *FullTextRetriever {
 	return &FullTextRetriever{
-		db:            db,
-		DatasetIDs:    datasetIDs,
-		JiebaService:  jiebaService,
-		SearchOptions: options,
+		db:           db,
+		datasetIDs:   datasetIDs,
+		jiebaService: jiebaService,
 	}
 }
 
-// GetRelevantDocuments 根据传递的query执行关键词检索获取LangChain文档列表
-func (r *FullTextRetriever) GetRelevantDocuments(ctx context.Context, query string) ([]schema.Document, error) {
+func (r *FullTextRetriever) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*schema.Document, error) {
 	// 1.将查询query转换成关键词列表
-	keywords := r.JiebaService.ExtractKeywords(query, 10)
+	keywords := r.jiebaService.ExtractKeywords(query, 10)
+	if len(keywords) == 0 {
+		return []*schema.Document{}, nil
+	}
 
-	// 2.查找指定知识库的关键词表
-	keywordTables, err := r.getKeywordTables()
+	keywordTables, err := r.getKeywordTables(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get keyword tables: %w", err)
 	}
 
 	// 3.遍历所有的知识库关键词表，找到匹配query关键词的id列表
-	allIDs := []string{}
+	var allIDs []string
 	for _, keywordTable := range keywordTables {
 		// 4.遍历每一个关键词表的每一项
 		for keyword, segmentIDs := range keywordTable {
@@ -61,58 +54,57 @@ func (r *FullTextRetriever) GetRelevantDocuments(ctx context.Context, query stri
 		}
 	}
 
+	if len(allIDs) == 0 {
+		return []*schema.Document{}, nil
+	}
 	// 6.统计segment_id出现的频率
 	idCounter := make(map[string]int)
 	for _, id := range allIDs {
 		idCounter[id]++
 	}
 
-	// 7.获取频率最高的前k条数据
-	k := 4
-	if kVal, ok := r.SearchOptions["k"]; ok {
-		if kInt, ok := kVal.(int); ok {
-			k = kInt
-		}
-	}
-
-	topKIDs := getTopKIDs(idCounter, k)
-
-	// 8.根据得到的id列表检索数据库得到片段列表信息
-	segments, err := r.getSegmentsByIDs(topKIDs)
+	// 7. 根据得到的id列表检索数据库得到片段列表信息
+	segments, err := r.getSegmentsByIDs(ctx, allIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get segments: %w", err)
 	}
 
-	// 9.构建LangChain文档列表
-	documents := make([]schema.Document, 0, len(segments))
-	for _, segment := range segments {
-		documents = append(documents, schema.Document{
-			PageContent: segment.Content,
-			Metadata: map[string]any{
-				"account_id":       segment.DatasetID.String(), // 修正：使用DatasetID作为account_id
+	// 8. 根据频率进行排序
+	sortedSegments := r.sortSegmentsByFrequency(segments, allIDs, idCounter)
+
+	// 9. 构建 Document 列表
+	documents := make([]*schema.Document, 0, len(sortedSegments))
+	for _, segment := range sortedSegments {
+		doc := &schema.Document{
+			Content: segment.Content,
+			MetaData: map[string]any{
+				"account_id":       segment.AccountID.String(),
 				"dataset_id":       segment.DatasetID.String(),
 				"document_id":      segment.DocumentID.String(),
 				"segment_id":       segment.ID.String(),
 				"node_id":          segment.NodeID,
 				"document_enabled": true,
-				"segment_enabled":  segment.Status,
+				"segment_enabled":  true,
 				"score":            0,
 			},
-		})
+		}
+		documents = append(documents, doc)
 	}
 
 	return documents, nil
 }
 
 // getKeywordTables 获取知识库关键词表
-func (r *FullTextRetriever) getKeywordTables() ([]map[string][]string, error) {
+func (r *FullTextRetriever) getKeywordTables(ctx context.Context) ([]map[string][]string, error) {
 	var keywords []entity.Keyword
 
-	err := r.db.Where("dataset_id IN ?", r.DatasetIDs).Find(&keywords).Error
+	// 查询指定数据集的关键词表
+	err := r.db.Where("dataset_id IN ?", r.datasetIDs).Find(&keywords).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to query keyword tables: %w", err)
 	}
 
+	// 转换为 map 格式
 	result := make([]map[string][]string, 0, len(keywords))
 	for _, kt := range keywords {
 		if kt.KeywordMap != nil {
@@ -124,9 +116,7 @@ func (r *FullTextRetriever) getKeywordTables() ([]map[string][]string, error) {
 }
 
 // getSegmentsByIDs 根据ID获取片段
-func (r *FullTextRetriever) getSegmentsByIDs(ids []string) ([]entity.Segment, error) {
-	var segments []entity.Segment
-
+func (r *FullTextRetriever) getSegmentsByIDs(ctx context.Context, ids []string) ([]entity.Segment, error) {
 	// Convert string IDs to UUIDs
 	uuids := make([]uuid.UUID, 0, len(ids))
 	for _, id := range ids {
@@ -135,49 +125,36 @@ func (r *FullTextRetriever) getSegmentsByIDs(ids []string) ([]entity.Segment, er
 		}
 	}
 
-	err := r.db.Where("id IN ?", uuids).Find(&segments).Error
+	if len(uuids) == 0 {
+		return []entity.Segment{}, nil
+	}
+
+	var segments []entity.Segment
+	err := r.db.WithContext(ctx).
+		Where("id IN ? AND dataset_id IN ?", uuids, r.datasetIDs).
+		Find(&segments).Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to query segments: %w", err)
 	}
 
-	// Sort segments by the order of IDs
+	return segments, nil
+}
+
+// sortSegmentsByFrequency 根据频率对片段进行排序
+func (r *FullTextRetriever) sortSegmentsByFrequency(segments []entity.Segment, topKIDs []string, idCounter map[string]int) []entity.Segment {
+	// 创建片段映射
 	segmentMap := make(map[string]entity.Segment)
 	for _, segment := range segments {
 		segmentMap[segment.ID.String()] = segment
 	}
 
-	sortedSegments := make([]entity.Segment, 0, len(ids))
-	for _, id := range ids {
+	// 按照频率排序返回片段
+	sortedSegments := make([]entity.Segment, 0, len(topKIDs))
+	for _, id := range topKIDs {
 		if segment, exists := segmentMap[id]; exists {
 			sortedSegments = append(sortedSegments, segment)
 		}
 	}
 
-	return sortedSegments, nil
-}
-
-// getTopKIDs 获取出现频率最高的前K个ID
-func getTopKIDs(idCounter map[string]int, k int) []string {
-	type idFreq struct {
-		id   string
-		freq int
-	}
-
-	idFreqs := make([]idFreq, 0, len(idCounter))
-	for id, freq := range idCounter {
-		idFreqs = append(idFreqs, idFreq{id: id, freq: freq})
-	}
-
-	// 按频率降序排序
-	sort.Slice(idFreqs, func(i, j int) bool {
-		return idFreqs[i].freq > idFreqs[j].freq
-	})
-
-	// 获取前k个
-	result := make([]string, 0, k)
-	for i := 0; i < len(idFreqs) && i < k; i++ {
-		result = append(result, idFreqs[i].id)
-	}
-
-	return result
+	return sortedSegments
 }

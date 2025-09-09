@@ -4,48 +4,24 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 )
 
-// TemplateTransformNodeData 模板转换节点数据
+// TemplateTransformNodeData represents the data structure for template transform workflow nodes
 type TemplateTransformNodeData struct {
 	*entities.BaseNodeData
-	Template string                     `json:"template"` // 需要拼接转换的字符串模板
-	Inputs   []*entities.VariableEntity `json:"inputs"`   // 输入列表信息
-	Outputs  []*entities.VariableEntity `json:"outputs"`  // 输出列表信息
+	Template string                     `json:"template"`
+	Inputs   []*entities.VariableEntity `json:"inputs"`
+	Outputs  []*entities.VariableEntity `json:"outputs"`
 }
 
-// NewTemplateTransformNodeData 创建新的模板转换节点数据
+// NewTemplateTransformNodeData creates a new template transform node data instance
 func NewTemplateTransformNodeData() *TemplateTransformNodeData {
-	baseData := entities.NewBaseNodeData()
-	baseData.NodeType = entities.NodeTypeTemplateTransform
-
-	// 默认输出变量
-	outputs := []*entities.VariableEntity{
-		{
-			Name: "output",
-			Type: entities.VariableTypeString,
-			Value: entities.VariableValue{
-				Type: entities.VariableValueTypeGenerated,
-			},
-		},
-	}
-
 	return &TemplateTransformNodeData{
-		BaseNodeData: baseData,
+		BaseNodeData: &entities.BaseNodeData{NodeType: entities.NodeTypeTemplateTransform},
 		Inputs:       make([]*entities.VariableEntity, 0),
-		Outputs:      outputs,
+		Outputs:      make([]*entities.VariableEntity, 0),
 	}
 }
 
-// GetInputs 实现NodeDataInterface接口
-func (t *TemplateTransformNodeData) GetInputs() []*entities.VariableEntity {
-	return t.Inputs
-}
-
-// GetOutputs 实现NodeDataInterface接口
-func (t *TemplateTransformNodeData) GetOutputs() []*entities.VariableEntity {
-	return t.Outputs
-}
-
-// GetBaseNodeData 实现NodeDataInterface接口
+// GetBaseNodeData returns the base node data (implements NodeDataInterface)
 func (t *TemplateTransformNodeData) GetBaseNodeData() *entities.BaseNodeData {
 	return t.BaseNodeData
 }

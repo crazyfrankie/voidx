@@ -5,13 +5,13 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 	"github.com/silenceper/wechat/v2/officialaccount/message"
-	lcllms "github.com/tmc/langchaingo/llms"
 
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	agenteneity "github.com/crazyfrankie/voidx/internal/core/agent/entities"
-	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/wechat/repository"
@@ -137,7 +137,7 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 		logs.Errorf("Failed to get conversation by ID %s: %v", conversationID, err)
 		return
 	}
-	s.tokenBufMem = s.tokenBufMem.WithLLM(llm)
+	s.tokenBufMem.WithConversationID(conversationID)
 	history, err := s.tokenBufMem.GetHistoryPromptMessages(2000, appConfig.DialogRound)
 	if err != nil {
 		logs.Errorf("Failed to get conversation history: %v", err)
@@ -145,9 +145,9 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 	}
 
 	// 3. 构建工具链
-	tools, err := s.appConfigSvc.GetLangchainToolsByToolsConfig(ctx, appConfig.Tools)
+	tools, err := s.appConfigSvc.GetToolsByToolsConfig(ctx, appConfig.Tools)
 	if err != nil {
-		logs.Errorf("Failed to get langchain tools by config: %v", err)
+		logs.Errorf("Failed to get tools by config: %v", err)
 		return
 	}
 
@@ -158,7 +158,7 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 			datasetIDs = append(datasetIDs, dataset["id"].(uuid.UUID))
 		}
 		// 5.构建LangChain知识库检索工具
-		datasetRetrieval, err := s.retrievalSvc.CreateLangchainToolFromSearch(ctx, app.AccountID,
+		datasetRetrieval, err := s.retrievalSvc.CreateToolFromSearch(ctx, app.AccountID,
 			datasetIDs, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
 		if err != nil {
 			logs.Errorf("Failed to create dataset retrieval tool: %v", err)
@@ -174,7 +174,7 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 			workflowIDs = append(workflowIDs, workflow["id"].(uuid.UUID))
 		}
 		// 5.构建LangChain知识库检索工具
-		workflowTool, err := s.appConfigSvc.GetLangchainToolsByWorkflowIDs(ctx, workflowIDs)
+		workflowTool, err := s.appConfigSvc.GetToolsByWorkflowIDs(ctx, workflowIDs)
 		if err != nil {
 			logs.Errorf("Failed to get workflow tools: %v", err)
 			return
@@ -183,7 +183,7 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 	}
 
 	// 7.根据LLM是否支持tool_call决定使用不同的Agent
-	agentCfg := agenteneity.AgentConfig{
+	agentCfg := &agenteneity.AgentConfig{
 		UserID:               app.AccountID,
 		InvokeFrom:           consts.InvokeFromDebugger,
 		PresetPrompt:         appConfig.PresetPrompt,
@@ -199,26 +199,27 @@ func (s *WechatService) processMessageAsync(ctx context.Context, app *entity.App
 		if f == llmentity.FeatureToolCall {
 			agentIns = agent.NewFunctionCallAgent(llm, agentCfg, s.agentManager)
 			break
+
 		}
-	}
 
-	// 8.定义智能体状态基础数据
-	agentState := agenteneity.AgentState{
-		History:        util.MessageContentToChatMessages(history),
-		LongTermMemory: conversation.Summary,
-		Messages:       []lcllms.ChatMessage{util.MessageContentToChatMessage(llm.ConvertToHumanMessage(query, nil))},
-	}
+		// 8.定义智能体状态基础数据
+		agentState := agenteneity.AgentState{
+			History:        history,
+			LongTermMemory: conversation.Summary,
+			Messages:       []*schema.Message{llm.ConvertToHumanMessage(query, nil)},
+		}
 
-	// 9.调用智能体获取执行结果
-	agentResult, err := agentIns.Invoke(ctx, agentState)
-	if err != nil {
-		logs.Errorf("Agent invocation failed: %v", err)
-		return
-	}
+		// 9.调用智能体获取执行结果
+		agentResult, err := agentIns.Invoke(ctx, agentState)
+		if err != nil {
+			logs.Errorf("Agent invocation failed: %v", err)
+			return
+		}
 
-	// 10.将数据存储到数据库中，包含会话、消息、推理过程
-	err = s.conversationSvc.SaveAgentThoughts(ctx, app.AccountID, app.ID, conversationID, messageID, agentResult.AgentThoughts)
-	if err != nil {
-		logs.Errorf("Failed to save agent thoughts: %v", err)
+		// 10.将数据存储到数据库中，包含会话、消息、推理过程
+		err = s.conversationSvc.SaveAgentThoughts(ctx, app.AccountID, app.ID, conversationID, messageID, agentResult.AgentThoughts)
+		if err != nil {
+			logs.Errorf("Failed to save agent thoughts: %v", err)
+		}
 	}
 }

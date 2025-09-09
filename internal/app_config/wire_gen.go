@@ -19,7 +19,7 @@ import (
 
 // Injectors from wire.go:
 
-func InitAppConfigModule(db *gorm.DB, llmMgr *llm.LanguageModelManager, builtinProvider *providers.BuiltinProviderManager, apiProvider *providers2.ApiProviderManager) *AppConfigModule {
+func InitAppConfigModule(db *gorm.DB, llmMgr *llm.LanguageModelManager, builtinProvider *providers.BuiltinProviderManager, apiProvider *providers2.APIProviderManager) *AppConfigModule {
 	appConfigDao := dao.NewAppConfigDao(db)
 	appConfigRepo := repository.NewAppConfigRepo(appConfigDao)
 	appConfigService := service.NewAppConfigService(appConfigRepo, llmMgr, builtinProvider, apiProvider)

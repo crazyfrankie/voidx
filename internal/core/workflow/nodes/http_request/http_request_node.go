@@ -2,187 +2,228 @@ package http_request
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
-	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
 	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
-// HttpRequestNode HTTP请求节点
-type HttpRequestNode struct {
-	*nodes.BaseNodeImpl
-	nodeData *HttpRequestNodeData
+// HTTPRequestNode represents an HTTP request workflow node
+type HTTPRequestNode struct {
+	nodeData   *HTTPRequestNodeData
+	httpClient *http.Client
 }
 
-// NewHttpRequestNode 创建新的HTTP请求节点
-func NewHttpRequestNode(nodeData *HttpRequestNodeData) *HttpRequestNode {
-	return &HttpRequestNode{
-		BaseNodeImpl: nodes.NewBaseNodeImpl(nodeData.BaseNodeData),
-		nodeData:     nodeData,
+// NewHTTPRequestNode creates a new HTTP request node instance
+func NewHTTPRequestNode(nodeData *HTTPRequestNodeData) *HTTPRequestNode {
+	return &HTTPRequestNode{
+		nodeData: nodeData,
+		httpClient: &http.Client{
+			Timeout: time.Duration(nodeData.Timeout) * time.Second,
+		},
 	}
 }
 
-// Invoke HTTP请求节点调用函数，向指定的URL发起请求并获取响应
-func (h *HttpRequestNode) Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error) {
-	startAt := time.Now()
+// Execute executes the HTTP request node with the given workflow state
+func (n *HTTPRequestNode) Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error) {
+	startTime := time.Now()
 
-	// 1. 提取节点输入变量字典
-	inputsDict := h.extractVariablesFromState(state)
+	// Create node result
+	result := entities.NewNodeResult(n.nodeData.BaseNodeData)
+	result.StartTime = startTime.Unix()
 
-	// 2. 提取数据，涵盖params、headers、body的数据
-	params := make(map[string]string)
-	headers := make(map[string]string)
-	body := make(map[string]any)
+	// Extract input variables from state
+	inputsDict, err := n.extractVariablesFromState(state)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to extract input variables: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+	result.Inputs = inputsDict
 
-	for _, input := range h.nodeData.Inputs {
-		if inputType, exists := input.Meta["type"]; exists {
-			if value, valueExists := inputsDict[input.Name]; valueExists {
-				switch inputType {
-				case string(HttpRequestInputTypeParams):
-					params[input.Name] = fmt.Sprintf("%v", value)
-				case string(HttpRequestInputTypeHeaders):
-					headers[input.Name] = fmt.Sprintf("%v", value)
-				case string(HttpRequestInputTypeBody):
-					body[input.Name] = value
+	// Render URL template
+	url, err := n.renderTemplate(n.nodeData.URL, inputsDict)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to render URL template: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	// Render body template
+	body, err := n.renderTemplate(n.nodeData.Body, inputsDict)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to render body template: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	// Make HTTP request
+	response, err := n.makeHTTPRequest(ctx, url, body, inputsDict)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("HTTP request failed: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	// Build output data structure
+	outputs := make(map[string]interface{})
+	if len(n.nodeData.Outputs) > 0 {
+		outputs[n.nodeData.Outputs[0].Name] = response
+	} else {
+		outputs["response"] = response
+	}
+	result.Outputs = outputs
+
+	// Set success status
+	result.Status = entities.NodeStatusSucceeded
+	result.EndTime = time.Now().Unix()
+
+	return result, nil
+}
+
+// extractVariablesFromState extracts input variables from the workflow state
+func (n *HTTPRequestNode) extractVariablesFromState(state *entities.WorkflowState) (map[string]interface{}, error) {
+	inputsDict := make(map[string]interface{})
+
+	for _, input := range n.nodeData.Inputs {
+		var value interface{}
+		var found bool
+
+		// Check if it's a reference to another node's output
+		if input.Value.Type == entities.VariableValueTypeRef {
+			if content, ok := input.Value.Content.(*entities.VariableContent); ok {
+				if content.RefNodeID != nil {
+					// Find the referenced node's output in state
+					for _, nodeResult := range state.NodeResults {
+						if nodeResult.NodeID == *content.RefNodeID {
+							if refValue, exists := nodeResult.Outputs[content.RefVarName]; exists {
+								value = refValue
+								found = true
+								break
+							}
+						}
+					}
 				}
 			}
-		}
-	}
-
-	// 3. 发起HTTP请求
-	response, err := h.makeHttpRequest(params, headers, body)
-	if err != nil {
-		nodeResult := entities.NewNodeResult(h.nodeData.BaseNodeData)
-		nodeResult.Status = entities.NodeStatusFailed
-		nodeResult.Error = err.Error()
-		nodeResult.Latency = time.Since(startAt)
-
-		newState := &entities.WorkflowState{
-			Inputs:      state.Inputs,
-			Outputs:     state.Outputs,
-			NodeResults: append(state.NodeResults, nodeResult),
-		}
-
-		return newState, err
-	}
-
-	// 4. 构建输出数据结构
-	outputs := map[string]any{
-		"text":        response.Text,
-		"status_code": response.StatusCode,
-	}
-
-	// 5. 构建节点结果
-	nodeResult := entities.NewNodeResult(h.nodeData.BaseNodeData)
-	nodeResult.Status = entities.NodeStatusSucceeded
-	nodeResult.Inputs = map[string]any{
-		"params":  params,
-		"headers": headers,
-		"body":    body,
-	}
-	nodeResult.Outputs = outputs
-	nodeResult.Latency = time.Since(startAt)
-
-	// 6. 构建新状态
-	newState := &entities.WorkflowState{
-		Inputs:      state.Inputs,
-		Outputs:     state.Outputs,
-		NodeResults: append(state.NodeResults, nodeResult),
-	}
-
-	return newState, nil
-}
-
-// HttpResponse HTTP响应结构
-type HttpResponse struct {
-	Text       string
-	StatusCode int
-}
-
-// makeHttpRequest 发起HTTP请求
-func (h *HttpRequestNode) makeHttpRequest(params map[string]string, headers map[string]string, body map[string]any) (*HttpResponse, error) {
-	// 构建URL和查询参数
-	requestURL := h.nodeData.URL
-	if len(params) > 0 {
-		values := url.Values{}
-		for key, value := range params {
-			values.Add(key, value)
-		}
-		if strings.Contains(requestURL, "?") {
-			requestURL += "&" + values.Encode()
 		} else {
-			requestURL += "?" + values.Encode()
+			// It's a constant value
+			value = input.Value.Content
+			found = true
+		}
+
+		if !found && input.Required {
+			return nil, fmt.Errorf("required input variable %s not found", input.Name)
+		}
+
+		if found {
+			inputsDict[input.Name] = value
 		}
 	}
 
-	// 准备请求体
+	// Also include workflow inputs
+	for key, value := range state.Inputs {
+		if _, exists := inputsDict[key]; !exists {
+			inputsDict[key] = value
+		}
+	}
+
+	return inputsDict, nil
+}
+
+// renderTemplate renders a template string with the given variables
+func (n *HTTPRequestNode) renderTemplate(templateStr string, variables map[string]interface{}) (string, error) {
+	if templateStr == "" {
+		return "", nil
+	}
+
+	// Use Go's text/template to render the template
+	tmpl, err := template.New("http").Parse(templateStr)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var result strings.Builder
+	if err := tmpl.Execute(&result, variables); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return result.String(), nil
+}
+
+// makeHTTPRequest makes the actual HTTP request
+func (n *HTTPRequestNode) makeHTTPRequest(ctx context.Context, url, body string, variables map[string]interface{}) (map[string]interface{}, error) {
+	// Create request body
 	var requestBody io.Reader
-	if h.nodeData.Method != HttpRequestMethodGet && len(body) > 0 {
-		bodyBytes, err := sonic.Marshal(body)
+	if body != "" {
+		requestBody = bytes.NewBufferString(body)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, string(n.nodeData.Method), url, requestBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	// Set headers
+	for key, value := range n.nodeData.Headers {
+		// Render header value template
+		renderedValue, err := n.renderTemplate(value, variables)
 		if err != nil {
-			return nil, fmt.Errorf("序列化请求体失败: %v", err)
+			return nil, fmt.Errorf("failed to render header template for %s: %w", key, err)
 		}
-		requestBody = bytes.NewBuffer(bodyBytes)
+		req.Header.Set(key, renderedValue)
+	}
 
-		// 如果没有设置Content-Type，默认设置为application/json
-		if _, exists := headers["Content-Type"]; !exists {
-			headers["Content-Type"] = "application/json"
+	// Set default content type for POST/PUT/PATCH requests
+	if (n.nodeData.Method == HTTPMethodPOST || n.nodeData.Method == HTTPMethodPUT || n.nodeData.Method == HTTPMethodPATCH) && body != "" {
+		if req.Header.Get("Content-Type") == "" {
+			req.Header.Set("Content-Type", "application/json")
 		}
 	}
 
-	// 创建HTTP请求
-	req, err := http.NewRequest(string(h.nodeData.Method), requestURL, requestBody)
+	// Make the request
+	resp, err := n.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
-	}
-
-	// 设置请求头
-	for key, value := range headers {
-		req.Header.Set(key, value)
-	}
-
-	// 发起请求
-	client := &http.Client{
-		Timeout: 30 * time.Second, // 30秒超时
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP请求失败: %v", err)
+		return nil, fmt.Errorf("failed to execute HTTP request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// 读取响应体
+	// Read response body
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("读取响应体失败: %v", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return &HttpResponse{
-		Text:       string(responseBody),
-		StatusCode: resp.StatusCode,
-	}, nil
+	// Parse response body as JSON if possible
+	var responseData interface{}
+	if err := sonic.Unmarshal(responseBody, &responseData); err != nil {
+		// If JSON parsing fails, use raw string
+		responseData = string(responseBody)
+	}
+
+	// Build response object
+	response := map[string]interface{}{
+		"status_code": resp.StatusCode,
+		"headers":     resp.Header,
+		"body":        responseData,
+		"url":         url,
+		"method":      string(n.nodeData.Method),
+	}
+
+	return response, nil
 }
 
-// extractVariablesFromState 从状态中提取变量
-func (h *HttpRequestNode) extractVariablesFromState(state *entities.WorkflowState) map[string]any {
-	result := make(map[string]any)
-
-	for _, input := range h.nodeData.Inputs {
-		inputs := make(map[string]any)
-		if err := sonic.UnmarshalString(state.Inputs, &inputs); err != nil {
-			return nil
-		}
-		if val, exists := inputs[input.Name]; exists {
-			result[input.Name] = val
-		}
-	}
-
-	return result
+// GetNodeData returns the node data
+func (n *HTTPRequestNode) GetNodeData() *HTTPRequestNodeData {
+	return n.nodeData
 }

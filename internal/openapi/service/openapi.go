@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
+	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/app"
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	agenteneity "github.com/crazyfrankie/voidx/internal/core/agent/entities"
-	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
@@ -34,13 +34,13 @@ type OpenAPIService struct {
 	llmSvc              *llm.Service
 	appConfigSvc        *app_config.Service
 	appSvc              *app.Service
-	agentManager        *agent.AgentQueueManager
+	agentManager        *agent.AgentQueueManagerFactory
 	tokeBufMem          *memory.TokenBufferMemory
 }
 
 func NewOpenAPIService(repo *repository.OpenAPIRepo, conversationService *service.ConversationService,
 	retrieverSvc *retriever.Service, llmSvc *llm.Service, appConfigSvc *app_config.Service,
-	appSvc *app.Service, agentManager *agent.AgentQueueManager, tokeBufMem *memory.TokenBufferMemory) *OpenAPIService {
+	appSvc *app.Service, agentManager *agent.AgentQueueManagerFactory, tokeBufMem *memory.TokenBufferMemory) *OpenAPIService {
 	return &OpenAPIService{
 		repo:                repo,
 		conversationService: conversationService,
@@ -99,12 +99,6 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 		return nil, err
 	}
 
-	// 6. 从语言模型中根据模型配置获取模型实例
-	llm, err := s.llmSvc.LoadLanguageModel(appConfig.ModelConfig)
-	if err != nil {
-		return nil, err
-	}
-	s.tokeBufMem = s.tokeBufMem.WithLLM(llm)
 	// 7. 获取历史消息（Chat方法中暂不使用，但保留调用以验证功能）
 	_, err = s.tokeBufMem.GetHistoryPromptMessages(2000, appConfig.DialogRound)
 	if err != nil {
@@ -112,7 +106,7 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 	}
 
 	// 8. 将配置中的tools转换成LangChain工具
-	tools, err := s.appConfigSvc.GetLangchainToolsByToolsConfig(ctx, appConfig.Tools)
+	tools, err := s.appConfigSvc.GetToolsByToolsConfig(ctx, appConfig.Tools)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +120,7 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 			}
 		}
 		if len(datasets) > 0 {
-			datasetTool, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, userID, datasets, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
+			datasetTool, err := s.retrieverSvc.CreateToolFromSearch(ctx, userID, datasets, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
 			if err == nil {
 				tools = append(tools, datasetTool)
 			}
@@ -142,7 +136,7 @@ func (s *OpenAPIService) Chat(ctx context.Context, userID uuid.UUID, chatReq req
 			}
 		}
 		if len(workflows) > 0 {
-			workflowTools, err := s.appConfigSvc.GetLangchainToolsByWorkflowIDs(ctx, workflows)
+			workflowTools, err := s.appConfigSvc.GetToolsByWorkflowIDs(ctx, workflows)
 			if err == nil {
 				tools = append(tools, workflowTools...)
 			}
@@ -218,15 +212,16 @@ func (s *OpenAPIService) ProcessStreamChat(ctx context.Context, userID uuid.UUID
 	if err != nil {
 		return nil, err
 	}
-	s.tokeBufMem = s.tokeBufMem.WithLLM(llm)
+
 	// 7. 获取历史消息
+	s.tokeBufMem.WithConversationID(conversation.ID)
 	history, err := s.tokeBufMem.GetHistoryPromptMessages(2000, appConfig.DialogRound)
 	if err != nil {
 		return nil, err
 	}
 
 	// 8. 将配置中的tools转换成LangChain工具
-	tools, err := s.appConfigSvc.GetLangchainToolsByToolsConfig(ctx, appConfig.Tools)
+	tools, err := s.appConfigSvc.GetToolsByToolsConfig(ctx, appConfig.Tools)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +235,7 @@ func (s *OpenAPIService) ProcessStreamChat(ctx context.Context, userID uuid.UUID
 			}
 		}
 		if len(datasets) > 0 {
-			datasetTool, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, userID, datasets, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
+			datasetTool, err := s.retrieverSvc.CreateToolFromSearch(ctx, userID, datasets, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
 			if err == nil {
 				tools = append(tools, datasetTool)
 			}
@@ -256,7 +251,7 @@ func (s *OpenAPIService) ProcessStreamChat(ctx context.Context, userID uuid.UUID
 			}
 		}
 		if len(workflows) > 0 {
-			workflowTools, err := s.appConfigSvc.GetLangchainToolsByWorkflowIDs(ctx, workflows)
+			workflowTools, err := s.appConfigSvc.GetToolsByWorkflowIDs(ctx, workflows)
 			if err == nil {
 				tools = append(tools, workflowTools...)
 			}
@@ -321,15 +316,15 @@ func (s *OpenAPIService) processStreamChatAsync(
 	message *entity.Message,
 	appConfig *resp.AppDraftConfigResp,
 	llm llmentity.BaseLanguageModel,
-	history []llms.MessageContent,
-	tools []tools.Tool,
+	history []*schema.Message,
+	tools []tool.InvokableTool,
 	chatReq req.OpenAPIChatReq,
 	responseStream chan<- string,
 ) {
 	defer close(responseStream)
 
 	// 创建Agent配置
-	agentConfig := agenteneity.AgentConfig{
+	agentConfig := &agenteneity.AgentConfig{
 		UserID:               endUser.TenantID,
 		InvokeFrom:           consts.InvokeFromServiceAPI,
 		PresetPrompt:         appConfig.PresetPrompt,
@@ -360,21 +355,21 @@ func (s *OpenAPIService) processStreamChatAsync(
 		}
 	}
 	if agentInstance == nil {
-		agentInstance = agent.NewReACTAgent(llm, agentConfig, s.agentManager)
+		agentInstance = agent.NewReactAgent(llm, agentConfig, s.agentManager)
 	}
 
 	// 创建Agent状态
 	agentState := agenteneity.AgentState{
 		TaskID:         uuid.New(),
-		Messages:       util.MessageContentToChatMessages(history),
-		History:        util.MessageContentToChatMessages(history),
+		Messages:       history,
+		History:        history,
 		LongTermMemory: conversation.Summary,
 		IterationCount: 0,
 	}
 
 	// 添加当前用户消息
 	if len(chatReq.Query) > 0 {
-		userMsg := llms.HumanChatMessage{Content: chatReq.Query}
+		userMsg := schema.UserMessage(chatReq.Query)
 		agentState.Messages = append(agentState.Messages, userMsg)
 	}
 
@@ -389,7 +384,7 @@ func (s *OpenAPIService) processStreamChatAsync(
 	}
 
 	// 存储agent思考过程
-	agentThoughts := make(map[string]agenteneity.AgentThought)
+	agentThoughts := make(map[string]*agenteneity.AgentThought)
 
 	// 处理流式输出
 	for agentThought := range thoughtChan {
@@ -444,7 +439,7 @@ func (s *OpenAPIService) processStreamChatAsync(
 	agentThoughtsList := make([]agenteneity.AgentThought, 0, len(agentThoughts))
 	for _, thought := range agentThoughts {
 		thoughtCopy := thought
-		agentThoughtsList = append(agentThoughtsList, thoughtCopy)
+		agentThoughtsList = append(agentThoughtsList, *thoughtCopy)
 	}
 
 	// 保存Agent思考过程到数据库
@@ -453,4 +448,29 @@ func (s *OpenAPIService) processStreamChatAsync(
 		// 记录错误但不中断流程
 		logs.Errorf("Failed to save agent thoughts: %v", err)
 	}
+}
+
+// createInvokableToolFromInfo 从ToolInfo创建InvokableTool实例
+func (s *OpenAPIService) createInvokableToolFromInfo(ctx context.Context, toolInfo *schema.ToolInfo) tool.InvokableTool {
+	// 创建一个通用的工具包装器，将ToolInfo转换为可执行的工具
+	return &toolInfoWrapper{
+		info: toolInfo,
+	}
+}
+
+// toolInfoWrapper 将ToolInfo包装为InvokableTool
+type toolInfoWrapper struct {
+	info *schema.ToolInfo
+}
+
+// Info 实现 tool.BaseTool 接口
+func (w *toolInfoWrapper) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return w.info, nil
+}
+
+// InvokableRun 实现 tool.InvokableTool 接口
+func (w *toolInfoWrapper) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	// 这里应该根据具体的工具类型来执行相应的逻辑
+	// 目前返回一个占位符响应
+	return fmt.Sprintf("Tool %s executed with arguments: %s", w.info.Name, argumentsInJSON), nil
 }

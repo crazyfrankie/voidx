@@ -1,6 +1,7 @@
 package llm
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,11 +9,11 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/core/llm/provider"
 )
 
-// LanguageModelManager manages all language model models and their models
+// LanguageModelManager manages all language model providers and their models
 type LanguageModelManager struct {
 	providerMap map[string]*provider.Provider
 	mu          sync.RWMutex
@@ -31,7 +32,7 @@ func NewLanguageModelManager() (*LanguageModelManager, error) {
 	return manager, nil
 }
 
-// initialize loads all models from the models.yaml configuration
+// initialize loads all providers from the providers.yaml configuration
 func (lmm *LanguageModelManager) initialize() error {
 	// Get the current working directory and construct the models path
 	currentDir, err := os.Getwd()
@@ -42,13 +43,13 @@ func (lmm *LanguageModelManager) initialize() error {
 	providersPath := filepath.Join(currentDir, "internal", "core", "llm", "models")
 	providersYamlPath := filepath.Join(providersPath, "providers.yaml")
 
-	// Read models.yaml
+	// Read providers.yaml
 	providersData, err := os.ReadFile(providersYamlPath)
 	if err != nil {
 		return fmt.Errorf("failed to read providers.yaml: %w", err)
 	}
 
-	var providersConfig []entity.ProviderEntity
+	var providersConfig []entities.ProviderEntity
 	if err := yaml.Unmarshal(providersData, &providersConfig); err != nil {
 		return fmt.Errorf("failed to unmarshal providers.yaml: %w", err)
 	}
@@ -73,13 +74,13 @@ func (lmm *LanguageModelManager) GetProvider(providerName string) (*provider.Pro
 
 	pv, exists := lmm.providerMap[providerName]
 	if !exists {
-		return nil, entity.NotFoundError("该模型服务提供商不存在，请核实后重试")
+		return nil, entities.NotFoundError("该模型服务提供商不存在，请核实后重试")
 	}
 
 	return pv, nil
 }
 
-// GetProviders returns all available models
+// GetProviders returns all available providers
 func (lmm *LanguageModelManager) GetProviders() []*provider.Provider {
 	lmm.mu.RLock()
 	defer lmm.mu.RUnlock()
@@ -93,7 +94,7 @@ func (lmm *LanguageModelManager) GetProviders() []*provider.Provider {
 }
 
 // GetModelFactoryByProviderAndType returns a model factory by provider name and model type
-func (lmm *LanguageModelManager) GetModelFactoryByProviderAndType(providerName string, modelType entity.ModelType) (entity.ModelFactory, error) {
+func (lmm *LanguageModelManager) GetModelFactoryByProviderAndType(providerName string, modelType entities.ModelType) (entities.ModelFactory, error) {
 	pv, err := lmm.GetProvider(providerName)
 	if err != nil {
 		return nil, err
@@ -103,7 +104,7 @@ func (lmm *LanguageModelManager) GetModelFactoryByProviderAndType(providerName s
 }
 
 // GetModelFactoryByProviderAndModel returns a model factory by provider name and model name
-func (lmm *LanguageModelManager) GetModelFactoryByProviderAndModel(providerName string, modelName string) (entity.ModelFactory, error) {
+func (lmm *LanguageModelManager) GetModelFactoryByProviderAndModel(providerName string, modelName string) (entities.ModelFactory, error) {
 	// Get the provider
 	pv, err := lmm.GetProvider(providerName)
 	if err != nil {
@@ -121,17 +122,17 @@ func (lmm *LanguageModelManager) GetModelFactoryByProviderAndModel(providerName 
 }
 
 // CreateModel creates a language model instance
-func (lmm *LanguageModelManager) CreateModel(providerName string, modelName string, config map[string]any) (entity.BaseLanguageModel, error) {
+func (lmm *LanguageModelManager) CreateModel(ctx context.Context, providerName string, modelName string, config map[string]any) (entities.BaseLanguageModel, error) {
 	pv, err := lmm.GetProvider(providerName)
 	if err != nil {
 		return nil, err
 	}
 
-	return pv.CreateModel(modelName, config)
+	return pv.CreateModel(ctx, modelName, config)
 }
 
 // GetModelEntity returns a model entity by provider and model name
-func (lmm *LanguageModelManager) GetModelEntity(providerName string, modelName string) (*entity.ModelEntity, error) {
+func (lmm *LanguageModelManager) GetModelEntity(providerName string, modelName string) (*entities.ModelEntity, error) {
 	pv, err := lmm.GetProvider(providerName)
 	if err != nil {
 		return nil, err
@@ -140,12 +141,12 @@ func (lmm *LanguageModelManager) GetModelEntity(providerName string, modelName s
 	return pv.GetModelEntity(modelName)
 }
 
-// GetAllModels returns all available models from all models
-func (lmm *LanguageModelManager) GetAllModels() map[string][]entity.ModelEntity {
+// GetAllModels returns all available models from all providers
+func (lmm *LanguageModelManager) GetAllModels() map[string][]*entities.ModelEntity {
 	lmm.mu.RLock()
 	defer lmm.mu.RUnlock()
 
-	allModels := make(map[string][]entity.ModelEntity)
+	allModels := make(map[string][]*entities.ModelEntity)
 	for providerName, pv := range lmm.providerMap {
 		allModels[providerName] = pv.GetModelEntities()
 	}
@@ -154,7 +155,7 @@ func (lmm *LanguageModelManager) GetAllModels() map[string][]entity.ModelEntity 
 }
 
 // GetModelsByProvider returns all models for a specific provider
-func (lmm *LanguageModelManager) GetModelsByProvider(providerName string) ([]entity.ModelEntity, error) {
+func (lmm *LanguageModelManager) GetModelsByProvider(providerName string) ([]*entities.ModelEntity, error) {
 	pv, err := lmm.GetProvider(providerName)
 	if err != nil {
 		return nil, err
@@ -163,14 +164,14 @@ func (lmm *LanguageModelManager) GetModelsByProvider(providerName string) ([]ent
 	return pv.GetModelEntities(), nil
 }
 
-// GetModelsByType returns all models of a specific type from all models
-func (lmm *LanguageModelManager) GetModelsByType(modelType entity.ModelType) map[string][]entity.ModelEntity {
+// GetModelsByType returns all models of a specific type from all providers
+func (lmm *LanguageModelManager) GetModelsByType(modelType entities.ModelType) map[string][]*entities.ModelEntity {
 	lmm.mu.RLock()
 	defer lmm.mu.RUnlock()
 
-	modelsByType := make(map[string][]entity.ModelEntity)
+	modelsByType := make(map[string][]*entities.ModelEntity)
 	for providerName, pv := range lmm.providerMap {
-		var modelsOfType []entity.ModelEntity
+		var modelsOfType []*entities.ModelEntity
 		for _, model := range pv.GetModelEntities() {
 			if model.ModelType == modelType {
 				modelsOfType = append(modelsOfType, model)
@@ -185,13 +186,13 @@ func (lmm *LanguageModelManager) GetModelsByType(modelType entity.ModelType) map
 }
 
 // GetModelsByFeature returns all models that support a specific feature
-func (lmm *LanguageModelManager) GetModelsByFeature(feature entity.ModelFeature) map[string][]entity.ModelEntity {
+func (lmm *LanguageModelManager) GetModelsByFeature(feature entities.ModelFeature) map[string][]*entities.ModelEntity {
 	lmm.mu.RLock()
 	defer lmm.mu.RUnlock()
 
-	modelsByFeature := make(map[string][]entity.ModelEntity)
+	modelsByFeature := make(map[string][]*entities.ModelEntity)
 	for providerName, pv := range lmm.providerMap {
-		var modelsWithFeature []entity.ModelEntity
+		var modelsWithFeature []*entities.ModelEntity
 		for _, model := range pv.GetModelEntities() {
 			for _, modelFeature := range model.Features {
 				if modelFeature == feature {
@@ -245,36 +246,36 @@ func (lmm *LanguageModelManager) ValidateModelConfig(providerName string, modelN
 }
 
 // validateParameter validates a single parameter value
-func (lmm *LanguageModelManager) validateParameter(param entity.ModelParameter, value any) error {
+func (lmm *LanguageModelManager) validateParameter(param entities.ModelParameter, value any) error {
 	switch param.Type {
-	case entity.ParameterTypeFloat:
+	case entities.ParameterTypeFloat:
 		if floatVal, ok := value.(float64); ok {
 			if param.Min != nil && floatVal < *param.Min {
-				return fmt.Errorf("value %f is below minimum %f", floatVal, param.Min)
+				return fmt.Errorf("value %f is below minimum %f", floatVal, *param.Min)
 			}
 			if param.Max != nil && floatVal > *param.Max {
-				return fmt.Errorf("value %f is above maximum %f", floatVal, param.Max)
+				return fmt.Errorf("value %f is above maximum %f", floatVal, *param.Max)
 			}
 		} else {
 			return fmt.Errorf("expected float, got %T", value)
 		}
-	case entity.ParameterTypeInt:
+	case entities.ParameterTypeInt:
 		if intVal, ok := value.(int); ok {
 			floatVal := float64(intVal)
 			if param.Min != nil && floatVal < *param.Min {
-				return fmt.Errorf("value %d is below minimum %f", intVal, param.Min)
+				return fmt.Errorf("value %d is below minimum %f", intVal, *param.Min)
 			}
 			if param.Max != nil && floatVal > *param.Max {
-				return fmt.Errorf("value %d is above maximum %f", intVal, param.Max)
+				return fmt.Errorf("value %d is above maximum %f", intVal, *param.Max)
 			}
 		} else {
 			return fmt.Errorf("expected int, got %T", value)
 		}
-	case entity.ParameterTypeString:
+	case entities.ParameterTypeString:
 		if _, ok := value.(string); !ok {
 			return fmt.Errorf("expected string, got %T", value)
 		}
-	case entity.ParameterTypeBoolean:
+	case entities.ParameterTypeBoolean:
 		if _, ok := value.(bool); !ok {
 			return fmt.Errorf("expected boolean, got %T", value)
 		}
@@ -288,7 +289,7 @@ func (lmm *LanguageModelManager) Reload() error {
 	lmm.mu.Lock()
 	defer lmm.mu.Unlock()
 
-	// Clear existing models
+	// Clear existing providers
 	lmm.providerMap = make(map[string]*provider.Provider)
 
 	// Reinitialize

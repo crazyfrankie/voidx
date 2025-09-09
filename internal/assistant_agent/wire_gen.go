@@ -7,6 +7,7 @@
 package assistant_agent
 
 import (
+	"context"
 	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/handler"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/repository"
@@ -16,7 +17,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
-	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/google/wire"
 	"gorm.io/gorm"
@@ -24,13 +25,13 @@ import (
 
 // Injectors from wire.go:
 
-func InitAssistantModule(db *gorm.DB, conversationSvc *conversation.ConversationModule, agentManager *agent.AgentQueueManager, llmManager *llm.LanguageModelManager, tokeBufMem *memory.TokenBufferMemory) *AssistantModule {
+func InitAssistantModule(db *gorm.DB, conversationSvc *conversation.ConversationModule, agentManager *agent.AgentQueueManagerFactory, llmManager *llm.LanguageModelManager, tokeBufMem *memory.TokenBufferMemory) *AssistantModule {
 	assistantAgentDao := dao.NewAssistantAgentDao(db)
 	assistantAgentRepo := repository.NewAssistantAgentRepo(assistantAgentDao)
 	conversationService := conversationSvc.Service
 	appProducer := InitProducer()
 	baseLanguageModel := InitModel(llmManager)
-	assistantAgentService := service.NewAssistantAgentService(assistantAgentRepo, conversationService, appProducer, baseLanguageModel, tokeBufMem, agentManager)
+	assistantAgentService := service.NewAssistantAgentService(assistantAgentRepo, conversationService, appProducer, llmManager, tokeBufMem, agentManager, baseLanguageModel)
 	assistantAgentHandler := handler.NewAssistantAgentHandler(assistantAgentService)
 	assistantModule := &AssistantModule{
 		Handler: assistantAgentHandler,
@@ -48,8 +49,8 @@ type AssistantModule struct {
 
 var ProviderSet = wire.NewSet(dao.NewAssistantAgentDao, repository.NewAssistantAgentRepo, service.NewAssistantAgentService, handler.NewAssistantAgentHandler)
 
-func InitModel(llmManager *llm.LanguageModelManager) entity.BaseLanguageModel {
-	model, err := llmManager.CreateModel("tongyi", "qwen-max", map[string]any{
+func InitModel(llmManager *llm.LanguageModelManager) entities.BaseLanguageModel {
+	model, err := llmManager.CreateModel(context.Background(), "tongyi", "qwen-max", map[string]any{
 		"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
 	})
 	if err != nil {

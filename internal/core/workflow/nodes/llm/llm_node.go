@@ -1,101 +1,155 @@
 package llm
 
 import (
+	"context"
 	"fmt"
 	"strings"
+	"text/template"
 	"time"
 
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
+
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
-	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
-	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
-// LLMNode LLM节点
+// LLMNode represents a Large Language Model workflow node
 type LLMNode struct {
-	*nodes.BaseNodeImpl
 	nodeData *LLMNodeData
+	llm      model.BaseChatModel
 }
 
-// NewLLMNode 创建新的LLM节点
-func NewLLMNode(nodeData *LLMNodeData) *LLMNode {
+// NewLLMNode creates a new LLM node instance
+func NewLLMNode(nodeData *LLMNodeData, llm model.BaseChatModel) *LLMNode {
 	return &LLMNode{
-		BaseNodeImpl: nodes.NewBaseNodeImpl(nodeData.BaseNodeData),
-		nodeData:     nodeData,
+		nodeData: nodeData,
+		llm:      llm,
 	}
 }
 
-// Invoke LLM节点执行函数
-func (l *LLMNode) Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error) {
-	startAt := time.Now()
+// Execute executes the LLM node with the given workflow state
+func (n *LLMNode) Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error) {
+	startTime := time.Now()
 
-	// 处理输入数据
-	inputs := make(map[string]any)
-	originInputs := make(map[string]any)
-	if err := sonic.UnmarshalString(state.Inputs, &originInputs); err != nil {
-		return nil, err
+	// Create node result
+	result := entities.NewNodeResult(n.nodeData.BaseNodeData)
+	result.StartTime = startTime.Unix()
+
+	// Extract input variables from state
+	inputsDict, err := n.extractVariablesFromState(state)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to extract input variables: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
 	}
-	for _, input := range l.nodeData.Inputs {
-		if val, exists := originInputs[input.Name]; exists {
-			inputs[input.Name] = val
-		} else if input.Required {
-			return nil, fmt.Errorf("LLM节点缺少必需的输入参数: %s", input.Name)
+	result.Inputs = inputsDict
+
+	// Render prompt template using extracted variables
+	promptValue, err := n.renderPromptTemplate(inputsDict)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to render prompt template: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	// Create message for LLM
+	messages := []*schema.Message{
+		schema.UserMessage(promptValue),
+	}
+
+	// Generate response using LLM
+	response, err := n.llm.Generate(ctx, messages)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("LLM generation failed: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	// Build output data structure
+	outputs := make(map[string]interface{})
+	if len(n.nodeData.Outputs) > 0 {
+		outputs[n.nodeData.Outputs[0].Name] = response.Content
+	} else {
+		outputs["output"] = response.Content
+	}
+	result.Outputs = outputs
+
+	// Set success status
+	result.Status = entities.NodeStatusSucceeded
+	result.EndTime = time.Now().Unix()
+
+	return result, nil
+}
+
+// extractVariablesFromState extracts input variables from the workflow state
+func (n *LLMNode) extractVariablesFromState(state *entities.WorkflowState) (map[string]interface{}, error) {
+	inputsDict := make(map[string]interface{})
+
+	for _, input := range n.nodeData.Inputs {
+		var value interface{}
+		var found bool
+
+		// Check if it's a reference to another node's output
+		if input.Value.Type == entities.VariableValueTypeRef {
+			if content, ok := input.Value.Content.(*entities.VariableContent); ok {
+				if content.RefNodeID != nil {
+					// Find the referenced node's output in state
+					for _, nodeResult := range state.NodeResults {
+						if nodeResult.NodeID == *content.RefNodeID {
+							if refValue, exists := nodeResult.Outputs[content.RefVarName]; exists {
+								value = refValue
+								found = true
+								break
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// It's a constant value
+			value = input.Value.Content
+			found = true
+		}
+
+		if !found && input.Required {
+			return nil, fmt.Errorf("required input variable %s not found", input.Name)
+		}
+
+		if found {
+			inputsDict[input.Name] = value
 		}
 	}
 
-	// 构建提示词
-	prompt := l.buildPrompt(inputs)
-
-	// 模拟LLM调用（实际实现中应该调用真实的LLM API）
-	response := l.simulateLLMCall(prompt)
-
-	// 处理输出数据
-	outputs := make(map[string]any)
-	for _, output := range l.nodeData.Outputs {
-		switch output.Name {
-		case "response":
-			outputs[output.Name] = response
-		case "prompt_used":
-			outputs[output.Name] = prompt
-		case "model":
-			outputs[output.Name] = l.nodeData.Model
-		default:
-			outputs[output.Name] = ""
+	// Also include workflow inputs
+	for key, value := range state.Inputs {
+		if _, exists := inputsDict[key]; !exists {
+			inputsDict[key] = value
 		}
 	}
 
-	// 构建节点结果
-	nodeResult := entities.NewNodeResult(l.nodeData.BaseNodeData)
-	nodeResult.Status = entities.NodeStatusSucceeded
-	nodeResult.Inputs = inputs
-	nodeResult.Outputs = outputs
-	nodeResult.Latency = time.Since(startAt)
-
-	// 构建新状态
-	newState := &entities.WorkflowState{
-		Inputs:      state.Inputs,
-		Outputs:     state.Outputs,
-		NodeResults: append(state.NodeResults, nodeResult),
-	}
-
-	return newState, nil
+	return inputsDict, nil
 }
 
-// buildPrompt 构建提示词
-func (l *LLMNode) buildPrompt(inputs map[string]any) string {
-	prompt := l.nodeData.Prompt
-
-	// 简单的模板替换
-	for key, value := range inputs {
-		placeholder := fmt.Sprintf("{{%s}}", key)
-		prompt = strings.ReplaceAll(prompt, placeholder, fmt.Sprintf("%v", value))
+// renderPromptTemplate renders the prompt template with the given variables
+func (n *LLMNode) renderPromptTemplate(variables map[string]interface{}) (string, error) {
+	// Use Go's text/template to render the prompt
+	tmpl, err := template.New("prompt").Parse(n.nodeData.Prompt)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse prompt template: %w", err)
 	}
 
-	return prompt
+	var result strings.Builder
+	if err := tmpl.Execute(&result, variables); err != nil {
+		return "", fmt.Errorf("failed to execute prompt template: %w", err)
+	}
+
+	return result.String(), nil
 }
 
-// simulateLLMCall 模拟LLM调用
-func (l *LLMNode) simulateLLMCall(prompt string) string {
-	// 这里是模拟实现，实际应该调用真实的LLM API
-	return fmt.Sprintf("基于提示词 '%s' 生成的模拟响应，使用模型: %s",
-		prompt, l.nodeData.Model)
+// GetNodeData returns the node data
+func (n *LLMNode) GetNodeData() *LLMNodeData {
+	return n.nodeData
 }

@@ -31,13 +31,13 @@ type WechatService struct {
 	appConfigSvc    *app_config.Service
 	conversationSvc *conversation.Service
 	llmSvc          *llm.Service
-	agentManager    *agent.AgentQueueManager
+	agentManager    *agent.AgentQueueManagerFactory
 	tokenBufMem     *memory.TokenBufferMemory
 }
 
 func NewWechatService(wec *wechat.Wechat, repo *repository.WechatRepository, retrievalSvc *retriever.Service, appConfigSvc *app_config.Service,
 	conversationSvc *conversation.Service, llmSvc *llm.Service, tokenBufMem *memory.TokenBufferMemory,
-	agentManager *agent.AgentQueueManager) *WechatService {
+	agentManager *agent.AgentQueueManagerFactory) *WechatService {
 	return &WechatService{
 		wec:             wec,
 		repo:            repo,

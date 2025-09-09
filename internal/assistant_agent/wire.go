@@ -4,12 +4,14 @@
 package assistant_agent
 
 import (
+	"context"
+	
 	"github.com/crazyfrankie/voidx/conf"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/task"
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	llmcore "github.com/crazyfrankie/voidx/internal/core/llm"
-	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/google/wire"
 	"gorm.io/gorm"
@@ -33,8 +35,8 @@ var ProviderSet = wire.NewSet(
 	handler.NewAssistantAgentHandler,
 )
 
-func InitModel(llmManager *llmcore.LanguageModelManager) entity.BaseLanguageModel {
-	model, err := llmManager.CreateModel("tongyi", "qwen-max", map[string]any{
+func InitModel(llmManager *llmcore.LanguageModelManager) entities.BaseLanguageModel {
+	model, err := llmManager.CreateModel(context.Background(), "tongyi", "qwen-max", map[string]any{
 		"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
 	})
 	if err != nil {
@@ -54,7 +56,7 @@ func InitProducer() *task.AppProducer {
 }
 
 func InitAssistantModule(db *gorm.DB, conversationSvc *conversation.ConversationModule,
-	agentManager *agent.AgentQueueManager, llmManager *llmcore.LanguageModelManager,
+	agentManager *agent.AgentQueueManagerFactory, llmManager *llmcore.LanguageModelManager,
 	tokeBufMem *memory.TokenBufferMemory) *AssistantModule {
 	wire.Build(
 		InitProducer,

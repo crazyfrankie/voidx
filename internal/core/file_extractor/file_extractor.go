@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/tmc/langchaingo/documentloaders"
-	"github.com/tmc/langchaingo/schema"
+	"github.com/cloudwego/eino-ext/components/document/loader/file"
+	"github.com/cloudwego/eino/components/document"
+	"github.com/cloudwego/eino/schema"
 
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/upload"
@@ -18,18 +18,28 @@ import (
 
 // FileExtractor handles file extraction and conversion to LangChain documents
 type FileExtractor struct {
-	uploadSvc *upload.Service
+	uploadSvc  *upload.Service
+	fileLoader *file.FileLoader
 }
 
 // NewFileExtractor creates a new FileExtractor instance
-func NewFileExtractor(uploadSvc *upload.Service) *FileExtractor {
-	return &FileExtractor{
-		uploadSvc: uploadSvc,
+func NewFileExtractor(uploadSvc *upload.Service) (*FileExtractor, error) {
+	// Create eino file loader
+	fileLoader, err := file.NewFileLoader(context.Background(), &file.FileLoaderConfig{
+		UseNameAsID: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create file loader: %w", err)
 	}
+
+	return &FileExtractor{
+		uploadSvc:  uploadSvc,
+		fileLoader: fileLoader,
+	}, nil
 }
 
-// Load loads a file from UploadFile record and returns LangChain documents or text
-func (f *FileExtractor) Load(ctx context.Context, uploadFile *entity.UploadFile, returnText, isUnstructured bool) ([]schema.Document, error) {
+// Load loads a file from UploadFile record and returns eino documents
+func (f *FileExtractor) Load(ctx context.Context, uploadFile *entity.UploadFile, returnText, isUnstructured bool) ([]*schema.Document, error) {
 	// Create a temporary directory
 	tempDir, err := os.MkdirTemp("", "file_extractor_*")
 	if err != nil {
@@ -49,8 +59,8 @@ func (f *FileExtractor) Load(ctx context.Context, uploadFile *entity.UploadFile,
 	return LoadFromFile(filePath, returnText, isUnstructured)
 }
 
-// LoadFromURL loads a file from URL and returns LangChain documents or text
-func LoadFromURL(url string, returnText bool) (any, error) {
+// LoadFromURL loads a file from URL and returns eino documents
+func LoadFromURL(url string, returnText bool) ([]*schema.Document, error) {
 	// Download file from URL
 	resp, err := http.Get(url)
 	if err != nil {
@@ -81,49 +91,23 @@ func LoadFromURL(url string, returnText bool) (any, error) {
 	return LoadFromFile(filePath, returnText, true)
 }
 
-// LoadFromFile loads a file from local path and returns LangChain documents or text
-func LoadFromFile(filePath string, returnText, isUnstructured bool) ([]schema.Document, error) {
-	// Get file extension
-	extension := strings.ToLower(filepath.Ext(filePath))
-
-	// Create appropriate loader based on file extension
-	var loader documentloaders.Loader
-	var err error
-
-	file, err := os.Open(filePath)
+// LoadFromFile loads a file from local path and returns eino documents
+func LoadFromFile(filePath string, returnText, isUnstructured bool) ([]*schema.Document, error) {
+	// Create eino file loader
+	fileLoader, err := file.NewFileLoader(context.Background(), &file.FileLoaderConfig{
+		UseNameAsID: true,
+	})
 	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	switch extension {
-	//case ".xlsx", ".xls":
-	//	loader, err = documentloaders.NewExcel(filePath)
-	case ".pdf":
-		finfo, err := file.Stat()
-		if err != nil {
-			return nil, err
-		}
-		loader = documentloaders.NewPDF(file, finfo.Size())
-	case ".md", ".markdown":
-		loader = documentloaders.NewText(file) // Use text loader for markdown
-	case ".htm", ".html":
-		loader = documentloaders.NewHTML(file)
-	case ".csv":
-		loader = documentloaders.NewCSV(file)
-	case ".ppt", ".pptx":
-		loader = documentloaders.NewText(file) // Use text loader for PowerPoint
-	case ".xml":
-		loader = documentloaders.NewText(file) // Use text loader for XML
-	default:
-		loader = documentloaders.NewText(file)
+		return nil, fmt.Errorf("failed to create file loader: %w", err)
 	}
 
-	if loader != nil {
-		return nil, fmt.Errorf("failed to create document loader: %w", err)
+	// Create document source
+	src := document.Source{
+		URI: filePath,
 	}
 
-	// Load documents
-	docs, err := loader.Load(context.Background())
+	// Load documents using eino
+	docs, err := fileLoader.Load(context.Background(), src)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load documents: %w", err)
 	}

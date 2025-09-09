@@ -23,14 +23,14 @@ import (
 
 // Injectors from wire.go:
 
-func InitWechatModule(db *gorm.DB, wec *wechat.Wechat, retrieval *retriever.RetrieverModule, appConfigSvc *app_config.AppConfigModule, conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule, agentManager *agent.AgentQueueManager, tokenBufMem *memory.TokenBufferMemory) *WechatModule {
+func InitWechatModule(db *gorm.DB, wec *wechat.Wechat, retrieval *retriever.RetrieverModule, appConfigSvc *app_config.AppConfigModule, conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule, agentService *agent.Service, tokenBufMem *memory.TokenBufferMemory) *WechatModule {
 	wechatDao := dao.NewWechatDao(db)
 	wechatRepository := repository.NewWechatRepository(wechatDao)
 	retrievalService := retrieval.Service
 	appConfigService := appConfigSvc.Service
 	conversationService := conversationSvc.Service
 	llmService := llmSvc.Service
-	wechatService := service.NewWechatService(wec, wechatRepository, retrievalService, appConfigService, conversationService, llmService, tokenBufMem, agentManager)
+	wechatService := service.NewWechatService(wec, wechatRepository, retrievalService, appConfigService, conversationService, llmService, tokenBufMem, agentService)
 	wechatHandler := handler.NewWechatHandler(wechatService)
 	wechatModule := &WechatModule{
 		Handler: wechatHandler,

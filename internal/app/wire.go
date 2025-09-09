@@ -3,6 +3,8 @@
 package app
 
 import (
+	"context"
+
 	"github.com/crazyfrankie/voidx/internal/app/handler"
 	"github.com/crazyfrankie/voidx/internal/app/repository"
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
@@ -11,14 +13,12 @@ import (
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	llmcore "github.com/crazyfrankie/voidx/internal/core/llm"
-	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
 	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
-	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/upload"
-	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/google/wire"
 	"gorm.io/gorm"
 )
@@ -31,8 +31,8 @@ type AppModule struct {
 	Service *Service
 }
 
-func InitModel(llmManager *llmcore.LanguageModelManager) entity.BaseLanguageModel {
-	model, err := llmManager.CreateModel("tongyi", "qwen-max", map[string]any{
+func InitModel(llmManager *llmcore.LanguageModelManager) entities.BaseLanguageModel {
+	model, err := llmManager.CreateModel(context.Background(), "tongyi", "qwen-max", map[string]any{
 		"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
 	})
 	if err != nil {
@@ -42,10 +42,10 @@ func InitModel(llmManager *llmcore.LanguageModelManager) entity.BaseLanguageMode
 	return model
 }
 
-func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory *memory.TokenBufferMemory,
-	llmCore *llmcore.LanguageModelManager, appConfig *app_config.AppConfigModule,
-	ossSvc *upload.UploadModule, retrieverSvc *retriever.RetrieverModule, agentManager *agent.AgentQueueManager,
-	llmModule *llm.LLMModule, apiProvider *providers.ApiProviderManager, builtinProvider *builtin.BuiltinProviderManager,
+func InitAppModule(db *gorm.DB, memory *memory.TokenBufferMemory,
+	llmCore *llmcore.LanguageModelManager, appConfig *app_config.AppConfigModule, agentSvc *agent.AgentQueueManagerFactory,
+	ossSvc *upload.UploadModule, retrieverSvc *retriever.RetrieverModule,
+	apiProvider *providers.APIProviderManager, builtinProvider *builtin.BuiltinProviderManager,
 	convers *conversation.ConversationModule) *AppModule {
 	wire.Build(
 		InitModel,
@@ -57,7 +57,6 @@ func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory *memo
 		wire.Struct(new(AppModule), "*"),
 		wire.FieldsOf(new(*app_config.AppConfigModule), "Service"),
 		wire.FieldsOf(new(*conversation.ConversationModule), "Service"),
-		wire.FieldsOf(new(*llm.LLMModule), "Service"),
 		wire.FieldsOf(new(*upload.UploadModule), "Service"),
 		wire.FieldsOf(new(*retriever.RetrieverModule), "Service"),
 	)

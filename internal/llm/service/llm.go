@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/crazyfrankie/voidx/internal/core/llm"
-	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/types/errno"
 )
@@ -30,14 +30,18 @@ func (s *LLMService) GetProviders(ctx context.Context) ([]*resp.ProviderResp, er
 
 	providerResps := make([]*resp.ProviderResp, 0, len(providers))
 	for _, provider := range providers {
+		modelTypes := make([]entities.ModelType, 0, len(provider.ProviderEntity.SupportedModelTypes))
+		for _, modelType := range provider.ProviderEntity.SupportedModelTypes {
+			modelTypes = append(modelTypes, modelType)
+		}
+
 		providerResps = append(providerResps, &resp.ProviderResp{
 			Name:        provider.Name,
 			Label:       provider.ProviderEntity.Label,
 			Description: provider.ProviderEntity.Description,
 			Icon:        provider.ProviderEntity.Icon,
 			Background:  provider.ProviderEntity.Background,
-			ModelTypes:  provider.ProviderEntity.SupportedModelTypes,
-			Position:    provider.Position,
+			ModelTypes:  modelTypes,
 		})
 	}
 
@@ -78,7 +82,7 @@ func (s *LLMService) GetProviderIcon(ctx context.Context, providerName string) (
 
 	providerPath := filepath.Join(
 		rootPath,
-		"internal", "core", "llm", "models", providerName,
+		"internal", "core", "llm", "providers", providerName,
 	)
 
 	iconPath := filepath.Join(providerPath, "_asset", provider.ProviderEntity.Icon)
@@ -101,7 +105,7 @@ func (s *LLMService) GetProviderIcon(ctx context.Context, providerName string) (
 }
 
 // LoadLanguageModel 从模型配置加载语言模型
-func (s *LLMService) LoadLanguageModel(modelConfig map[string]any) (entity.BaseLanguageModel, error) {
+func (s *LLMService) LoadLanguageModel(modelConfig map[string]any) (entities.BaseLanguageModel, error) {
 	// 验证并处理模型配置
 	validConfig, err := s.processAndValidateModelConfig(modelConfig)
 	if err != nil {
@@ -110,10 +114,10 @@ func (s *LLMService) LoadLanguageModel(modelConfig map[string]any) (entity.BaseL
 
 	providerName := validConfig["provider"].(string)
 	modelName := validConfig["model"].(string)
-	parameters := validConfig["parameters"].(map[string]any)
+	parameters := validConfig["parameters"].(map[string]interface{})
 
 	// 创建模型实例
-	return s.llmCore.CreateModel(providerName, modelName, parameters)
+	return s.llmCore.CreateModel(context.Background(), providerName, modelName, parameters)
 }
 
 // processAndValidateModelConfig 处理并验证模型配置
@@ -147,10 +151,10 @@ func (s *LLMService) processAndValidateModelConfig(modelConfig map[string]any) (
 	}
 
 	// 处理参数
-	parameters := make(map[string]any)
-	configParams, ok := modelConfig["parameters"].(map[string]any)
+	parameters := make(map[string]interface{})
+	configParams, ok := modelConfig["parameters"].(map[string]interface{})
 	if !ok {
-		configParams = make(map[string]any)
+		configParams = make(map[string]interface{})
 	}
 
 	// 为每个参数设置值
@@ -193,12 +197,12 @@ func (s *LLMService) processAndValidateModelConfig(modelConfig map[string]any) (
 }
 
 // validateParameterType 验证参数类型
-func (s *LLMService) validateParameterType(value interface{}, paramType entity.ModelParameterType) bool {
+func (s *LLMService) validateParameterType(value interface{}, paramType entities.ModelParameterType) bool {
 	switch paramType {
-	case entity.ParameterTypeFloat:
+	case entities.ParameterTypeFloat:
 		_, ok := value.(float64)
 		return ok
-	case entity.ParameterTypeInt:
+	case entities.ParameterTypeInt:
 		_, ok := value.(int)
 		if !ok {
 			// 也接受 float64 类型的整数
@@ -207,10 +211,10 @@ func (s *LLMService) validateParameterType(value interface{}, paramType entity.M
 			}
 		}
 		return ok
-	case entity.ParameterTypeString:
+	case entities.ParameterTypeString:
 		_, ok := value.(string)
 		return ok
-	case entity.ParameterTypeBoolean:
+	case entities.ParameterTypeBoolean:
 		_, ok := value.(bool)
 		return ok
 	default:
@@ -230,7 +234,7 @@ func (s *LLMService) getDefaultModelConfig() map[string]any {
 	}
 }
 
-func convertFeatures(features []entity.ModelFeature) []string {
+func convertFeatures(features []entities.ModelFeature) []string {
 	result := make([]string, 0, len(features))
 	for _, feature := range features {
 		result = append(result, string(feature))
@@ -238,7 +242,7 @@ func convertFeatures(features []entity.ModelFeature) []string {
 	return result
 }
 
-func convertParameters(parameters []entity.ModelParameter) []resp.ModelParameterResp {
+func convertParameters(parameters []entities.ModelParameter) []resp.ModelParameterResp {
 	result := make([]resp.ModelParameterResp, 0, len(parameters))
 	for _, param := range parameters {
 		result = append(result, resp.ModelParameterResp{
@@ -257,7 +261,7 @@ func convertParameters(parameters []entity.ModelParameter) []resp.ModelParameter
 	return result
 }
 
-func convertParameterOptions(options []entity.ModelParameterOption) []resp.ModelParameterOptionResp {
+func convertParameterOptions(options []entities.ModelParameterOption) []resp.ModelParameterOptionResp {
 	result := make([]resp.ModelParameterOptionResp, 0, len(options))
 	for _, option := range options {
 		result = append(result, resp.ModelParameterOptionResp{

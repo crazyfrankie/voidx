@@ -25,7 +25,7 @@ type WechatModule struct {
 }
 
 func InitWechatModule(db *gorm.DB, wec *wechat.Wechat, retrieval *retriever.RetrieverModule, appConfigSvc *app_config.AppConfigModule,
-	conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule, agentManager *agent.AgentQueueManager,
+	conversationSvc *conversation.ConversationModule, llmSvc *llm.LLMModule, agentService *agent.Service,
 	tokenBufMem *memory.TokenBufferMemory) *WechatModule {
 	wire.Build(
 		dao.NewWechatDao,

@@ -1,10 +1,11 @@
 package entities
 
 import (
-	"github.com/crazyfrankie/voidx/types/consts"
+	"github.com/cloudwego/eino/components/tool"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
+
+	"github.com/cloudwego/eino/schema"
+	"github.com/crazyfrankie/voidx/types/consts"
 )
 
 // AgentConfig represents the configuration for an agent
@@ -28,7 +29,7 @@ type AgentConfig struct {
 	EnableLongTermMemory bool `json:"enable_long_term_memory"`
 
 	// Tools represents the list of tools available to the agent
-	Tools []tools.Tool `json:"tools"`
+	Tools []tool.InvokableTool `json:"tools"`
 
 	// ReviewConfig represents the configuration for content review
 	ReviewConfig ReviewConfig `json:"review_config"`
@@ -62,13 +63,26 @@ type AgentState struct {
 	IterationCount int `json:"iteration_count"`
 
 	// History represents the conversation history
-	History []llms.ChatMessage `json:"history"`
+	History []*schema.Message `json:"history"`
 
 	// LongTermMemory represents the long-term memory content
 	LongTermMemory string `json:"long_term_memory"`
 
 	// Messages represents the current messages in processing
-	Messages []llms.ChatMessage `json:"messages"`
+	Messages []*schema.Message `json:"messages"`
+
+	// NodeResults represents the results from workflow nodes
+	NodeResults []NodeResult `json:"node_results,omitempty"`
+}
+
+// NodeResult represents the result of a workflow node execution
+type NodeResult struct {
+	NodeID   uuid.UUID              `json:"node_id"`
+	NodeType string                 `json:"node_type"`
+	Status   string                 `json:"status"`
+	Inputs   map[string]interface{} `json:"inputs,omitempty"`
+	Outputs  map[string]interface{} `json:"outputs,omitempty"`
+	Error    string                 `json:"error,omitempty"`
 }
 
 // Constants for agent configuration

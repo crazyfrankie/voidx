@@ -1,130 +1,192 @@
 package question_classifier
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/schema"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
-	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
-	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/crazyfrankie/voidx/internal/core/workflow/utils"
 )
 
-// QuestionClassifierNode 问题分类器节点
+// Question classifier system prompt
+const QuestionClassifierSystemPrompt = `# 角色
+你是一个文本分类引擎，负责对输入的文本进行分类，并返回相应的分类名称，如果没有匹配的分类则返回第一个分类，预设分类会以json列表的名称提供，请注意正确识别。
+
+## 技能
+### 技能1：文本分类
+- 接收用户输入的文本内容。
+- 使用自然语言处理技术分析文本特征。
+- 根据预设的分类信息，将文本准确划分至相应类别，并返回分类名称。
+- 分类名称格式为xxx_uuid，例如: qc_source_handle_1e3ac414-52f9-48f5-94fd-fbf4d3fe2df7，请注意识别。
+
+## 预设分类信息
+预设分类信息如下:
+%s
+
+## 限制
+- 仅处理文本分类相关任务。
+- 输出仅包含分类名称，不提供额外解释或信息。
+- 确保分类结果的准确性，避免错误分类。
+- 使用预设的分类标准进行判断，不进行主观解释。 
+- 如果预设的分类没有符合条件，请直接返回第一个分类。`
+
+// QuestionClassifierNode represents a question classifier workflow node
 type QuestionClassifierNode struct {
-	*nodes.BaseNodeImpl
 	nodeData *QuestionClassifierNodeData
+	llmModel model.BaseChatModel
 }
 
-// NewQuestionClassifierNode 创建新的问题分类器节点
-func NewQuestionClassifierNode(nodeData *QuestionClassifierNodeData) *QuestionClassifierNode {
+// ClassInfo represents class information for the prompt
+type ClassInfo struct {
+	Query string `json:"query"`
+	Class string `json:"class"`
+}
+
+// NewQuestionClassifierNode creates a new question classifier node instance
+func NewQuestionClassifierNode(nodeData *QuestionClassifierNodeData, llmModel model.BaseChatModel) *QuestionClassifierNode {
+
 	return &QuestionClassifierNode{
-		BaseNodeImpl: nodes.NewBaseNodeImpl(nodeData.BaseNodeData),
-		nodeData:     nodeData,
+		nodeData: nodeData,
+		llmModel: llmModel,
 	}
 }
 
-// Invoke 覆盖重写invoke实现问题分类器节点，执行问题分类后返回节点的名称，如果LLM判断错误默认返回第一个节点名称
-func (q *QuestionClassifierNode) Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error) {
-	// 1. 提取节点输入变量字典映射
-	inputsDict := q.extractVariablesFromState(state)
+// Execute executes the question classifier node
+func (n *QuestionClassifierNode) Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error) {
+	startTime := time.Now()
 
-	// 2. 构建分类信息
-	classInfos := make([]map[string]any, 0, len(q.nodeData.Classes))
-	for _, classConfig := range q.nodeData.Classes {
-		classInfos = append(classInfos, map[string]any{
-			"query": classConfig.Query,
-			"class": fmt.Sprintf("qc_source_handle_%s", classConfig.SourceHandleID),
-		})
-	}
+	// Create node result
+	result := entities.NewNodeResult(n.nodeData.BaseNodeData)
+	result.StartTime = startTime.Unix()
 
-	// 3. 序列化分类信息
-	classInfosJSON, err := sonic.Marshal(classInfos)
+	// Extract input variables from state
+	inputsDict, err := utils.ExtractVariablesFromState(n.nodeData.Inputs, state)
 	if err != nil {
-		return nil, fmt.Errorf("序列化分类信息失败: %v", err)
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to extract input variables: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, nil
 	}
 
-	// 4. 构建提示词
-	systemPrompt := fmt.Sprintf(QuestionClassifierSystemPrompt, string(classInfosJSON))
-	query := "用户没有输入任何内容"
-	if queryValue, exists := inputsDict["query"]; exists {
-		query = fmt.Sprintf("%v", queryValue)
+	result.Inputs = inputsDict
+
+	// Get the query from inputs
+	query, ok := inputsDict["query"]
+	if !ok {
+		query = "用户没有输入任何内容"
 	}
 
-	// 5. 调用LLM进行分类（这里需要实现LLM调用逻辑）
-	nodeFlag, err := q.callLLMForClassification(systemPrompt, query)
+	queryStr, ok := query.(string)
+	if !ok {
+		queryStr = fmt.Sprintf("%v", query)
+	}
+
+	// Build class information for the prompt
+	classInfos := make([]ClassInfo, len(n.nodeData.Classes))
+	for i, class := range n.nodeData.Classes {
+		classInfos[i] = ClassInfo{
+			Query: class.Query,
+			Class: fmt.Sprintf("qc_source_handle_%s", class.SourceHandleID),
+		}
+	}
+
+	// Convert class information to JSON
+	classInfoJSON, err := json.Marshal(classInfos)
 	if err != nil {
-		return nil, fmt.Errorf("LLM分类调用失败: %v", err)
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to marshal class information: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, nil
 	}
 
-	// 6. 获取所有分类信息
-	allClasses := make([]string, 0, len(q.nodeData.Classes))
-	for _, item := range q.nodeData.Classes {
-		allClasses = append(allClasses, fmt.Sprintf("qc_source_handle_%s", item.SourceHandleID))
+	// Build the system prompt with class information
+	systemPrompt := fmt.Sprintf(QuestionClassifierSystemPrompt, string(classInfoJSON))
+
+	// Create messages for the LLM
+	messages := []*schema.Message{
+		{
+			Role:    schema.System,
+			Content: systemPrompt,
+		},
+		{
+			Role:    schema.User,
+			Content: queryStr,
+		},
 	}
 
-	// 7. 检测获取的分类标识是否在规定列表内，并提取节点标识
+	// Call the LLM model
+	response, err := n.llmModel.Generate(ctx, messages, model.WithTemperature(0.0), model.WithMaxTokens(512))
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("LLM generation failed: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, nil
+	}
+
+	// Extract the classification result
+	nodeFlag := strings.TrimSpace(response.Content)
+
+	// Get all valid class names
+	allClasses := n.nodeData.GetClassNames()
+
+	// Validate the classification result
 	if len(allClasses) == 0 {
 		nodeFlag = "END"
-	} else if !contains(allClasses, nodeFlag) {
-		nodeFlag = allClasses[0]
+	} else {
+		// Check if the result is in the valid classes
+		validClass := false
+		for _, class := range allClasses {
+			if nodeFlag == class {
+				validClass = true
+				break
+			}
+		}
+
+		// If not valid, use the first class
+		if !validClass {
+			nodeFlag = allClasses[0]
+		}
 	}
 
-	// 8. 对于分类器节点，我们需要返回特殊的状态来指示下一个节点
-	newState := &entities.WorkflowState{
-		Inputs:      state.Inputs,
-		Outputs:     state.Outputs,
-		NodeResults: state.NodeResults,
+	// Set successful result
+	result.Status = entities.NodeStatusSucceeded
+	result.Outputs = map[string]any{
+		"classification": nodeFlag,
 	}
+	result.EndTime = time.Now().Unix()
 
-	return newState, nil
+	return result, nil
 }
 
-// callLLMForClassification 调用LLM进行分类（模拟实现）
-func (q *QuestionClassifierNode) callLLMForClassification(systemPrompt, query string) (string, error) {
-	// 这里应该实现真正的LLM调用逻辑
-	// 目前提供一个简单的模拟实现
-
-	// 简单的关键词匹配逻辑
-	queryLower := strings.ToLower(query)
-
-	for _, classConfig := range q.nodeData.Classes {
-		classQueryLower := strings.ToLower(classConfig.Query)
-		if strings.Contains(queryLower, classQueryLower) || strings.Contains(classQueryLower, queryLower) {
-			return fmt.Sprintf("qc_source_handle_%s", classConfig.SourceHandleID), nil
-		}
+// GetNextNodeFlag returns the next node flag based on classification result
+// This method is used by the workflow engine to determine the next node to execute
+func (n *QuestionClassifierNode) GetNextNodeFlag(ctx context.Context, state *entities.WorkflowState) (string, error) {
+	// Execute the node to get the classification result
+	result, err := n.Execute(ctx, state)
+	if err != nil {
+		return "", err
 	}
 
-	// 如果没有匹配，返回第一个分类
-	if len(q.nodeData.Classes) > 0 {
-		return fmt.Sprintf("qc_source_handle_%s", q.nodeData.Classes[0].SourceHandleID), nil
+	if result.Status == entities.NodeStatusFailed {
+		return "", fmt.Errorf("question classifier node failed: %s", result.Error)
 	}
 
-	return "END", nil
-}
-
-// extractVariablesFromState 从状态中提取变量
-func (q *QuestionClassifierNode) extractVariablesFromState(state *entities.WorkflowState) map[string]any {
-	result := make(map[string]any)
-
-	for _, input := range q.nodeData.Inputs {
-		inputs := make(map[string]any)
-		if err := sonic.UnmarshalString(state.Inputs, &inputs); err != nil {
-			return nil
+	// Extract the classification result
+	classification, ok := result.Outputs["classification"].(string)
+	if !ok {
+		// Fallback to first class if extraction fails
+		allClasses := n.nodeData.GetClassNames()
+		if len(allClasses) > 0 {
+			return allClasses[0], nil
 		}
-		if val, exists := inputs[input.Name]; exists {
-			result[input.Name] = val
-		}
+		return "END", nil
 	}
 
-	return result
-}
-
-// contains 检查切片是否包含指定元素
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return classification, nil
 }

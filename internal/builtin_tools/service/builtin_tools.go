@@ -9,20 +9,19 @@ import (
 	"path/filepath"
 
 	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/categories"
-	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/entities"
 	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
 	"github.com/crazyfrankie/voidx/types/errno"
 )
 
 type BuiltinToolsService struct {
-	toolManager     *categories.BuiltinCategoryManager
+	categoryManager *categories.BuiltinCategoryManager
 	providerManager *providers.BuiltinProviderManager
 }
 
-func NewBuiltinToolsService(toolManager *categories.BuiltinCategoryManager,
+func NewBuiltinToolsService(categoryManager *categories.BuiltinCategoryManager,
 	providerManager *providers.BuiltinProviderManager) *BuiltinToolsService {
 	return &BuiltinToolsService{
-		toolManager:     toolManager,
+		categoryManager: categoryManager,
 		providerManager: providerManager,
 	}
 }
@@ -61,8 +60,8 @@ func (s *BuiltinToolsService) GetBuiltinTools(ctx context.Context) []map[string]
 }
 
 func (s *BuiltinToolsService) GetProviderTool(ctx context.Context, providerName string, toolName string) (map[string]any, error) {
-	provider := s.providerManager.GetProvider(providerName)
-	if provider == nil {
+	provider, err := s.providerManager.GetProvider(providerName)
+	if err != nil {
 		return nil, errno.ErrNotFound.AppendBizMessage(fmt.Errorf("该提供商 %s 不存在", providerName))
 	}
 
@@ -92,8 +91,8 @@ func (s *BuiltinToolsService) GetProviderTool(ctx context.Context, providerName 
 }
 
 func (s *BuiltinToolsService) GetProviderIcon(ctx context.Context, providerName string) ([]byte, string, error) {
-	provider := s.providerManager.GetProvider(providerName)
-	if provider == nil {
+	provider, err := s.providerManager.GetProvider(providerName)
+	if err != nil {
 		return nil, "", errno.ErrNotFound.AppendBizMessage(fmt.Errorf("该工具提供者 %s 不存在", providerName))
 	}
 
@@ -127,7 +126,7 @@ func (s *BuiltinToolsService) GetProviderIcon(ctx context.Context, providerName 
 }
 
 func (s *BuiltinToolsService) GetCategories(ctx context.Context) []map[string]any {
-	categoryMap := s.toolManager.GetCategoryMap()
+	categoryMap := s.categoryManager.GetCategoryMap()
 
 	res := make([]map[string]any, 0, len(categoryMap))
 	for _, category := range categoryMap {
@@ -141,7 +140,7 @@ func (s *BuiltinToolsService) GetCategories(ctx context.Context) []map[string]an
 	return res
 }
 
-func (s *BuiltinToolsService) getToolInputs(tool *entities.ToolEntity) []map[string]any {
+func (s *BuiltinToolsService) getToolInputs(tool *providers.ToolEntity) []map[string]any {
 	var inputs []map[string]any
 
 	if tool == nil || tool.Params == nil {

@@ -1,71 +1,115 @@
 package end
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
-	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
-	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
-// EndNode 结束节点
+// EndNodeData represents the data structure for end workflow nodes
+type EndNodeData struct {
+	*entities.BaseNodeData
+	Outputs []*entities.VariableEntity `json:"outputs"`
+}
+
+// NewEndNodeData creates a new end node data instance
+func NewEndNodeData() *EndNodeData {
+	return &EndNodeData{
+		BaseNodeData: &entities.BaseNodeData{NodeType: entities.NodeTypeEnd},
+		Outputs:      make([]*entities.VariableEntity, 0),
+	}
+}
+
+// GetBaseNodeData returns the base node data (implements NodeDataInterface)
+func (e *EndNodeData) GetBaseNodeData() *entities.BaseNodeData {
+	return e.BaseNodeData
+}
+
+// EndNode represents an end workflow node
 type EndNode struct {
-	*nodes.BaseNodeImpl
 	nodeData *EndNodeData
 }
 
-// NewEndNode 创建新的结束节点
+// NewEndNode creates a new end node instance
 func NewEndNode(nodeData *EndNodeData) *EndNode {
 	return &EndNode{
-		BaseNodeImpl: nodes.NewBaseNodeImpl(nodeData.BaseNodeData),
-		nodeData:     nodeData,
+		nodeData: nodeData,
 	}
 }
 
-// Invoke 结束节点执行函数，该函数会处理输出数据并生成最终结果
-func (e *EndNode) Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error) {
-	startAt := time.Now()
+// Execute executes the end node with the given workflow state
+func (n *EndNode) Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error) {
+	startTime := time.Now()
 
-	// 处理输出数据
-	outputs := make(map[string]any)
+	// Create node result
+	result := entities.NewNodeResult(n.nodeData.BaseNodeData)
+	result.StartTime = startTime.Unix()
 
-	for _, output := range e.nodeData.Outputs {
-		// 这里简化处理，实际应该根据变量的value类型来处理引用或字面值
+	// Extract output variables from state
+	outputsDict, err := n.extractOutputsFromState(state)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to extract output variables: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+
+	result.Inputs = outputsDict
+	result.Outputs = outputsDict
+	result.Status = entities.NodeStatusSucceeded
+	result.EndTime = time.Now().Unix()
+
+	// Update workflow state outputs
+	state.Outputs = outputsDict
+
+	return result, nil
+}
+
+// extractOutputsFromState extracts output variables from the workflow state
+func (n *EndNode) extractOutputsFromState(state *entities.WorkflowState) (map[string]interface{}, error) {
+	outputsDict := make(map[string]interface{})
+
+	for _, output := range n.nodeData.Outputs {
+		var value interface{}
+		var found bool
+
+		// Check if it's a reference to another node's output
 		if output.Value.Type == entities.VariableValueTypeRef {
-			// 处理引用类型的输出
-			// 这里需要根据引用信息从前置节点获取数据
-			// 简化实现，直接从state中获取
-			inputs := make(map[string]any)
-			if err := sonic.UnmarshalString(state.Inputs, &inputs); err != nil {
-				return nil, err
-			}
-			if val, exists := inputs[output.Name]; exists {
-				outputs[output.Name] = val
+			if content, ok := output.Value.Content.(*entities.VariableContent); ok {
+				if content.RefNodeID != nil {
+					// Find the referenced node's output in state
+					for _, nodeResult := range state.NodeResults {
+						if nodeResult.NodeID == *content.RefNodeID {
+							if refValue, exists := nodeResult.Outputs[content.RefVarName]; exists {
+								value = refValue
+								found = true
+								break
+							}
+						}
+					}
+				}
 			}
 		} else {
-			// 处理字面值类型的输出
-			outputs[output.Name] = output.Value.Content
+			// It's a constant value
+			value = output.Value.Content
+			found = true
+		}
+
+		if !found && output.Required {
+			return nil, fmt.Errorf("required output variable %s not found", output.Name)
+		}
+
+		if found {
+			outputsDict[output.Name] = value
 		}
 	}
 
-	// 构建节点结果
-	nodeResult := entities.NewNodeResult(e.nodeData.BaseNodeData)
-	nodeResult.Status = entities.NodeStatusSucceeded
-	nodeResult.Inputs = make(map[string]any) // 结束节点通常没有特定输入
-	nodeResult.Outputs = outputs
-	nodeResult.Latency = time.Since(startAt)
+	return outputsDict, nil
+}
 
-	output, err := sonic.MarshalString(outputs)
-	if err != nil {
-		return nil, err
-	}
-
-	// 构建状态数据并返回，设置最终输出
-	newState := &entities.WorkflowState{
-		Inputs:      state.Inputs,
-		Outputs:     output, // 设置工作流的最终输出
-		NodeResults: append(state.NodeResults, nodeResult),
-	}
-
-	return newState, nil
+// GetNodeData returns the node data
+func (n *EndNode) GetNodeData() *EndNodeData {
+	return n.nodeData
 }

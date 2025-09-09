@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/schema"
-	"github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
 	"github.com/crazyfrankie/voidx/internal/models/req"
@@ -14,6 +16,71 @@ import (
 	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/types/consts"
 )
+
+// DatasetRetrievalInput 数据集检索工具的输入结构
+type DatasetRetrievalInput struct {
+	Query string `json:"query" description:"检索查询文本"`
+}
+
+// datasetRetrievalTool 数据集检索工具实现
+type datasetRetrievalTool struct {
+	service           *RetrievalService
+	userID            uuid.UUID
+	datasetIDs        []uuid.UUID
+	resource          consts.RetrievalSource
+	retrievalConfig   map[string]any
+	k                 int
+	score             float32
+	retrievalStrategy consts.RetrievalStrategy
+	inputSchema       DatasetRetrievalInput
+}
+
+// Info 实现 tool.BaseTool 接口
+func (t *datasetRetrievalTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{
+		Name: "dataset_retrieval",
+		Desc: "在知识库中检索相关文档内容",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"query": {
+				Type:     schema.String,
+				Desc:     "检索查询文本",
+				Required: true,
+			},
+		}),
+	}, nil
+}
+
+// InvokableRun 实现 tool.InvokableTool 接口
+func (t *datasetRetrievalTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	// 解析输入参数
+	var input DatasetRetrievalInput
+	if err := json.Unmarshal([]byte(argumentsInJSON), &input); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %w", err)
+	}
+
+	// 创建检索请求
+	searchReq := req.SearchRequest{
+		Query:          input.Query,
+		DatasetIDs:     t.datasetIDs,
+		K:              t.k,
+		ScoreThreshold: t.score,
+		RetrieverType:  string(t.retrievalStrategy),
+	}
+
+	// 执行检索
+	results, err := t.service.SearchInDatasets(ctx, t.userID, searchReq)
+	if err != nil {
+		return "", fmt.Errorf("failed to search in datasets: %w", err)
+	}
+
+	// 格式化结果
+	var resultTexts []string
+	for i, result := range results {
+		resultTexts = append(resultTexts, fmt.Sprintf("文档%d: %s", i+1, result.Content))
+	}
+
+	return fmt.Sprintf("检索到%d个相关文档:\n%s", len(results), strings.Join(resultTexts, "\n\n")), nil
+}
 
 // RetrievalService 检索服务，提供统一的检索接口
 type RetrievalService struct {
@@ -27,9 +94,9 @@ func NewRetrievalService(retrieverFactory *retrievers.RetrieverFactory) *Retriev
 	}
 }
 
-// CreateLangchainToolFromSearch 根据传递的参数构建一个LangChain知识库搜索工具
-func (s *RetrievalService) CreateLangchainToolFromSearch(ctx context.Context, userID uuid.UUID, datasets []uuid.UUID,
-	resource consts.RetrievalSource, retrievalConfig map[string]any) (tools.Tool, error) {
+// CreateToolFromSearch 根据传递的参数构建一个eino知识库搜索工具
+func (s *RetrievalService) CreateToolFromSearch(ctx context.Context, userID uuid.UUID, datasets []uuid.UUID,
+	resource consts.RetrievalSource, retrievalConfig map[string]any) (tool.InvokableTool, error) {
 	// 解析检索配置参数
 	k, ok := retrievalConfig["k"].(int)
 	if !ok {
@@ -121,18 +188,18 @@ func (s *RetrievalService) createRetriever(retrieverType string, datasetIDs []uu
 		retrieverType = string(retrievers.RetrieverTypeHybrid)
 	}
 
-	return s.RetrieverFactory.CreateRetriever(retrievers.RetrieverType(retrieverType), datasetIDs, options)
+	return s.RetrieverFactory.CreateRetriever(context.Background(), retrievers.RetrieverType(retrieverType), datasetIDs, options)
 }
 
 // retrieveDocuments 执行文档检索
-func (s *RetrievalService) retrieveDocuments(ctx context.Context, retriever interface{}, query string) ([]schema.Document, error) {
+func (s *RetrievalService) retrieveDocuments(ctx context.Context, retriever interface{}, query string) ([]*schema.Document, error) {
 	switch r := retriever.(type) {
 	case *retrievers.FullTextRetriever:
-		return r.GetRelevantDocuments(ctx, query)
+		return r.Retrieve(ctx, query)
 	case *retrievers.SemanticRetriever:
-		return r.GetRelevantDocuments(ctx, query)
+		return r.Retrieve(ctx, query)
 	case *retrievers.HybridRetriever:
-		return r.GetRelevantDocuments(ctx, query)
+		return r.Retrieve(ctx, query)
 	default:
 		return nil, fmt.Errorf("unsupported retriever type: %T", retriever)
 	}
@@ -140,7 +207,6 @@ func (s *RetrievalService) retrieveDocuments(ctx context.Context, retriever inte
 
 // validateDatasetAccess 验证数据集访问权限
 func (s *RetrievalService) validateDatasetAccess(ctx context.Context, userID uuid.UUID, datasetIDs []uuid.UUID) ([]uuid.UUID, error) {
-	// 使用RetrieverFactory验证数据集访问权限
 	validDatasetIDs, err := s.RetrieverFactory.ValidateDatasetAccess(userID, datasetIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate dataset access: %w", err)
@@ -154,71 +220,71 @@ func (s *RetrievalService) validateDatasetAccess(ctx context.Context, userID uui
 }
 
 // convertDocumentToSearchResult 将文档转换为检索结果
-func (s *RetrievalService) convertDocumentToSearchResult(doc schema.Document) resp.SearchResult {
+func (s *RetrievalService) convertDocumentToSearchResult(doc *schema.Document) resp.SearchResult {
 	result := resp.SearchResult{
-		Content: doc.PageContent,
+		Content: doc.Content,
 	}
 
 	// 从元数据中提取信息
-	if segmentID, ok := doc.Metadata["segment_id"].(string); ok {
+	if segmentID, ok := doc.MetaData["segment_id"].(string); ok {
 		if id, err := uuid.Parse(segmentID); err == nil {
 			result.SegmentID = id
 		}
 	}
 
-	if documentID, ok := doc.Metadata["document_id"].(string); ok {
+	if documentID, ok := doc.MetaData["document_id"].(string); ok {
 		if id, err := uuid.Parse(documentID); err == nil {
 			result.DocumentID = id
 		}
 	}
 
-	if datasetID, ok := doc.Metadata["dataset_id"].(string); ok {
+	if datasetID, ok := doc.MetaData["dataset_id"].(string); ok {
 		if id, err := uuid.Parse(datasetID); err == nil {
 			result.DatasetID = id
 		}
 	}
 
-	if documentName, ok := doc.Metadata["document_name"].(string); ok {
+	if documentName, ok := doc.MetaData["document_name"].(string); ok {
 		result.DocumentName = documentName
 	}
 
-	if score, ok := doc.Metadata["score"].(float64); ok {
+	if score, ok := doc.MetaData["score"].(float64); ok {
 		result.Score = score
 	}
 
-	if position, ok := doc.Metadata["position"].(int); ok {
+	if position, ok := doc.MetaData["position"].(int); ok {
 		result.Position = position
 	}
 
-	if keywords, ok := doc.Metadata["keywords"].([]string); ok {
+	if keywords, ok := doc.MetaData["keywords"].([]string); ok {
 		result.Keywords = keywords
 	}
 
-	if characterCount, ok := doc.Metadata["character_count"].(int); ok {
+	if characterCount, ok := doc.MetaData["character_count"].(int); ok {
 		result.CharacterCount = characterCount
 	}
 
-	if tokenCount, ok := doc.Metadata["token_count"].(int); ok {
+	if tokenCount, ok := doc.MetaData["token_count"].(int); ok {
 		result.TokenCount = tokenCount
 	}
 
-	if hitCount, ok := doc.Metadata["hit_count"].(int); ok {
+	if hitCount, ok := doc.MetaData["hit_count"].(int); ok {
 		result.HitCount = hitCount
 	}
 
-	if enabled, ok := doc.Metadata["enabled"].(bool); ok {
+	if enabled, ok := doc.MetaData["enabled"].(bool); ok {
 		result.Enabled = enabled
 	}
 
-	if status, ok := doc.Metadata["status"].(string); ok {
+	if status, ok := doc.MetaData["status"].(string); ok {
 		result.Status = status
 	}
 
-	if ctime, ok := doc.Metadata["ctime"].(int64); ok {
+	if ctime, ok := doc.MetaData["ctime"].(int64); ok {
 		result.Ctime = ctime
 	}
 
-	if utime, ok := doc.Metadata["utime"].(int64); ok {
+	if utime, ok := doc.MetaData["utime"].(int64); ok {
 		result.Utime = utime
 	}
 

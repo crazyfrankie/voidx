@@ -3,144 +3,133 @@ package dalle
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 
-	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
 )
 
-// Dalle3Tool represents a tool for DALLE-3 image generation
-type Dalle3Tool struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	APIKey      string `json:"-"`
-}
-
-// Dalle3Request represents the request structure for DALLE-3 API
+// Dalle3Request DALLE-3图像生成请求参数
 type Dalle3Request struct {
-	Model          string `json:"model"`
-	Prompt         string `json:"prompt"`
-	N              int    `json:"n"`
-	Size           string `json:"size"`
-	Style          string `json:"style"`
-	ResponseFormat string `json:"response_format"`
+	Query string `json:"query" jsonschema:"description=输入应该是生成图像的文本提示(prompt)"`
 }
 
-// Dalle3Response represents the response structure from DALLE-3 API
+// Dalle3Response DALLE-3图像生成响应
 type Dalle3Response struct {
+	Success  bool   `json:"success"`
+	ImageURL string `json:"image_url,omitempty"`
+	Message  string `json:"message"`
+}
+
+// OpenAIImageRequest OpenAI图像生成请求
+type OpenAIImageRequest struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	N      int    `json:"n"`
+	Size   string `json:"size"`
+}
+
+// OpenAIImageResponse OpenAI图像生成响应
+type OpenAIImageResponse struct {
 	Created int64 `json:"created"`
 	Data    []struct {
 		URL           string `json:"url"`
-		RevisedPrompt string `json:"revised_prompt"`
+		RevisedPrompt string `json:"revised_prompt,omitempty"`
 	} `json:"data"`
+	Error struct {
+		Message string `json:"message"`
+		Type    string `json:"type"`
+		Code    string `json:"code"`
+	} `json:"error,omitempty"`
 }
 
-// NewDalle3Tool creates a new Dalle3Tool instance
-func NewDalle3Tool() *Dalle3Tool {
-	return &Dalle3Tool{
-		Name:        "dalle3",
-		Description: "DALLE-3是一个将文本转换成图片的绘图工具",
-		APIKey:      os.Getenv("OPENAI_API_KEY"),
+// dalle3Tool DALLE-3图像生成工具实现
+func dalle3Tool(ctx context.Context, req Dalle3Request) (Dalle3Response, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return Dalle3Response{
+			Success: false,
+			Message: "OpenAI API密钥未配置，无法使用DALLE-3图像生成功能",
+		}, nil
 	}
+
+	if req.Query == "" {
+		return Dalle3Response{
+			Success: false,
+			Message: "查询参数不能为空",
+		}, nil
+	}
+
+	imageURL, err := generateImage(ctx, req.Query, apiKey)
+	if err != nil {
+		return Dalle3Response{
+			Success: false,
+			Message: fmt.Sprintf("图像生成失败: %v", err),
+		}, nil
+	}
+
+	return Dalle3Response{
+		Success:  true,
+		ImageURL: imageURL,
+		Message:  fmt.Sprintf("图像生成成功！\n提示词: %s\n图像URL: %s\n\n请注意：生成的图像URL有效期有限，建议及时保存。", req.Query, imageURL),
+	}, nil
 }
 
-// Run executes the DALLE-3 image generation
-func (t *Dalle3Tool) Run(ctx context.Context, input string) (string, error) {
-	args := make(map[string]any)
-	if err := sonic.UnmarshalString(input, &args); err != nil {
+// generateImage 生成图像
+func generateImage(ctx context.Context, prompt, apiKey string) (string, error) {
+	requestBody := OpenAIImageRequest{
+		Model:  "dall-e-3",
+		Prompt: prompt,
+		N:      1,
+		Size:   "1024x1024",
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
 		return "", err
 	}
 
-	query, ok := args["query"].(string)
-	if !ok {
-		return "", fmt.Errorf("query parameter is required and must be a string")
-	}
-
-	if t.APIKey == "" {
-		return "", fmt.Errorf("OPENAI_API_KEY environment variable is not set")
-	}
-
-	// Get optional parameters with defaults
-	size := "1024x1024"
-	if s, ok := args["size"].(string); ok {
-		size = s
-	}
-
-	style := "vivid"
-	if s, ok := args["style"].(string); ok {
-		style = s
-	}
-
-	// Prepare request
-	reqBody := Dalle3Request{
-		Model:          "dall-e-3",
-		Prompt:         query,
-		N:              1,
-		Size:           size,
-		Style:          style,
-		ResponseFormat: "url",
-	}
-
-	jsonData, err := sonic.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.openai.com/v1/images/generations", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		return "", err
 	}
 
-	// Make HTTP request
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/images/generations", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+t.APIKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to make request: %w", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var dalleResp Dalle3Response
-	if err := sonic.Unmarshal(body, &dalleResp); err != nil {
-		return "", fmt.Errorf("failed to parse response: %w", err)
-	}
-
-	if len(dalleResp.Data) == 0 {
-		return "", fmt.Errorf("no image generated")
-	}
-
-	result := map[string]any{
-		"image_url":       dalleResp.Data[0].URL,
-		"revised_prompt":  dalleResp.Data[0].RevisedPrompt,
-		"original_prompt": query,
-		"size":            size,
-		"style":           style,
-	}
-
-	res, err := sonic.MarshalString(result)
-	if err != nil {
 		return "", err
 	}
 
-	return res, nil
+	var imageResp OpenAIImageResponse
+	if err := json.Unmarshal(body, &imageResp); err != nil {
+		return "", err
+	}
+
+	if imageResp.Error.Message != "" {
+		return "", fmt.Errorf("OpenAI API error: %s", imageResp.Error.Message)
+	}
+
+	if len(imageResp.Data) == 0 {
+		return "", fmt.Errorf("no image generated")
+	}
+
+	return imageResp.Data[0].URL, nil
 }
 
-// Dalle3 is the exported function for dynamic loading
-func Dalle3(ctx context.Context, input string) (string, error) {
-	tool := NewDalle3Tool()
-	return tool.Run(ctx, input)
+// NewDalle3Tool 创建DALLE-3图像生成工具
+func NewDalle3Tool() (tool.InvokableTool, error) {
+	return utils.InferTool("dalle3", "DALLE-3图像生成工具，可以根据文本描述生成图像", dalle3Tool)
 }

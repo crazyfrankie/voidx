@@ -2,23 +2,30 @@ package gaode
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
 
-	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
 )
 
-// GaodeWeatherTool represents a tool for Gaode weather query
-type GaodeWeatherTool struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	APIKey      string `json:"-"`
+// GaodeWeatherRequest 高德天气查询请求参数
+type GaodeWeatherRequest struct {
+	City string `json:"city" jsonschema:"description=需要查询天气预报的目标城市，例如：广州"`
 }
 
-// CityResponse represents the response from city query API
+// GaodeWeatherResponse 高德天气查询响应
+type GaodeWeatherResponse struct {
+	Success bool   `json:"success"`
+	Weather string `json:"weather,omitempty"`
+	Message string `json:"message"`
+}
+
+// CityResponse 城市查询响应
 type CityResponse struct {
 	Status    string `json:"status"`
 	Info      string `json:"info"`
@@ -28,16 +35,14 @@ type CityResponse struct {
 	} `json:"districts"`
 }
 
-// WeatherResponse represents the response from weather API
+// WeatherResponse 天气查询响应
 type WeatherResponse struct {
 	Status    string `json:"status"`
 	Info      string `json:"info"`
 	Forecasts []struct {
-		City       string `json:"city"`
-		AdCode     string `json:"adcode"`
-		Province   string `json:"province"`
-		ReportTime string `json:"reporttime"`
-		Casts      []struct {
+		City     string `json:"city"`
+		Province string `json:"province"`
+		Casts    []struct {
 			Date         string `json:"date"`
 			Week         string `json:"week"`
 			DayWeather   string `json:"dayweather"`
@@ -52,91 +57,137 @@ type WeatherResponse struct {
 	} `json:"forecasts"`
 }
 
-// NewGaodeWeatherTool creates a new GaodeWeatherTool instance
-func NewGaodeWeatherTool() *GaodeWeatherTool {
-	return &GaodeWeatherTool{
-		Name:        "gaode_weather",
-		Description: "当你想查询天气或者与天气相关的问题时可以使用的工具",
-		APIKey:      os.Getenv("GAODE_API_KEY"),
+// gaodeWeatherTool 高德天气预报工具实现
+func gaodeWeatherTool(ctx context.Context, req GaodeWeatherRequest) (GaodeWeatherResponse, error) {
+	apiKey := os.Getenv("GAODE_API_KEY")
+	if apiKey == "" {
+		return GaodeWeatherResponse{
+			Success: false,
+			Message: "高德开放平台API未配置",
+		}, nil
 	}
+
+	if req.City == "" {
+		return GaodeWeatherResponse{
+			Success: false,
+			Message: "城市参数不能为空",
+		}, nil
+	}
+
+	weather, err := getWeather(ctx, req.City, apiKey)
+	if err != nil {
+		return GaodeWeatherResponse{
+			Success: false,
+			Message: fmt.Sprintf("获取%s天气预报信息失败: %v", req.City, err),
+		}, nil
+	}
+
+	return GaodeWeatherResponse{
+		Success: true,
+		Weather: weather,
+		Message: fmt.Sprintf("成功获取%s的天气预报", req.City),
+	}, nil
 }
 
-// Run executes the Gaode weather query
-func (t *GaodeWeatherTool) Run(ctx context.Context, city string) (string, error) {
-	if t.APIKey == "" {
-		return "高德开放平台API未配置", nil
+// getWeather 获取天气信息
+func getWeather(ctx context.Context, city, apiKey string) (string, error) {
+	// 1. 获取城市编码
+	adCode, err := getCityAdCode(ctx, city, apiKey)
+	if err != nil {
+		return "", err
 	}
 
-	// Step 1: Get city adcode
-	cityURL := fmt.Sprintf("https://restapi.amap.com/v3/config/district?key=%s&keywords=%s&subdistrict=0",
-		t.APIKey, url.QueryEscape(city))
+	// 2. 根据城市编码获取天气信息
+	weatherURL := fmt.Sprintf("https://restapi.amap.com/v3/weather/weatherInfo?key=%s&city=%s&extensions=all",
+		apiKey, adCode)
 
-	resp, err := http.Get(cityURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", weatherURL, nil)
 	if err != nil {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
+		return "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
-	}
-
-	var cityResp CityResponse
-	if err := sonic.Unmarshal(body, &cityResp); err != nil {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
-	}
-
-	if cityResp.Info != "OK" || len(cityResp.Districts) == 0 {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
-	}
-
-	adCode := cityResp.Districts[0].AdCode
-
-	// Step 2: Get weather information
-	weatherURL := fmt.Sprintf("https://restapi.amap.com/v3/weather/weatherInfo?key=%s&city=%s&extensions=all",
-		t.APIKey, adCode)
-
-	resp, err = http.Get(weatherURL)
-	if err != nil {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
-	}
-	defer resp.Body.Close()
-
-	body, err = io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
+		return "", err
 	}
 
 	var weatherResp WeatherResponse
-	if err := sonic.Unmarshal(body, &weatherResp); err != nil {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
+	if err := json.Unmarshal(body, &weatherResp); err != nil {
+		return "", err
 	}
 
-	if weatherResp.Info != "OK" || len(weatherResp.Forecasts) == 0 {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
+	if weatherResp.Info != "OK" {
+		return "", fmt.Errorf("weather API error: %s", weatherResp.Info)
 	}
 
-	// Format the weather information
+	// 格式化天气信息
+	if len(weatherResp.Forecasts) == 0 || len(weatherResp.Forecasts[0].Casts) == 0 {
+		return fmt.Sprintf("%s暂无天气预报信息", city), nil
+	}
+
 	forecast := weatherResp.Forecasts[0]
-	result := map[string]any{
-		"city":        forecast.City,
-		"province":    forecast.Province,
-		"report_time": forecast.ReportTime,
-		"forecasts":   forecast.Casts,
+	result := fmt.Sprintf("城市: %s, %s\n\n", forecast.City, forecast.Province)
+
+	for i, cast := range forecast.Casts {
+		if i >= 3 { // 只显示前3天
+			break
+		}
+		result += fmt.Sprintf("日期: %s (%s)\n", cast.Date, cast.Week)
+		result += fmt.Sprintf("白天: %s, %s°C, %s%s级\n",
+			cast.DayWeather, cast.DayTemp, cast.DayWind, cast.DayPower)
+		result += fmt.Sprintf("夜间: %s, %s°C, %s%s级\n\n",
+			cast.NightWeather, cast.NightTemp, cast.NightWind, cast.NightPower)
 	}
 
-	// Convert to JSON string for consistency with Python version
-	resStr, err := sonic.MarshalString(result)
-	if err != nil {
-		return fmt.Sprintf("获取%s天气预报信息失败", city), nil
-	}
-
-	return resStr, nil
+	return result, nil
 }
 
-// GaodeWeather is the exported function for dynamic loading
-func GaodeWeather(ctx context.Context, input string) (string, error) {
-	tool := NewGaodeWeatherTool()
-	return tool.Run(ctx, input)
+// getCityAdCode 获取城市行政区域编码
+func getCityAdCode(ctx context.Context, city, apiKey string) (string, error) {
+	cityURL := fmt.Sprintf("https://restapi.amap.com/v3/config/district?key=%s&keywords=%s&subdistrict=0",
+		apiKey, url.QueryEscape(city))
+
+	req, err := http.NewRequestWithContext(ctx, "GET", cityURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var cityResp CityResponse
+	if err := json.Unmarshal(body, &cityResp); err != nil {
+		return "", err
+	}
+
+	if cityResp.Info != "OK" || len(cityResp.Districts) == 0 {
+		return "", fmt.Errorf("city not found: %s", city)
+	}
+
+	return cityResp.Districts[0].AdCode, nil
+}
+
+// NewGaodeWeatherTool 创建高德天气预报工具
+func NewGaodeWeatherTool() (tool.InvokableTool, error) {
+	return utils.InferTool("gaode_weather", "当你想查询天气或者与天气相关的问题时可以使用的工具", gaodeWeatherTool)
 }

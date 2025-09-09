@@ -67,6 +67,17 @@ type Segment struct {
 	Ctime               int64                `gorm:"autoCreateTime" json:"ctime"`
 }
 
+type DocumentSegment struct {
+	*Document
+	Content    string    `gorm:"type:text" json:"content"`
+	DocumentID uuid.UUID `gorm:"type:uuid;not null" json:"document_id"`
+	WordCount  int       `gorm:"" json:"word_count"`
+	HitCount   int       `gorm:"" json:"hit_count"`
+	Hash       string    `gorm:"type:text" json:"hash"`
+	Keywords   []string  `gorm:"type:jsonb;serializer:json;not null;default:'[]'::jsonb" json:"keywords"`
+	Embedding  []float64 `gorm:"" json:"embedding"`
+}
+
 // Keyword 关键词表模型
 type Keyword struct {
 	ID         uuid.UUID           `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`

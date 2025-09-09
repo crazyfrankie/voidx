@@ -1,16 +1,15 @@
 package resp
 
-import "github.com/crazyfrankie/voidx/internal/core/llm/entity"
+import "github.com/crazyfrankie/voidx/internal/core/llm/entities"
 
 // ProviderResp 提供商响应
 type ProviderResp struct {
-	Name        string             `json:"name"`
-	Label       string             `json:"label"`
-	Description string             `json:"description"`
-	Icon        string             `json:"icon"`
-	Background  string             `json:"background"`
-	ModelTypes  []entity.ModelType `json:"model_types"`
-	Position    int                `json:"position"`
+	Name        string               `json:"name"`
+	Label       string               `json:"label"`
+	Description string               `json:"description"`
+	Icon        string               `json:"icon"`
+	Background  string               `json:"background"`
+	ModelTypes  []entities.ModelType `json:"model_types"`
 }
 
 // ModelResp 模型响应

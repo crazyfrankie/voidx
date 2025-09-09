@@ -3,111 +3,171 @@ package retrievers
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/schema"
-	"github.com/tmc/langchaingo/vectorstores"
+	"gorm.io/gorm"
 
-	"github.com/crazyfrankie/voidx/internal/core/embedding"
+	"github.com/cloudwego/eino/components/embedding"
+	"github.com/cloudwego/eino/components/retriever"
+	"github.com/cloudwego/eino/schema"
+
+	model "github.com/crazyfrankie/voidx/internal/models/entity"
 )
 
-// SemanticRetriever 相似性检索器/向量检索器
+// ScoredSegment represents a document segment with its relevance score
+type ScoredSegment struct {
+	Segment *model.DocumentSegment
+	Score   float64
+}
+
+// SemanticRetriever implements semantic search using vector embeddings with eino
 type SemanticRetriever struct {
-	VectorStore    vectorstores.VectorStore
-	Embedder       *embedding.EmbeddingService
-	SearchOptions  map[string]any
-	DatasetIDs     []uuid.UUID
-	ScoreThreshold float32
+	db             *gorm.DB
+	embedder       embedding.Embedder
+	datasetIDs     uuid.UUID
+	scoreThreshold float64
 }
 
-// NewSemanticRetriever 创建一个新的语义检索器
-func NewSemanticRetriever(vectorStore vectorstores.VectorStore, embedder *embedding.EmbeddingService,
-	datasetIDs []uuid.UUID, options map[string]any) *SemanticRetriever {
-	// 默认相似度阈值
-	scoreThreshold := float32(0.0)
-	if threshold, ok := options["score_threshold"].(float32); ok {
-		scoreThreshold = threshold
-	}
-
+// NewSemanticRetriever creates a new semantic retriever
+func NewSemanticRetriever(db *gorm.DB, embedder embedding.Embedder) *SemanticRetriever {
 	return &SemanticRetriever{
-		VectorStore:    vectorStore,
-		Embedder:       embedder,
-		DatasetIDs:     datasetIDs,
-		SearchOptions:  options,
-		ScoreThreshold: scoreThreshold,
+		db:             db,
+		embedder:       embedder,
+		scoreThreshold: 0.0,
 	}
 }
 
-// GetRelevantDocuments 根据传递的query执行相似性检索
-func (r *SemanticRetriever) GetRelevantDocuments(ctx context.Context, query string) ([]schema.Document, error) {
-	// 1.提取最大搜索条件k，默认值为4
-	k := 4
-	if kVal, ok := r.SearchOptions["k"]; ok {
-		if kInt, ok := kVal.(int); ok {
-			k = kInt
-		}
-	}
+// WithDatasetID sets the dataset ID for retrieval
+func (r *SemanticRetriever) WithDatasetID(datasetID uuid.UUID) *SemanticRetriever {
+	r.datasetIDs = datasetID
+	return r
+}
 
-	// 2.构建过滤条件 - 根据Python实现使用Weaviate的过滤格式
-	filters := make(map[string]any)
+// WithScoreThreshold sets the minimum similarity score threshold
+func (r *SemanticRetriever) WithScoreThreshold(threshold float64) *SemanticRetriever {
+	r.scoreThreshold = threshold
+	return r
+}
 
-	// 添加数据集ID过滤
-	if len(r.DatasetIDs) > 0 {
-		datasetIDStrs := make([]string, 0, len(r.DatasetIDs))
-		for _, id := range r.DatasetIDs {
-			datasetIDStrs = append(datasetIDStrs, id.String())
-		}
-		// 使用contains_any过滤器，类似Python中的Filter.by_property("dataset_id").contains_any()
-		filters["dataset_id"] = map[string]any{
-			"contains_any": datasetIDStrs,
-		}
-	}
-
-	// 添加其他过滤条件
-	filters["document_enabled"] = map[string]any{
-		"equal": true,
-	}
-	filters["segment_enabled"] = map[string]any{
-		"equal": true,
-	}
-
-	// 3.执行相似性检索并获取得分信息
-	searchOptions := []vectorstores.Option{
-		vectorstores.WithFilters(filters),
-	}
-
-	// 添加其他搜索选项
-	for key, value := range r.SearchOptions {
-		if key != "k" && key != "score_threshold" {
-			searchOptions = append(searchOptions, vectorstores.WithFilters(map[string]any{key: value}))
-		}
-	}
-
-	// 使用SimilaritySearch方法
-	docs, err := r.VectorStore.SimilaritySearch(ctx, query, k, searchOptions...)
+// Retrieve implements the eino retriever interface
+func (r *SemanticRetriever) Retrieve(ctx context.Context, query string, opts ...retriever.Option) ([]*schema.Document, error) {
+	// Generate embedding for the query
+	queryEmbeddings, err := r.embedder.EmbedStrings(ctx, []string{query})
 	if err != nil {
-		return nil, fmt.Errorf("similarity search failed: %w", err)
+		return nil, fmt.Errorf("failed to generate query embedding: %w", err)
 	}
 
-	if len(docs) == 0 {
-		return []schema.Document{}, nil
+	if len(queryEmbeddings) == 0 || len(queryEmbeddings[0]) == 0 {
+		return nil, fmt.Errorf("empty query embedding")
 	}
 
-	// 4.过滤低于阈值的结果
-	if r.ScoreThreshold > 0 {
-		filteredDocs := make([]schema.Document, 0, len(docs))
-		for _, doc := range docs {
-			if score, ok := doc.Metadata["score"].(float32); ok && score >= r.ScoreThreshold {
-				filteredDocs = append(filteredDocs, doc)
-			} else if score, ok := doc.Metadata["score"].(float64); ok && float32(score) >= r.ScoreThreshold {
-				filteredDocs = append(filteredDocs, doc)
-			} else {
-				// 如果没有分数信息，保留文档
-				filteredDocs = append(filteredDocs, doc)
-			}
+	queryVector := queryEmbeddings[0]
+
+	// Query document segments from database
+	var segments []model.DocumentSegment
+	queryBuilder := r.db.Where("dataset_id IN ? AND is_deleted = ?", r.datasetIDs, false)
+
+	// Add enabled filter if available
+	queryBuilder = queryBuilder.Where("enabled = ?", true)
+
+	result := queryBuilder.Find(&segments)
+	if result.Error != nil {
+		return nil, fmt.Errorf("failed to query document segments: %w", result.Error)
+	}
+
+	// Calculate similarity scores
+	var scoredSegments []ScoredSegment
+	for i := range segments {
+		segment := &segments[i]
+
+		// Skip segments without embeddings
+		if len(segment.Embedding) == 0 {
+			continue
 		}
-		return filteredDocs, nil
+
+		// Calculate cosine similarity
+		score := r.cosineSimilarity(queryVector, segment.Embedding)
+
+		// Apply score threshold
+		if score >= r.scoreThreshold {
+			scoredSegments = append(scoredSegments, ScoredSegment{
+				Segment: segment,
+				Score:   score,
+			})
+		}
 	}
 
-	return docs, nil
+	// Sort by score in descending order
+	sort.Slice(scoredSegments, func(i, j int) bool {
+		return scoredSegments[i].Score > scoredSegments[j].Score
+	})
+
+	// Convert to eino documents
+	var documents []*schema.Document
+	for _, scored := range scoredSegments {
+		segment := scored.Segment
+
+		// Create document metadata
+		metadata := map[string]interface{}{
+			"segment_id":  segment.ID.String(),
+			"document_id": segment.DocumentID.String(),
+			"dataset_id":  segment.DatasetID.String(),
+			"position":    segment.Position,
+			"word_count":  segment.WordCount,
+			"token_count": segment.TokenCount,
+			"score":       scored.Score,
+			"hit_count":   segment.HitCount,
+			"hash":        segment.Hash,
+			"created_at":  segment.Ctime,
+			"updated_at":  segment.Utime,
+		}
+
+		// Add document information if available
+		if segment.Document != nil {
+			metadata["document_name"] = segment.Document.Name
+		}
+
+		doc := &schema.Document{
+			Content:  segment.Content,
+			MetaData: metadata,
+		}
+
+		documents = append(documents, doc)
+	}
+
+	// Update hit counts asynchronously
+	go r.updateHitCounts(ctx, scoredSegments)
+
+	return documents, nil
+}
+
+// cosineSimilarity calculates cosine similarity between two vectors
+func (r *SemanticRetriever) cosineSimilarity(a, b []float64) float64 {
+	if len(a) != len(b) {
+		return 0.0
+	}
+
+	var dotProduct, normA, normB float64
+	for i := 0; i < len(a); i++ {
+		dotProduct += a[i] * b[i]
+		normA += a[i] * a[i]
+		normB += b[i] * b[i]
+	}
+
+	if normA == 0.0 || normB == 0.0 {
+		return 0.0
+	}
+
+	return dotProduct / (normA * normB)
+}
+
+// updateHitCounts updates hit counts for retrieved segments
+func (r *SemanticRetriever) updateHitCounts(ctx context.Context, scoredSegments []ScoredSegment) {
+	for _, scored := range scoredSegments {
+		// Increment hit count
+		r.db.Model(&model.DocumentSegment{}).
+			Where("id = ?", scored.Segment.ID).
+			Update("hit_count", gorm.Expr("hit_count + ?", 1))
+	}
 }

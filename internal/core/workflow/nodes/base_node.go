@@ -1,31 +1,29 @@
 package nodes
 
 import (
+	"context"
+
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 )
 
-// BaseNode 工作流节点基类接口
-type BaseNode interface {
-	// Invoke 执行节点逻辑
-	Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error)
-
-	// GetNodeData 获取节点数据
-	GetNodeData() *entities.BaseNodeData
+// NodeExecutor defines the interface for all workflow nodes
+type NodeExecutor interface {
+	Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error)
 }
 
-// BaseNodeImpl 基础节点实现
-type BaseNodeImpl struct {
-	NodeData *entities.BaseNodeData
+// BaseNode provides common functionality for all workflow nodes
+type BaseNode struct {
+	nodeData *entities.BaseNodeData
 }
 
-// GetNodeData 获取节点数据
-func (b *BaseNodeImpl) GetNodeData() *entities.BaseNodeData {
-	return b.NodeData
-}
-
-// NewBaseNodeImpl 创建基础节点实现
-func NewBaseNodeImpl(nodeData *entities.BaseNodeData) *BaseNodeImpl {
-	return &BaseNodeImpl{
-		NodeData: nodeData,
+// NewBaseNode creates a new base node instance
+func NewBaseNode(nodeData *entities.BaseNodeData) *BaseNode {
+	return &BaseNode{
+		nodeData: nodeData,
 	}
+}
+
+// GetNodeData returns the node data
+func (n *BaseNode) GetNodeData() *entities.BaseNodeData {
+	return n.nodeData
 }

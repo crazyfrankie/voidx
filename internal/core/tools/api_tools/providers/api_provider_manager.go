@@ -1,284 +1,219 @@
 package providers
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"reflect"
 	"strings"
 
-	"github.com/tmc/langchaingo/tools"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
 
-	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/entities"
-	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/crazyfrankie/voidx/internal/core/tools/entities"
 )
 
-// ApiProviderManager API工具提供者管理器，能根据传递的工具配置信息生成自定义API工具
-type ApiProviderManager struct{}
+// ParameterIn represents where the parameter should be placed in the request
+type ParameterIn string
 
-// NewApiProviderManager 创建新的API提供者管理器
-func NewApiProviderManager() *ApiProviderManager {
-	return &ApiProviderManager{}
+const (
+	ParameterInPath        ParameterIn = "path"
+	ParameterInQuery       ParameterIn = "query"
+	ParameterInHeader      ParameterIn = "header"
+	ParameterInCookie      ParameterIn = "cookie"
+	ParameterInRequestBody ParameterIn = "request_body"
+)
+
+// ParameterTypeMap maps parameter types to Go types
+var ParameterTypeMap = map[string]string{
+	"string":  "string",
+	"integer": "int",
+	"number":  "float64",
+	"boolean": "bool",
 }
 
-// ToolFunc API工具函数类型
-type ToolFunc func(ctx context.Context, input string) (string, error)
-
-// ToolSchema 工具模式定义
-type ToolSchema struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	Parameters  map[string]any `json:"parameters"`
+// APIProviderManager API工具提供者管理器，能根据传递的工具配置信息生成自定义工具
+type APIProviderManager struct {
+	httpClient *http.Client
 }
 
-// ApiTool API工具实现
-type ApiTool struct {
-	entity   *entities.ToolEntity
-	toolFunc ToolFunc
-	schema   *ToolSchema
-}
-
-// Name 获取工具名称
-func (t *ApiTool) Name() string {
-	return fmt.Sprintf("%s_%s", t.entity.ID, t.entity.Name)
-}
-
-// Description 获取工具描述
-func (t *ApiTool) Description() string {
-	return t.entity.Description
-}
-
-// GetSchema 获取工具模式
-func (t *ApiTool) GetSchema() *ToolSchema {
-	return t.schema
-}
-
-// Call 执行工具
-func (t *ApiTool) Call(ctx context.Context, input string) (string, error) {
-	return t.toolFunc(ctx, input)
+// NewAPIProviderManager 创建API工具提供者管理器
+func NewAPIProviderManager() *APIProviderManager {
+	return &APIProviderManager{
+		httpClient: &http.Client{},
+	}
 }
 
 // GetTool 根据传递的配置获取自定义API工具
-func (m *ApiProviderManager) GetTool(toolEntity *entities.ToolEntity) tools.Tool {
-	toolFunc := m.createToolFuncFromToolEntity(toolEntity)
-	schema := m.createSchemaFromParameters(toolEntity)
-
-	return &ApiTool{
-		entity:   toolEntity,
-		toolFunc: toolFunc,
-		schema:   schema,
-	}
+func (apm *APIProviderManager) GetTool(ctx context.Context, toolEntity *entities.APIToolEntity) (tool.InvokableTool, error) {
+	return &APITool{
+		entity:     toolEntity,
+		httpClient: apm.httpClient,
+	}, nil
 }
 
-// createToolFuncFromToolEntity 根据传递的信息创建发起API请求的函数
-func (m *ApiProviderManager) createToolFuncFromToolEntity(toolEntity *entities.ToolEntity) ToolFunc {
-	return func(ctx context.Context, input string) (string, error) {
-		// 1.定义变量存储来自path/query/header/cookie/request_body中的数据
-		parameters := map[entities.ParameterIn]map[string]any{
-			entities.ParameterInPath:        make(map[string]any),
-			entities.ParameterInHeader:      make(map[string]any),
-			entities.ParameterInQuery:       make(map[string]any),
-			entities.ParameterInCookie:      make(map[string]any),
-			entities.ParameterInRequestBody: make(map[string]any),
-		}
-
-		// 2.更改参数结构映射
-		parameterMap := make(map[string]map[string]any)
-		for _, parameter := range toolEntity.Parameters {
-			if name, ok := parameter["name"].(string); ok {
-				parameterMap[name] = parameter
-			}
-		}
-
-		headerMap := make(map[string]string)
-		for _, header := range toolEntity.Headers {
-			headerMap[header.Key] = header.Value
-		}
-
-		args := make(map[string]any)
-		if err := sonic.UnmarshalString(input, &args); err != nil {
-			return "", err
-		}
-
-		// 3.循环遍历传递的所有字段并校验
-		for key, value := range args {
-			// 4.提取键值对关联的字段并校验
-			parameter, exists := parameterMap[key]
-			if !exists {
-				continue
-			}
-
-			// 5.将参数存储到合适的位置上，默认在query上
-			paramIn := entities.ParameterInQuery
-			if inValue, ok := parameter["in"].(string); ok {
-				paramIn = entities.ParameterIn(inValue)
-			}
-			parameters[paramIn][key] = value
-		}
-
-		// 6.构建request请求并返回采集的内容
-		return m.makeHTTPRequest(toolEntity, parameters, headerMap)
-	}
+// APITool 实现了eino的InvokableTool接口的API工具
+type APITool struct {
+	entity     *entities.APIToolEntity
+	httpClient *http.Client
 }
 
-// makeHTTPRequest 发起HTTP请求
-func (m *ApiProviderManager) makeHTTPRequest(
-	toolEntity *entities.ToolEntity,
-	parameters map[entities.ParameterIn]map[string]any,
-	headerMap map[string]string,
-) (string, error) {
-	// 处理URL中的路径参数
-	requestURL := toolEntity.URL
-	for key, value := range parameters[entities.ParameterInPath] {
+// Info 返回工具信息
+func (at *APITool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	// Convert parameters to eino schema
+	params := make(map[string]*schema.ParameterInfo)
+
+	for _, param := range at.entity.Parameters {
+		paramName, _ := param["name"].(string)
+		paramType, _ := param["type"].(string)
+		paramDesc, _ := param["description"].(string)
+		paramRequired, _ := param["required"].(bool)
+
+		// Map parameter type to eino DataType
+		var dataType schema.DataType
+		switch paramType {
+		case "string":
+			dataType = schema.String
+		case "integer":
+			dataType = schema.Integer
+		case "number":
+			dataType = schema.Number
+		case "boolean":
+			dataType = schema.Boolean
+		default:
+			dataType = schema.String
+		}
+
+		params[paramName] = &schema.ParameterInfo{
+			Type:     dataType,
+			Desc:     paramDesc,
+			Required: paramRequired,
+		}
+	}
+
+	var paramsOneOf *schema.ParamsOneOf
+	if len(params) > 0 {
+		paramsOneOf = schema.NewParamsOneOfByParams(params)
+	}
+
+	return &schema.ToolInfo{
+		Name:        fmt.Sprintf("%s_%s", at.entity.ID, at.entity.Name),
+		Desc:        at.entity.Description,
+		ParamsOneOf: paramsOneOf,
+	}, nil
+}
+
+// InvokableRun 执行API调用
+func (at *APITool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	// Parse arguments
+	var args map[string]interface{}
+	if argumentsInJSON != "" {
+		if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
+			return "", fmt.Errorf("failed to parse arguments: %w", err)
+		}
+	}
+
+	// Organize parameters by location
+	parameters := map[ParameterIn]map[string]interface{}{
+		ParameterInPath:        make(map[string]interface{}),
+		ParameterInQuery:       make(map[string]interface{}),
+		ParameterInHeader:      make(map[string]interface{}),
+		ParameterInCookie:      make(map[string]interface{}),
+		ParameterInRequestBody: make(map[string]interface{}),
+	}
+
+	// Create parameter map for easy lookup
+	parameterMap := make(map[string]map[string]interface{})
+	for _, param := range at.entity.Parameters {
+		if name, ok := param["name"].(string); ok {
+			parameterMap[name] = param
+		}
+	}
+
+	// Organize arguments by parameter location
+	for key, value := range args {
+		if param, exists := parameterMap[key]; exists {
+			location := ParameterInQuery // default location
+			if in, ok := param["in"].(string); ok {
+				location = ParameterIn(in)
+			}
+			parameters[location][key] = value
+		}
+	}
+
+	// Build headers
+	headers := make(map[string]string)
+	for _, header := range at.entity.Headers {
+		headers[header.Key] = header.Value
+	}
+	for key, value := range parameters[ParameterInHeader] {
+		headers[key] = fmt.Sprintf("%v", value)
+	}
+
+	// Build URL with path parameters
+	url := at.entity.URL
+	for key, value := range parameters[ParameterInPath] {
 		placeholder := fmt.Sprintf("{%s}", key)
-		requestURL = strings.ReplaceAll(requestURL, placeholder, fmt.Sprintf("%v", value))
+		url = strings.ReplaceAll(url, placeholder, fmt.Sprintf("%v", value))
 	}
 
-	// 构建查询参数
-	if len(parameters[entities.ParameterInQuery]) > 0 {
-		queryParams := url.Values{}
-		for key, value := range parameters[entities.ParameterInQuery] {
-			queryParams.Add(key, fmt.Sprintf("%v", value))
-		}
-		if strings.Contains(requestURL, "?") {
-			requestURL += "&" + queryParams.Encode()
-		} else {
-			requestURL += "?" + queryParams.Encode()
-		}
-	}
+	// Create request
+	var req *http.Request
+	var err error
 
-	// 构建请求体
-	var requestBody io.Reader
-	if len(parameters[entities.ParameterInRequestBody]) > 0 {
-		jsonData, err := sonic.Marshal(parameters[entities.ParameterInRequestBody])
+	if len(parameters[ParameterInRequestBody]) > 0 {
+		// If there's a request body, marshal it to JSON
+		bodyData, err := json.Marshal(parameters[ParameterInRequestBody])
 		if err != nil {
 			return "", fmt.Errorf("failed to marshal request body: %w", err)
 		}
-		requestBody = bytes.NewBuffer(jsonData)
+		req, err = http.NewRequestWithContext(ctx, strings.ToUpper(at.entity.Method), url, strings.NewReader(string(bodyData)))
+		if err != nil {
+			return "", fmt.Errorf("failed to create request: %w", err)
+		}
+		headers["Content-Type"] = "application/json"
+	} else {
+		req, err = http.NewRequestWithContext(ctx, strings.ToUpper(at.entity.Method), url, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create request: %w", err)
+		}
 	}
 
-	// 创建HTTP请求
-	req, err := http.NewRequest(strings.ToUpper(toolEntity.Method), requestURL, requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// 设置请求头
-	for key, value := range headerMap {
+	// Add headers
+	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
-	for key, value := range parameters[entities.ParameterInHeader] {
-		req.Header.Set(key, fmt.Sprintf("%v", value))
+
+	// Add query parameters
+	if len(parameters[ParameterInQuery]) > 0 {
+		q := req.URL.Query()
+		for key, value := range parameters[ParameterInQuery] {
+			q.Add(key, fmt.Sprintf("%v", value))
+		}
+		req.URL.RawQuery = q.Encode()
 	}
 
-	// 设置Cookie
-	for key, value := range parameters[entities.ParameterInCookie] {
+	// Add cookies
+	for key, value := range parameters[ParameterInCookie] {
 		req.AddCookie(&http.Cookie{
 			Name:  key,
 			Value: fmt.Sprintf("%v", value),
 		})
 	}
 
-	// 如果有请求体，设置Content-Type
-	if requestBody != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	// 发起请求
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	// Execute request
+	resp, err := at.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to make request: %w", err)
+		return "", fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// 读取响应
-	responseBody, err := io.ReadAll(resp.Body)
-	if err != nil {
+	// Read response
+	var res []byte
+	if res, err = io.ReadAll(resp.Body); err != nil {
 		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
-	return string(responseBody), nil
-}
-
-// createSchemaFromParameters 根据传递的parameters参数创建工具模式
-func (m *ApiProviderManager) createSchemaFromParameters(toolEntity *entities.ToolEntity) *ToolSchema {
-	properties := make(map[string]any)
-	var required []string
-
-	for _, parameter := range toolEntity.Parameters {
-		name, ok := parameter["name"].(string)
-		if !ok {
-			continue
-		}
-
-		paramType, ok := parameter["type"].(string)
-		if !ok {
-			paramType = "string"
-		}
-
-		description, ok := parameter["description"].(string)
-		if !ok {
-			description = ""
-		}
-
-		isRequired, ok := parameter["required"].(bool)
-		if !ok {
-			isRequired = true
-		}
-
-		// 转换参数类型
-		jsonType := m.convertParameterType(paramType)
-
-		properties[name] = map[string]any{
-			"type":        jsonType,
-			"description": description,
-		}
-
-		if isRequired {
-			required = append(required, name)
-		}
-	}
-
-	parameters := map[string]any{
-		"type":       "object",
-		"properties": properties,
-	}
-
-	if len(required) > 0 {
-		parameters["required"] = required
-	}
-
-	return &ToolSchema{
-		Name:        fmt.Sprintf("%s_%s", toolEntity.ID, toolEntity.Name),
-		Description: toolEntity.Description,
-		Parameters:  parameters,
-	}
-}
-
-// convertParameterType 转换参数类型到JSON Schema类型
-func (m *ApiProviderManager) convertParameterType(paramType string) string {
-	switch paramType {
-	case string(entities.ParameterTypeStr):
-		return "string"
-	case string(entities.ParameterTypeInt):
-		return "integer"
-	case string(entities.ParameterTypeFloat):
-		return "number"
-	case string(entities.ParameterTypeBool):
-		return "boolean"
-	default:
-		return "string"
-	}
-}
-
-// GetParameterTypeFromString 从字符串获取参数类型
-func GetParameterTypeFromString(paramType string) reflect.Type {
-	if t, exists := entities.ParameterTypeMap[entities.ParameterType(paramType)]; exists {
-		return t
-	}
-	return reflect.TypeOf("")
+	return string(res), nil
 }

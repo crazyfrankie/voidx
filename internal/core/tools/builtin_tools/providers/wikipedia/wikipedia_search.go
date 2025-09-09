@@ -2,32 +2,41 @@ package wikipedia
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
 )
 
-// WikipediaSearchTool represents a tool for Wikipedia search
-type WikipediaSearchTool struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+// WikipediaSearchRequest 维基百科搜索请求参数
+type WikipediaSearchRequest struct {
+	Query string `json:"query" jsonschema:"description=需要搜索的查询语句"`
 }
 
-// WikipediaSearchResponse represents the response from Wikipedia search API
+// WikipediaSearchResponse 维基百科搜索响应
 type WikipediaSearchResponse struct {
+	Success bool   `json:"success"`
+	Content string `json:"content,omitempty"`
+	Message string `json:"message"`
+}
+
+// WikipediaSearchAPIResponse 维基百科搜索API响应
+type WikipediaSearchAPIResponse struct {
 	Query struct {
 		Search []struct {
 			Title   string `json:"title"`
 			Snippet string `json:"snippet"`
+			Size    int    `json:"size"`
 		} `json:"search"`
 	} `json:"query"`
 }
 
-// WikipediaPageResponse represents the response from Wikipedia page API
+// WikipediaPageResponse 维基百科页面响应
 type WikipediaPageResponse struct {
 	Query struct {
 		Pages map[string]struct {
@@ -37,100 +46,127 @@ type WikipediaPageResponse struct {
 	} `json:"query"`
 }
 
-// NewWikipediaSearchTool creates a new WikipediaSearchTool instance
-func NewWikipediaSearchTool() *WikipediaSearchTool {
-	return &WikipediaSearchTool{
-		Name:        "wikipedia_search",
-		Description: "一个用于执行维基百科搜索并提取片段和网页的工具",
+// wikipediaSearchTool 维基百科搜索工具实现
+func wikipediaSearchTool(ctx context.Context, req WikipediaSearchRequest) (WikipediaSearchResponse, error) {
+	if req.Query == "" {
+		return WikipediaSearchResponse{
+			Success: false,
+			Message: "查询参数不能为空",
+		}, nil
 	}
+
+	results, err := search(ctx, req.Query)
+	if err != nil {
+		return WikipediaSearchResponse{
+			Success: false,
+			Message: fmt.Sprintf("搜索失败: %v", err),
+		}, nil
+	}
+
+	return WikipediaSearchResponse{
+		Success: true,
+		Content: results,
+		Message: "维基百科搜索完成",
+	}, nil
 }
 
-// Run executes the Wikipedia search
-func (t *WikipediaSearchTool) Run(ctx context.Context, query string) (string, error) {
-	// Step 1: Search for pages
+// search 执行实际的搜索
+func search(ctx context.Context, query string) (string, error) {
+	// 首先搜索相关页面
 	searchURL := fmt.Sprintf("https://zh.wikipedia.org/w/api.php?action=query&list=search&srsearch=%s&format=json&srlimit=3",
 		url.QueryEscape(query))
 
-	resp, err := http.Get(searchURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", searchURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to search Wikipedia: %w", err)
+		return "", err
+	}
+
+	req.Header.Set("User-Agent", "LLMOps/1.0 (https://example.com/contact)")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read search response: %w", err)
+		return "", err
 	}
 
-	var searchResp WikipediaSearchResponse
-	if err := sonic.Unmarshal(body, &searchResp); err != nil {
-		return "", fmt.Errorf("failed to parse search response: %w", err)
+	var searchResp WikipediaSearchAPIResponse
+	if err := json.Unmarshal(body, &searchResp); err != nil {
+		return "", err
 	}
 
 	if len(searchResp.Query.Search) == 0 {
 		return fmt.Sprintf("没有找到关于 '%s' 的维基百科条目", query), nil
 	}
 
-	// Step 2: Get detailed content for the first result
+	// 获取第一个搜索结果的详细内容
 	firstResult := searchResp.Query.Search[0]
-	pageURL := fmt.Sprintf("https://zh.wikipedia.org/w/api.php?action=query&titles=%s&prop=extracts&exintro=true&explaintext=true&format=json&exsectionformat=plain",
-		url.QueryEscape(firstResult.Title))
-
-	resp, err = http.Get(pageURL)
+	pageContent, err := getPageContent(ctx, firstResult.Title)
 	if err != nil {
-		return "", fmt.Errorf("failed to get page content: %w", err)
+		// 如果获取页面内容失败，返回搜索结果摘要
+		var resultStrings []string
+		for _, result := range searchResp.Query.Search {
+			snippet := strings.ReplaceAll(result.Snippet, "<span class=\"searchmatch\">", "")
+			snippet = strings.ReplaceAll(snippet, "</span>", "")
+			resultStrings = append(resultStrings, fmt.Sprintf("标题: %s\n摘要: %s",
+				result.Title, snippet))
+		}
+		return strings.Join(resultStrings, "\n\n---\n\n"), nil
+	}
+
+	return pageContent, nil
+}
+
+// getPageContent 获取页面详细内容
+func getPageContent(ctx context.Context, title string) (string, error) {
+	pageURL := fmt.Sprintf("https://zh.wikipedia.org/w/api.php?action=query&prop=extracts&exintro&explaintext&titles=%s&format=json",
+		url.QueryEscape(title))
+
+	req, err := http.NewRequestWithContext(ctx, "GET", pageURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("User-Agent", "LLMOps/1.0 (https://example.com/contact)")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
 	}
 	defer resp.Body.Close()
 
-	body, err = io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read page response: %w", err)
+		return "", err
 	}
 
 	var pageResp WikipediaPageResponse
-	if err := sonic.Unmarshal(body, &pageResp); err != nil {
-		return "", fmt.Errorf("failed to parse page response: %w", err)
+	if err := json.Unmarshal(body, &pageResp); err != nil {
+		return "", err
 	}
 
-	// Format results
-	var results []string
-
-	// Add main content
 	for _, page := range pageResp.Query.Pages {
 		if page.Extract != "" {
-			// Limit extract length
+			// 限制内容长度
 			extract := page.Extract
 			if len(extract) > 1000 {
 				extract = extract[:1000] + "..."
 			}
-			results = append(results, fmt.Sprintf("标题: %s\n内容: %s", page.Title, extract))
-		}
-		break // Only process the first page
-	}
-
-	// Add related search results
-	if len(searchResp.Query.Search) > 1 {
-		results = append(results, "\n相关条目:")
-		for i, result := range searchResp.Query.Search[1:] {
-			if i >= 2 { // Limit to 2 additional results
-				break
-			}
-			// Clean HTML tags from snippet
-			snippet := strings.ReplaceAll(result.Snippet, "<span class=\"searchmatch\">", "")
-			snippet = strings.ReplaceAll(snippet, "</span>", "")
-			results = append(results, fmt.Sprintf("  %d. %s - %s", i+1, result.Title, snippet))
+			return fmt.Sprintf("标题: %s\n\n内容: %s\n\n来源: https://zh.wikipedia.org/wiki/%s",
+				page.Title, extract, url.QueryEscape(strings.ReplaceAll(page.Title, " ", "_"))), nil
 		}
 	}
 
-	if len(results) == 0 {
-		return fmt.Sprintf("没有找到关于 '%s' 的详细信息", query), nil
-	}
-
-	return strings.Join(results, "\n"), nil
+	return fmt.Sprintf("找到页面 '%s' 但无法获取内容", title), nil
 }
 
-// WikipediaSearch is the exported function for dynamic loading
-func WikipediaSearch(ctx context.Context, input string) (string, error) {
-	tool := NewWikipediaSearchTool()
-	return tool.Run(ctx, input)
+// NewWikipediaSearchTool 创建维基百科搜索工具
+func NewWikipediaSearchTool() (tool.InvokableTool, error) {
+	return utils.InferTool("wikipedia_search", "维基百科搜索工具，可以搜索维基百科上的文章内容", wikipediaSearchTool)
 }

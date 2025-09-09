@@ -4,26 +4,43 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"time"
 
+	"github.com/cloudwego/eino/components/embedding"
 	"github.com/pkoukk/tiktoken-go"
 	"github.com/redis/go-redis/v9"
 
-	"github.com/crazyfrankie/voidx/pkg/langchainx/embeddings"
 	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
 type EmbeddingService struct {
 	cmd      redis.Cmdable
-	embedder *embeddings.OpenAI
+	embedder embedding.Embedder
 }
 
-func NewEmbeddingService(cmd redis.Cmdable, embedder *embeddings.OpenAI) *EmbeddingService {
+func NewEmbeddingService(cmd redis.Cmdable, embedder embedding.Embedder) *EmbeddingService {
 	return &EmbeddingService{cmd: cmd, embedder: embedder}
 }
 
 func (s *EmbeddingService) Embeddings(ctx context.Context, query string) ([]float32, error) {
-	return s.embedder.EmbedQuery(ctx, query)
+	// 使用eino的Embedder接口
+	embeddings, err := s.embedder.EmbedStrings(ctx, []string{query})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(embeddings) == 0 || len(embeddings[0]) == 0 {
+		return nil, nil
+	}
+
+	// 转换float64到float32
+	result := make([]float32, len(embeddings[0]))
+	for i, v := range embeddings[0] {
+		result[i] = float32(v)
+	}
+
+	return result, nil
 }
 
 func (s *EmbeddingService) StoreEmbedded(ctx context.Context, query string, embedded []float32) error {
@@ -50,6 +67,27 @@ func (s *EmbeddingService) GetEmbedded(ctx context.Context, query string) ([]flo
 	}
 
 	return res, nil
+}
+
+func (s *EmbeddingService) EmbedText(ctx context.Context, text string) ([]float32, error) {
+	return s.Embeddings(ctx, text)
+}
+
+func (s *EmbeddingService) EmbedTexts(ctx context.Context, texts []string) ([][]float32, error) {
+	result, err := s.embedder.EmbedStrings(ctx, texts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to embed texts: %w", err)
+	}
+
+	embeddings := make([][]float32, len(result))
+	for i, emb := range result {
+		embeddings[i] = make([]float32, len(emb))
+		for j, v := range emb {
+			embeddings[i][j] = float32(v)
+		}
+	}
+
+	return embeddings, nil
 }
 
 func (s *EmbeddingService) CalculateTokenCount(query string) int {

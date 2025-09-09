@@ -3,10 +3,11 @@
 package llm
 
 import (
+	"github.com/google/wire"
+
 	"github.com/crazyfrankie/voidx/internal/core/llm"
 	"github.com/crazyfrankie/voidx/internal/llm/handler"
 	"github.com/crazyfrankie/voidx/internal/llm/service"
-	"github.com/google/wire"
 )
 
 type Handler = handler.LLMHandler

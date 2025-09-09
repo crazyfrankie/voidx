@@ -3,174 +3,143 @@ package pptx
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
-	"time"
 
-	"github.com/crazyfrankie/voidx/pkg/sonic"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
 )
 
-// MarkdownToPptxTool represents a tool for converting Markdown to PPTX
-type MarkdownToPptxTool struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
+// MarkdownToPPTXRequest Markdown转PPT请求参数
+type MarkdownToPPTXRequest struct {
+	Markdown string `json:"markdown" jsonschema:"description=要生成PPT内容的markdown文档字符串"`
 }
 
-// Slide represents a single slide in the presentation
-type Slide struct {
-	Title   string
-	Content []string
+// MarkdownToPPTXResponse Markdown转PPT响应
+type MarkdownToPPTXResponse struct {
+	Success bool   `json:"success"`
+	Content string `json:"content,omitempty"`
+	Message string `json:"message"`
 }
 
-// NewMarkdownToPptxTool creates a new MarkdownToPptxTool instance
-func NewMarkdownToPptxTool() *MarkdownToPptxTool {
-	return &MarkdownToPptxTool{
-		Name:        "markdown_to_pptx",
-		Description: "这是一款能将Markdown文档内容转换成本地PPT文件的工具",
-	}
-}
-
-// Run executes the Markdown to PPTX conversion
-func (t *MarkdownToPptxTool) Run(ctx context.Context, content string) (string, error) {
-	// Parse markdown content into slides
-	slides := t.parseMarkdownToSlides(content)
-	if len(slides) == 0 {
-		return "没有找到可转换的内容", nil
+// markdownToPPTXTool Markdown转PPT工具实现
+func markdownToPPTXTool(ctx context.Context, req MarkdownToPPTXRequest) (MarkdownToPPTXResponse, error) {
+	if req.Markdown == "" {
+		return MarkdownToPPTXResponse{
+			Success: false,
+			Message: "Markdown内容不能为空",
+		}, nil
 	}
 
-	// Generate output filename
-	timestamp := time.Now().Format("20060102_150405")
-	filename := fmt.Sprintf("presentation_%s.txt", timestamp)
-
-	// Create output directory if it doesn't exist
-	outputDir := "output"
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create output directory: %w", err)
-	}
-
-	outputPath := filepath.Join(outputDir, filename)
-
-	// Generate presentation content (simplified text format)
-	presentationContent := t.generatePresentationContent(slides)
-
-	// Write to file
-	if err := os.WriteFile(outputPath, []byte(presentationContent), 0644); err != nil {
-		return "", fmt.Errorf("failed to write presentation file: %w", err)
-	}
-
-	result := map[string]any{
-		"success":      true,
-		"output_path":  outputPath,
-		"slides_count": len(slides),
-		"message":      fmt.Sprintf("成功生成演示文稿，包含 %d 张幻灯片", len(slides)),
-	}
-
-	res, err := sonic.MarshalString(result)
+	pptContent, err := convertMarkdownToPPT(req.Markdown)
 	if err != nil {
-		return "", err
+		return MarkdownToPPTXResponse{
+			Success: false,
+			Message: fmt.Sprintf("PPT生成失败: %v", err),
+		}, nil
 	}
 
-	return res, nil
+	return MarkdownToPPTXResponse{
+		Success: true,
+		Content: pptContent,
+		Message: "PPT结构化内容生成成功",
+	}, nil
 }
 
-// parseMarkdownToSlides parses markdown content into slides
-func (t *MarkdownToPptxTool) parseMarkdownToSlides(content string) []Slide {
-	var slides []Slide
-	lines := strings.Split(content, "\n")
-
-	var currentSlide *Slide
+// convertMarkdownToPPT 将Markdown转换为PPT结构化内容
+func convertMarkdownToPPT(markdown string) (string, error) {
+	lines := strings.Split(markdown, "\n")
+	var pptSlides []string
+	var currentSlide strings.Builder
+	var slideTitle string
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
-		// Check for slide title (# or ##)
-		if strings.HasPrefix(line, "# ") || strings.HasPrefix(line, "## ") {
-			// Save previous slide if exists
-			if currentSlide != nil {
-				slides = append(slides, *currentSlide)
-			}
+		if line == "" {
+			continue
+		}
 
-			// Start new slide
+		// 处理标题
+		if strings.HasPrefix(line, "# ") {
+			// H1作为PPT标题页
+			if currentSlide.Len() > 0 {
+				pptSlides = append(pptSlides, formatSlide(slideTitle, currentSlide.String()))
+				currentSlide.Reset()
+			}
 			title := strings.TrimPrefix(line, "# ")
-			title = strings.TrimPrefix(title, "## ")
-			currentSlide = &Slide{
-				Title:   title,
-				Content: []string{},
+			pptSlides = append(pptSlides, formatTitleSlide(title))
+		} else if strings.HasPrefix(line, "## ") {
+			// H2作为新幻灯片标题
+			if currentSlide.Len() > 0 {
+				pptSlides = append(pptSlides, formatSlide(slideTitle, currentSlide.String()))
+				currentSlide.Reset()
 			}
-		} else if currentSlide != nil && line != "" {
-			// Add content to current slide
-			// Clean up markdown formatting
-			cleanLine := t.cleanMarkdownFormatting(line)
-			if cleanLine != "" {
-				currentSlide.Content = append(currentSlide.Content, cleanLine)
+			slideTitle = strings.TrimPrefix(line, "## ")
+		} else if strings.HasPrefix(line, "### ") {
+			// H3作为内容小标题
+			if currentSlide.Len() > 0 {
+				currentSlide.WriteString("\n")
 			}
+			currentSlide.WriteString("【" + strings.TrimPrefix(line, "### ") + "】\n")
+		} else if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
+			// 列表项
+			if currentSlide.Len() > 0 {
+				currentSlide.WriteString("\n")
+			}
+			content := strings.TrimPrefix(line, "- ")
+			content = strings.TrimPrefix(content, "* ")
+			currentSlide.WriteString("• " + content)
+		} else if strings.HasPrefix(line, "```") {
+			// 代码块（简化处理）
+			if currentSlide.Len() > 0 {
+				currentSlide.WriteString("\n")
+			}
+			currentSlide.WriteString("[代码块]")
+		} else if strings.HasPrefix(line, "![") {
+			// 图片（简化处理）
+			if currentSlide.Len() > 0 {
+				currentSlide.WriteString("\n")
+			}
+			currentSlide.WriteString("[图片]")
+		} else if line != "" {
+			// 普通段落
+			if currentSlide.Len() > 0 {
+				currentSlide.WriteString("\n")
+			}
+			currentSlide.WriteString(line)
 		}
 	}
 
-	// Add the last slide
-	if currentSlide != nil {
-		slides = append(slides, *currentSlide)
+	// 添加最后一张幻灯片
+	if currentSlide.Len() > 0 {
+		pptSlides = append(pptSlides, formatSlide(slideTitle, currentSlide.String()))
 	}
 
-	return slides
-}
-
-// cleanMarkdownFormatting removes basic markdown formatting
-func (t *MarkdownToPptxTool) cleanMarkdownFormatting(text string) string {
-	// Remove bold and italic formatting
-	re := regexp.MustCompile(`\*\*(.*?)\*\*`)
-	text = re.ReplaceAllString(text, "$1")
-
-	re = regexp.MustCompile(`\*(.*?)\*`)
-	text = re.ReplaceAllString(text, "$1")
-
-	// Remove code formatting
-	re = regexp.MustCompile("`(.*?)`")
-	text = re.ReplaceAllString(text, "$1")
-
-	// Remove list markers
-	text = strings.TrimPrefix(text, "- ")
-	text = strings.TrimPrefix(text, "* ")
-
-	// Remove numbered list markers
-	re = regexp.MustCompile(`^\d+\.\s`)
-	text = re.ReplaceAllString(text, "")
-
-	return strings.TrimSpace(text)
-}
-
-// generatePresentationContent generates the presentation content in text format
-func (t *MarkdownToPptxTool) generatePresentationContent(slides []Slide) string {
-	var content strings.Builder
-
-	content.WriteString("=== 演示文稿 ===\n")
-	content.WriteString(fmt.Sprintf("生成时间: %s\n", time.Now().Format("2006-01-02 15:04:05")))
-	content.WriteString(fmt.Sprintf("幻灯片数量: %d\n\n", len(slides)))
-
-	for i, slide := range slides {
-		content.WriteString(fmt.Sprintf("=== 幻灯片 %d ===\n", i+1))
-		content.WriteString(fmt.Sprintf("标题: %s\n\n", slide.Title))
-
-		if len(slide.Content) > 0 {
-			content.WriteString("内容:\n")
-			for _, item := range slide.Content {
-				content.WriteString(fmt.Sprintf("• %s\n", item))
-			}
-		}
-
-		content.WriteString("\n" + strings.Repeat("-", 50) + "\n\n")
+	if len(pptSlides) == 0 {
+		return "无法从提供的Markdown内容生成PPT结构", nil
 	}
 
-	content.WriteString("注意: 这是一个简化的文本格式输出。\n")
-	content.WriteString("在实际应用中，可以使用专门的PPTX库（如unioffice）来生成真正的PowerPoint文件。\n")
+	result := "PPT生成成功！以下是PPT的结构化内容：\n\n"
+	result += strings.Join(pptSlides, "\n"+strings.Repeat("=", 50)+"\n\n")
+	result += "\n注意：这是PPT的结构化文本表示。在实际应用中，您可以将此内容导入到PowerPoint或其他演示软件中创建正式的PPT文件。"
 
-	return content.String()
+	return result, nil
 }
 
-// MarkdownToPptx is the exported function for dynamic loading
-func MarkdownToPptx(ctx context.Context, input string) (string, error) {
-	tool := NewMarkdownToPptxTool()
-	return tool.Run(ctx, input)
+// formatTitleSlide 格式化标题页
+func formatTitleSlide(title string) string {
+	return fmt.Sprintf("【封面页】\n标题: %s\n副标题: 由LLMOps平台生成", title)
+}
+
+// formatSlide 格式化内容页
+func formatSlide(title, content string) string {
+	if title == "" {
+		title = "内容页"
+	}
+	return fmt.Sprintf("【幻灯片】\n标题: %s\n内容:\n%s", title, content)
+}
+
+// NewMarkdownToPPTXTool 创建Markdown转PPT工具
+func NewMarkdownToPPTXTool() (tool.InvokableTool, error) {
+	return utils.InferTool("markdown_to_pptx", "这是一个可以将markdown文本转换成PPT的工具，传递的参数是markdown对应的文本字符串，返回的数据是PPT的结构化内容", markdownToPPTXTool)
 }

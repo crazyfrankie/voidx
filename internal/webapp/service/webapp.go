@@ -4,15 +4,15 @@ import (
 	"context"
 	"errors"
 
+	"github.com/cloudwego/eino/schema"
+	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/llms"
 
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	"github.com/crazyfrankie/voidx/internal/core/agent/entities"
 	agententities "github.com/crazyfrankie/voidx/internal/core/agent/entities"
-	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
@@ -27,18 +27,18 @@ import (
 )
 
 type WebAppService struct {
-	agentManager    *agent.AgentQueueManager
+	agentManager    *agent.AgentQueueManagerFactory
 	appConfigSvc    *app_config.Service
 	conversationSvc *conversation.Service
 	retrievalSvc    *retriever.Service
-	llmSvc          *llm.Service
 	tokenBufMem     *memory.TokenBufferMemory
 	repo            *repository.WebAppRepo
+	llmSvc          *llm.Service
 }
 
 func NewWebAppService(repo *repository.WebAppRepo, appConfigSvc *app_config.Service,
 	conversationSvc *conversation.Service, llmSvc *llm.Service, retrievalSvc *retriever.Service,
-	tokenBufMem *memory.TokenBufferMemory, agentManager *agent.AgentQueueManager) *WebAppService {
+	tokenBufMem *memory.TokenBufferMemory, agentManager *agent.AgentQueueManagerFactory) *WebAppService {
 	return &WebAppService{
 		repo:            repo,
 		conversationSvc: conversationSvc,
@@ -154,14 +154,13 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 		return nil, err
 	}
 
-	// 6. 从语言模型管理器中加载大语言模型
 	languageModel, err := s.llmSvc.LoadLanguageModel(appConfig.ModelConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// 7. 实例化TokenBufferMemory用于提取短期记忆
-	tokenBufferMemory := s.tokenBufMem.WithConversationID(convers.ID).WithLLM(languageModel)
+	s.tokenBufMem.WithConversationID(convers.ID)
 
 	// 解析对话轮数配置
 	var dialogRound = 10 // 默认值
@@ -169,13 +168,13 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 		dialogRound = appConfig.DialogRound
 	}
 
-	history, err := tokenBufferMemory.GetHistoryPromptMessages(2000, dialogRound)
+	history, err := s.tokenBufMem.GetHistoryPromptMessages(2000, dialogRound)
 	if err != nil {
 		return nil, err
 	}
 
 	// 8. 将草稿配置中的tools转换成工具
-	tools, err := s.appConfigSvc.GetLangchainToolsByToolsConfig(ctx, appConfig.Tools)
+	tools, err := s.appConfigSvc.GetToolsByToolsConfig(ctx, appConfig.Tools)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +187,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 			datasetIDs = append(datasetIDs, dataset["id"].(uuid.UUID))
 		}
 
-		datasetTool, err := s.retrievalSvc.CreateLangchainToolFromSearch(ctx, accountID, datasetIDs, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
+		datasetTool, err := s.retrievalSvc.CreateToolFromSearch(ctx, accountID, datasetIDs, consts.RetrievalSourceApp, appConfig.RetrievalConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -202,7 +201,7 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 			workflowIDs = append(workflowIDs, workflow["id"].(uuid.UUID))
 		}
 
-		workflowTools, err := s.appConfigSvc.GetLangchainToolsByWorkflowIDs(ctx, workflowIDs)
+		workflowTools, err := s.appConfigSvc.GetToolsByWorkflowIDs(ctx, workflowIDs)
 		if err != nil {
 			return nil, err
 		}
@@ -225,10 +224,10 @@ func (s *WebAppService) WebAppChat(ctx context.Context, token string, chatReq re
 	features := languageModel.GetFeatures()
 	for _, f := range features {
 		if f == llmentity.FeatureFunctionCall {
-			agentInstance = agent.NewFunctionCallAgent(languageModel, *agentConfig, s.agentManager)
+			agentInstance = agent.NewFunctionCallAgent(languageModel, agentConfig, s.agentManager)
 		}
 	}
-	agentInstance = agent.NewReACTAgent(languageModel, *agentConfig, s.agentManager)
+	agentInstance = agent.NewReactAgent(languageModel, agentConfig, s.agentManager)
 
 	// 13. 创建响应流通道
 	responseStream := make(chan string, 100)
@@ -255,7 +254,7 @@ func (s *WebAppService) StopWebAppChat(ctx context.Context, token, taskID string
 		return err
 	}
 
-	return s.agentManager.SetStopFlag(task, consts.InvokeFromWebApp, uid)
+	return s.agentManager.StopTask(ctx, task, uid, consts.InvokeFromWebApp)
 }
 
 func (s *WebAppService) GetConversations(ctx context.Context, token string, getReq req.GetWebAppConversationsReq) ([]resp.WebAppConversationResp, error) {
@@ -294,23 +293,23 @@ func (s *WebAppService) GetConversations(ctx context.Context, token string, getR
 // processWebAppChat 处理WebApp对话的异步逻辑
 func (s *WebAppService) processWebAppChat(ctx context.Context, agentInstance agent.BaseAgent,
 	conversation *entity.Conversation, message *entity.Message, chatReq req.WebAppChatReq,
-	history []llms.MessageContent, accountID uuid.UUID, responseStream chan<- string) {
+	history []*schema.Message, accountID uuid.UUID, responseStream chan<- string) {
 	defer close(responseStream)
 
 	// 构建Agent输入
-	convertHistory := make([]llms.ChatMessage, 0, len(history))
+	convertHistory := make([]*schema.Message, 0, len(history))
 	for _, h := range history {
-		convertHistory = append(convertHistory, util.MessageContentToChatMessage(h))
+		convertHistory = append(convertHistory, h)
 	}
 
 	agentInput := agententities.AgentState{
-		Messages:       []llms.ChatMessage{},
+		Messages:       []*schema.Message{},
 		History:        convertHistory,
 		LongTermMemory: conversation.Summary,
 	}
 
 	// 定义字典存储推理过程
-	agentThoughts := make(map[string]entities.AgentThought)
+	agentThoughts := make(map[string]*entities.AgentThought)
 
 	// 调用智能体获取消息流
 	thoughtStream, err := agentInstance.Stream(ctx, agentInput)
@@ -380,7 +379,7 @@ func (s *WebAppService) processWebAppChat(ctx context.Context, agentInstance age
 	// 将消息以及推理过程添加到数据库
 	var thoughtList []entities.AgentThought
 	for _, thought := range agentThoughts {
-		thoughtList = append(thoughtList, thought)
+		thoughtList = append(thoughtList, *thought)
 	}
 
 	err = s.conversationSvc.SaveAgentThoughts(ctx, accountID, conversation.AppID, conversation.ID, message.ID, thoughtList)

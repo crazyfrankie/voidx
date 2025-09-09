@@ -1,10 +1,8 @@
 package ioc
 
 import (
-	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 
-	"github.com/crazyfrankie/voidx/internal/core/agent"
 	"github.com/crazyfrankie/voidx/internal/core/builtin_apps"
 	"github.com/crazyfrankie/voidx/internal/core/embedding"
 	"github.com/crazyfrankie/voidx/internal/core/file_extractor"
@@ -15,12 +13,7 @@ import (
 	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/categories"
 	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
 	"github.com/crazyfrankie/voidx/internal/upload"
-	"github.com/crazyfrankie/voidx/pkg/langchainx/embeddings"
 )
-
-func InitAgentManager(cmd redis.Cmdable) *agent.AgentQueueManager {
-	return agent.NewAgentQueueManager(cmd)
-}
 
 func InitBuiltinAppManager() *builtin_apps.BuiltinAppManager {
 	return builtin_apps.NewBuiltinAppManager()
@@ -34,12 +27,20 @@ func InitBuiltinToolsCategories() *categories.BuiltinCategoryManager {
 	return manager
 }
 
-func InitEmbeddingService(cmd redis.Cmdable, embedder *embeddings.OpenAI) *embedding.EmbeddingService {
-	return embedding.NewEmbeddingService(cmd, embedder)
+func InitEmbeddingService() *embedding.EmbeddingService {
+	eb, err := embedding.NewEmbeddingService("https://dashscope.aliyuncs.com/compatible-mode/v1", "text-embedding-v4")
+	if err != nil {
+		panic(err)
+	}
+	return eb
 }
 
 func InitFileExtractor(uploadSvc *upload.Service) *file_extractor.FileExtractor {
-	return file_extractor.NewFileExtractor(uploadSvc)
+	fileExtra, err := file_extractor.NewFileExtractor(uploadSvc)
+	if err != nil {
+		panic(err)
+	}
+	return fileExtra
 }
 
 func InitJiebaService() *retrievers.JiebaService {
@@ -67,18 +68,18 @@ func InitLLMCore() *llm.LanguageModelManager {
 }
 
 func InitTokenBufMem(db *gorm.DB) *memory.TokenBufferMemory {
-	return memory.NewTokenBufferMemory(db)
+	return memory.NewTokenBufferMemory(db, 2000)
 }
 
-func InitApiToolsManager() *apitools.ApiProviderManager {
-	return apitools.NewApiProviderManager()
+func InitApiToolsManager() *apitools.APIProviderManager {
+	return apitools.NewAPIProviderManager()
 }
 
 func InitBuiltinToolsManager() *builtin.BuiltinProviderManager {
-	manager, err := builtin.NewBuiltinProviderManager()
+	builtinMan, err := builtin.NewBuiltinProviderManager()
 	if err != nil {
 		panic(err)
 	}
 
-	return manager
+	return builtinMan
 }

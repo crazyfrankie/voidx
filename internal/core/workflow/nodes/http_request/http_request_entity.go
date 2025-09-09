@@ -1,103 +1,45 @@
 package http_request
 
 import (
-	"fmt"
-
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
 )
 
-// HttpRequestMethod HTTP请求方法类型枚举
-type HttpRequestMethod string
+// HTTPMethod represents HTTP request methods
+type HTTPMethod string
 
 const (
-	HttpRequestMethodGet     HttpRequestMethod = "get"
-	HttpRequestMethodPost    HttpRequestMethod = "post"
-	HttpRequestMethodPut     HttpRequestMethod = "put"
-	HttpRequestMethodPatch   HttpRequestMethod = "patch"
-	HttpRequestMethodDelete  HttpRequestMethod = "delete"
-	HttpRequestMethodHead    HttpRequestMethod = "head"
-	HttpRequestMethodOptions HttpRequestMethod = "options"
+	HTTPMethodGET    HTTPMethod = "GET"
+	HTTPMethodPOST   HTTPMethod = "POST"
+	HTTPMethodPUT    HTTPMethod = "PUT"
+	HTTPMethodDELETE HTTPMethod = "DELETE"
+	HTTPMethodPATCH  HTTPMethod = "PATCH"
 )
 
-// HttpRequestInputType HTTP请求输入变量类型
-type HttpRequestInputType string
-
-const (
-	HttpRequestInputTypeParams  HttpRequestInputType = "params"  // query参数
-	HttpRequestInputTypeHeaders HttpRequestInputType = "headers" // header请求头
-	HttpRequestInputTypeBody    HttpRequestInputType = "body"    // body参数
-)
-
-// HttpRequestNodeData HTTP请求节点数据
-type HttpRequestNodeData struct {
+// HTTPRequestNodeData represents the data structure for HTTP request workflow nodes
+type HTTPRequestNodeData struct {
 	*entities.BaseNodeData
-	URL     string                     `json:"url"`     // 请求URL地址
-	Method  HttpRequestMethod          `json:"method"`  // API请求方法
-	Inputs  []*entities.VariableEntity `json:"inputs"`  // 输入变量列表
-	Outputs []*entities.VariableEntity `json:"outputs"` // 输出变量列表
+	URL     string                     `json:"url"`
+	Method  HTTPMethod                 `json:"method"`
+	Headers map[string]string          `json:"headers"`
+	Body    string                     `json:"body"`
+	Timeout int                        `json:"timeout"` // timeout in seconds
+	Inputs  []*entities.VariableEntity `json:"inputs"`
+	Outputs []*entities.VariableEntity `json:"outputs"`
 }
 
-// NewHttpRequestNodeData 创建新的HTTP请求节点数据
-func NewHttpRequestNodeData() *HttpRequestNodeData {
-	baseData := entities.NewBaseNodeData()
-	baseData.NodeType = entities.NodeTypeHTTPRequest
-
-	// 默认输出变量
-	outputs := []*entities.VariableEntity{
-		{
-			Name: "status_code",
-			Type: entities.VariableTypeInt,
-			Value: entities.VariableValue{
-				Type:    entities.VariableValueTypeGenerated,
-				Content: 0,
-			},
-		},
-		{
-			Name: "text",
-			Type: entities.VariableTypeString,
-			Value: entities.VariableValue{
-				Type: entities.VariableValueTypeGenerated,
-			},
-		},
-	}
-
-	return &HttpRequestNodeData{
-		BaseNodeData: baseData,
-		Method:       HttpRequestMethodGet,
+// NewHTTPRequestNodeData creates a new HTTP request node data instance
+func NewHTTPRequestNodeData() *HTTPRequestNodeData {
+	return &HTTPRequestNodeData{
+		BaseNodeData: &entities.BaseNodeData{NodeType: entities.NodeTypeHTTPRequest},
+		Method:       HTTPMethodGET,
+		Headers:      make(map[string]string),
+		Timeout:      30,
 		Inputs:       make([]*entities.VariableEntity, 0),
-		Outputs:      outputs,
+		Outputs:      make([]*entities.VariableEntity, 0),
 	}
 }
 
-// ValidateInputs 校验输入列表数据
-func (h *HttpRequestNodeData) ValidateInputs() error {
-	// 校验判断输入变量列表中的类型信息
-	for _, input := range h.Inputs {
-		if inputType, exists := input.Meta["type"]; exists {
-			switch inputType {
-			case string(HttpRequestInputTypeParams),
-				string(HttpRequestInputTypeHeaders),
-				string(HttpRequestInputTypeBody):
-				// 有效类型
-			default:
-				return fmt.Errorf("HTTP请求参数结构出错: 无效的输入类型 %v", inputType)
-			}
-		}
-	}
-	return nil
-}
-
-// GetInputs 实现NodeDataInterface接口
-func (h *HttpRequestNodeData) GetInputs() []*entities.VariableEntity {
-	return h.Inputs
-}
-
-// GetOutputs 实现NodeDataInterface接口
-func (h *HttpRequestNodeData) GetOutputs() []*entities.VariableEntity {
-	return h.Outputs
-}
-
-// GetBaseNodeData 实现NodeDataInterface接口
-func (h *HttpRequestNodeData) GetBaseNodeData() *entities.BaseNodeData {
+// GetBaseNodeData returns the base node data (implements NodeDataInterface)
+func (h *HTTPRequestNodeData) GetBaseNodeData() *entities.BaseNodeData {
 	return h.BaseNodeData
 }

@@ -7,6 +7,7 @@
 package app
 
 import (
+	"context"
 	"github.com/crazyfrankie/voidx/internal/app/handler"
 	"github.com/crazyfrankie/voidx/internal/app/repository"
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
@@ -15,20 +16,18 @@ import (
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
-	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
 	providers2 "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
-	llm2 "github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/upload"
-	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"gorm.io/gorm"
 )
 
 // Injectors from wire.go:
 
-func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory2 *memory.TokenBufferMemory, llmCore *llm.LanguageModelManager, appConfig *app_config.AppConfigModule, ossSvc *upload.UploadModule, retrieverSvc *retriever.RetrieverModule, agentManager *agent.AgentQueueManager, llmModule *llm2.LLMModule, apiProvider *providers.ApiProviderManager, builtinProvider *providers2.BuiltinProviderManager, convers *conversation.ConversationModule) *AppModule {
+func InitAppModule(db *gorm.DB, memory2 *memory.TokenBufferMemory, llmCore *llm.LanguageModelManager, appConfig *app_config.AppConfigModule, agentSvc *agent.AgentQueueManagerFactory, ossSvc *upload.UploadModule, retrieverSvc *retriever.RetrieverModule, apiProvider *providers.APIProviderManager, builtinProvider *providers2.BuiltinProviderManager, convers *conversation.ConversationModule) *AppModule {
 	appDao := dao.NewAppDao(db)
 	appRepo := repository.NewAppRepo(appDao)
 	appConfigService := appConfig.Service
@@ -36,8 +35,7 @@ func InitAppModule(db *gorm.DB, vecStore *vecstore.VecStoreService, memory2 *mem
 	retrievalService := retrieverSvc.Service
 	ossService := ossSvc.Service
 	baseLanguageModel := InitModel(llmCore)
-	llmService := llmModule.Service
-	appService := service.NewAppService(appRepo, vecStore, appConfigService, conversationService, retrievalService, ossService, apiProvider, builtinProvider, agentManager, baseLanguageModel, llmService, memory2, llmCore)
+	appService := service.NewAppService(appRepo, appConfigService, conversationService, retrievalService, ossService, apiProvider, builtinProvider, agentSvc, llmCore, memory2, baseLanguageModel)
 	appHandler := handler.NewAppHandler(appService, appConfigService)
 	appModule := &AppModule{
 		Handler: appHandler,
@@ -57,8 +55,8 @@ type AppModule struct {
 	Service *Service
 }
 
-func InitModel(llmManager *llm.LanguageModelManager) entity.BaseLanguageModel {
-	model, err := llmManager.CreateModel("tongyi", "qwen-max", map[string]any{
+func InitModel(llmManager *llm.LanguageModelManager) entities.BaseLanguageModel {
+	model, err := llmManager.CreateModel(context.Background(), "tongyi", "qwen-max", map[string]any{
 		"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
 	})
 	if err != nil {

@@ -221,7 +221,7 @@ func (s *ConversationService) CreateMessage(ctx context.Context, accountID uuid.
 	return message, nil
 }
 
-func (s *ConversationService) UpdateMessage(ctx context.Context, accountID uuid.UUID, messageID uuid.UUID, updateReq req.UpdateMessageReq) error {
+func (s *ConversationService) UpdateMessage(ctx context.Context, accountID uuid.UUID, messageID uuid.UUID, updateReq *req.UpdateMessageReq) error {
 	// 验证消息权限
 	message, err := s.repo.GetMessageByID(ctx, messageID)
 	if err != nil {
@@ -342,7 +342,7 @@ func (s *ConversationService) SaveAgentThoughts(ctx context.Context, accountID, 
 
 	// 更新消息的答案
 	if finalAnswer != "" {
-		err := s.UpdateMessage(ctx, accountID, messageID, req.UpdateMessageReq{
+		err := s.UpdateMessage(ctx, accountID, messageID, &req.UpdateMessageReq{
 			Answer: finalAnswer,
 		})
 		if err != nil {

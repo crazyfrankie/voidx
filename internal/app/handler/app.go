@@ -68,7 +68,7 @@ func (h *AppHandler) CreateApp() gin.HandlerFunc {
 			return
 		}
 
-		app, err := h.appService.CreateApp(c.Request.Context(), userID, createReq)
+		app, err := h.appService.CreateApp(c.Request.Context(), userID, &createReq)
 		if err != nil {
 			response.InternalServerErrorResponse(c, err)
 			return
@@ -126,7 +126,7 @@ func (h *AppHandler) UpdateApp() gin.HandlerFunc {
 			return
 		}
 
-		err = h.appService.UpdateApp(c.Request.Context(), appID, userID, updateReq)
+		err = h.appService.UpdateApp(c.Request.Context(), appID, userID, &updateReq)
 		if err != nil {
 			response.InternalServerErrorResponse(c, err)
 			return

@@ -100,3 +100,7 @@ const (
 	MessageStatusTimeout MessageStatus = "timeout" // 超时
 	MessageStatusError   MessageStatus = "error"   // 出错
 )
+
+func (ms MessageStatus) String() string {
+	return string(ms)
+}

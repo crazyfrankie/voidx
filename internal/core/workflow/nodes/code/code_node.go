@@ -1,165 +1,176 @@
 package code
 
 import (
+	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
-	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
 	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
-// CodeNode 代码节点
+// CodeNode represents a code execution workflow node
 type CodeNode struct {
-	*nodes.BaseNodeImpl
 	nodeData *CodeNodeData
 }
 
-// NewCodeNode 创建新的代码节点
+// NewCodeNode creates a new code node instance
 func NewCodeNode(nodeData *CodeNodeData) *CodeNode {
 	return &CodeNode{
-		BaseNodeImpl: nodes.NewBaseNodeImpl(nodeData.BaseNodeData),
-		nodeData:     nodeData,
+		nodeData: nodeData,
 	}
 }
 
-// Invoke 代码节点执行函数
-func (c *CodeNode) Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error) {
-	startAt := time.Now()
+// Execute executes the code node with the given workflow state
+func (n *CodeNode) Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error) {
+	startTime := time.Now()
 
-	// 处理输入数据
-	inputs := make(map[string]any)
-	originInputs := make(map[string]any)
-	if err := sonic.UnmarshalString(state.Inputs, &originInputs); err != nil {
-		return nil, err
-	}
-	for _, input := range c.nodeData.Inputs {
-		if val, exists := originInputs[input.Name]; exists {
-			inputs[input.Name] = val
-		} else if input.Required {
-			return nil, fmt.Errorf("代码节点缺少必需的输入参数: %s", input.Name)
-		}
-	}
+	// Create node result
+	result := entities.NewNodeResult(n.nodeData.BaseNodeData)
+	result.StartTime = startTime.Unix()
 
-	// 执行代码
-	result, err := c.executeCode(inputs)
+	// Extract input variables from state
+	inputsDict, err := n.extractVariablesFromState(state)
 	if err != nil {
-		nodeResult := entities.NewNodeResult(c.nodeData.BaseNodeData)
-		nodeResult.Status = entities.NodeStatusFailed
-		nodeResult.Error = err.Error()
-		nodeResult.Latency = time.Since(startAt)
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to extract input variables: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+	result.Inputs = inputsDict
 
-		newState := &entities.WorkflowState{
-			Inputs:      state.Inputs,
-			Outputs:     state.Outputs,
-			NodeResults: append(state.NodeResults, nodeResult),
-		}
-
-		return newState, err
+	// Execute Python code
+	codeResult, err := n.executePythonCode(ctx, inputsDict)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("code execution failed: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
 	}
 
-	// 处理输出数据
-	outputs := make(map[string]any)
-	for _, output := range c.nodeData.Outputs {
-		if val, exists := result[output.Name]; exists {
-			outputs[output.Name] = val
+	// Build output data structure
+	outputs := make(map[string]interface{})
+	if len(n.nodeData.Outputs) > 0 {
+		outputs[n.nodeData.Outputs[0].Name] = codeResult
+	} else {
+		outputs["result"] = codeResult
+	}
+	result.Outputs = outputs
+
+	// Set success status
+	result.Status = entities.NodeStatusSucceeded
+	result.EndTime = time.Now().Unix()
+
+	return result, nil
+}
+
+// extractVariablesFromState extracts input variables from the workflow state
+func (n *CodeNode) extractVariablesFromState(state *entities.WorkflowState) (map[string]interface{}, error) {
+	inputsDict := make(map[string]interface{})
+
+	for _, input := range n.nodeData.Inputs {
+		var value interface{}
+		var found bool
+
+		// Check if it's a reference to another node's output
+		if input.Value.Type == entities.VariableValueTypeRef {
+			if content, ok := input.Value.Content.(*entities.VariableContent); ok {
+				if content.RefNodeID != nil {
+					// Find the referenced node's output in state
+					for _, nodeResult := range state.NodeResults {
+						if nodeResult.NodeID == *content.RefNodeID {
+							if refValue, exists := nodeResult.Outputs[content.RefVarName]; exists {
+								value = refValue
+								found = true
+								break
+							}
+						}
+					}
+				}
+			}
 		} else {
-			outputs[output.Name] = entities.VariableTypeDefaultValueMap[output.Type]
+			// It's a constant value
+			value = input.Value.Content
+			found = true
+		}
+
+		if !found && input.Required {
+			return nil, fmt.Errorf("required input variable %s not found", input.Name)
+		}
+
+		if found {
+			inputsDict[input.Name] = value
 		}
 	}
 
-	// 构建节点结果
-	nodeResult := entities.NewNodeResult(c.nodeData.BaseNodeData)
-	nodeResult.Status = entities.NodeStatusSucceeded
-	nodeResult.Inputs = inputs
-	nodeResult.Outputs = outputs
-	nodeResult.Latency = time.Since(startAt)
-
-	// 构建新状态
-	newState := &entities.WorkflowState{
-		Inputs:      state.Inputs,
-		Outputs:     state.Outputs,
-		NodeResults: append(state.NodeResults, nodeResult),
+	// Also include workflow inputs
+	for key, value := range state.Inputs {
+		if _, exists := inputsDict[key]; !exists {
+			inputsDict[key] = value
+		}
 	}
 
-	return newState, nil
+	return inputsDict, nil
 }
 
-// executeCode 执行代码
-func (c *CodeNode) executeCode(inputs map[string]any) (map[string]any, error) {
-	// 这里是简化的代码执行实现
-	// 实际实现中应该根据语言类型调用相应的解释器或编译器
+// executePythonCode executes the Python code with the given variables
+func (n *CodeNode) executePythonCode(ctx context.Context, variables map[string]interface{}) (interface{}, error) {
+	// For security reasons, we'll implement a simple mock execution
+	// In a production environment, you would want to use a sandboxed Python execution environment
 
-	switch c.nodeData.Language {
-	case CodeLanguageGo:
-		return c.executeGoCode(inputs)
-	case CodeLanguagePython:
-		return c.executePythonCode(inputs)
-	case CodeLanguageJS:
-		return c.executeJSCode(inputs)
-	default:
-		return nil, fmt.Errorf("不支持的代码语言: %s", c.nodeData.Language)
-	}
-}
+	// Create a simple Python script that includes the variables and code
+	pythonScript := n.buildPythonScript(variables)
 
-// executeGoCode 执行Go代码（模拟实现）
-func (c *CodeNode) executeGoCode(inputs map[string]any) (map[string]any, error) {
-	// 模拟Go代码执行
-	result := make(map[string]any)
-
-	// 简单的字符串处理示例
-	if input, exists := inputs["input"]; exists {
-		inputStr := fmt.Sprintf("%v", input)
-		result["output"] = strings.ToUpper(inputStr)
-		result["length"] = len(inputStr)
+	// Execute Python script (this is a simplified implementation)
+	// In production, you should use a proper sandboxed execution environment
+	cmd := exec.CommandContext(ctx, "python3", "-c", pythonScript)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("python execution failed: %w", err)
 	}
 
-	result["language"] = "go"
-	result["code_executed"] = c.nodeData.Code
+	// Parse the output as JSON to get the result
+	var result interface{}
+	if err := sonic.Unmarshal(output, &result); err != nil {
+		// If JSON parsing fails, return the raw output as string
+		return strings.TrimSpace(string(output)), nil
+	}
 
 	return result, nil
 }
 
-// executePythonCode 执行Python代码（模拟实现）
-func (c *CodeNode) executePythonCode(inputs map[string]any) (map[string]any, error) {
-	// 模拟Python代码执行
-	result := make(map[string]any)
+// buildPythonScript builds a Python script with variables and user code
+func (n *CodeNode) buildPythonScript(variables map[string]interface{}) string {
+	var script strings.Builder
 
-	if input, exists := inputs["input"]; exists {
-		inputStr := fmt.Sprintf("%v", input)
-		result["output"] = strings.ToLower(inputStr)
-		result["reversed"] = reverseString(inputStr)
+	// Add imports
+	script.WriteString("import json\n")
+	script.WriteString("import sys\n\n")
+
+	// Add variables
+	for key, value := range variables {
+		valueJSON, _ := sonic.Marshal(value)
+		script.WriteString(fmt.Sprintf("%s = json.loads('%s')\n", key, string(valueJSON)))
 	}
 
-	result["language"] = "python"
-	result["code_executed"] = c.nodeData.Code
+	script.WriteString("\n")
 
-	return result, nil
+	// Add user code
+	script.WriteString(n.nodeData.Code)
+	script.WriteString("\n\n")
+
+	// Add result output
+	script.WriteString("if 'result' in locals():\n")
+	script.WriteString("    print(json.dumps(result))\n")
+	script.WriteString("else:\n")
+	script.WriteString("    print(json.dumps(None))\n")
+
+	return script.String()
 }
 
-// executeJSCode 执行JavaScript代码（模拟实现）
-func (c *CodeNode) executeJSCode(inputs map[string]any) (map[string]any, error) {
-	// 模拟JavaScript代码执行
-	result := make(map[string]any)
-
-	if input, exists := inputs["input"]; exists {
-		inputStr := fmt.Sprintf("%v", input)
-		result["output"] = fmt.Sprintf("JS: %s", inputStr)
-		result["char_count"] = len(inputStr)
-	}
-
-	result["language"] = "javascript"
-	result["code_executed"] = c.nodeData.Code
-
-	return result, nil
-}
-
-// reverseString 反转字符串
-func reverseString(s string) string {
-	runes := []rune(s)
-	for i, j := 0, len(runes)-1; i < j; i, j = i+1, j-1 {
-		runes[i], runes[j] = runes[j], runes[i]
-	}
-	return string(runes)
+// GetNodeData returns the node data
+func (n *CodeNode) GetNodeData() *CodeNodeData {
+	return n.nodeData
 }

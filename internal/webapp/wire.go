@@ -36,7 +36,7 @@ func InitWebAppModule(db *gorm.DB, tokenBufMem *memory.TokenBufferMemory,
 	appConfigModule *app_config.AppConfigModule,
 	conversationModule *conversation.ConversationModule,
 	llmModule *llm.LLMModule,
-	agentManager *agent.AgentQueueManager,
+	agentService *agent.Service,
 	retrievalModule *retriever.RetrieverModule,
 ) *WebAppModule {
 	wire.Build(

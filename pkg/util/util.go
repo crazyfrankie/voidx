@@ -7,13 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/llms"
 
 	"github.com/crazyfrankie/voidx/types/errno"
 )
@@ -46,55 +44,6 @@ func ConvertViaJSON(dest interface{}, src interface{}) error {
 	}
 
 	return sonic.Unmarshal(jsonData, dest)
-}
-
-func ChatMessageToMessageContent(msg llms.ChatMessage) llms.MessageContent {
-	return llms.MessageContent{
-		Role: msg.GetType(),
-		Parts: []llms.ContentPart{
-			llms.TextContent{Text: msg.GetContent()},
-		},
-	}
-}
-
-func MessageContentToChatMessage(mc llms.MessageContent) llms.ChatMessage {
-	var contentParts []string
-
-	for _, part := range mc.Parts {
-		switch p := part.(type) {
-		case llms.TextContent:
-			contentParts = append(contentParts, p.Text)
-		case llms.ImageURLContent:
-			contentParts = append(contentParts, p.URL)
-		case llms.BinaryContent:
-			contentParts = append(contentParts, p.String())
-		case llms.ToolCall:
-			jsonBytes, _ := sonic.Marshal(p)
-			contentParts = append(contentParts, string(jsonBytes))
-		}
-	}
-
-	content := strings.Join(contentParts, "\n")
-
-	switch mc.Role {
-	case llms.ChatMessageTypeHuman:
-		return llms.HumanChatMessage{Content: content}
-	case llms.ChatMessageTypeAI:
-		return llms.AIChatMessage{Content: content}
-	case llms.ChatMessageTypeSystem:
-		return llms.SystemChatMessage{Content: content}
-	default:
-		return llms.GenericChatMessage{Content: content, Role: string(mc.Role)}
-	}
-}
-
-func MessageContentToChatMessages(mc []llms.MessageContent) []llms.ChatMessage {
-	res := make([]llms.ChatMessage, 0, len(mc))
-	for _, m := range mc {
-		res = append(res, MessageContentToChatMessage(m))
-	}
-
-	return res
 }
 
 func GetValueType(value any) string {

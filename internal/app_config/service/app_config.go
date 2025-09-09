@@ -3,14 +3,16 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
+	"github.com/crazyfrankie/voidx/internal/core/tools/entities"
 	"github.com/google/uuid"
-	langchaintool "github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/app_config/repository"
 	"github.com/crazyfrankie/voidx/internal/core/llm"
-	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/entities"
 	apitools "github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
 	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
 	"github.com/crazyfrankie/voidx/internal/core/workflow"
@@ -25,16 +27,19 @@ type AppConfigService struct {
 	repo            *repository.AppConfigRepo
 	llmMgr          *llm.LanguageModelManager
 	builtinProvider *builtin.BuiltinProviderManager
-	apiProvider     *apitools.ApiProviderManager
+	apiProvider     *apitools.APIProviderManager
+	workflowManager *workflow.WorkflowManager
 }
 
 func NewAppConfigService(repo *repository.AppConfigRepo, llmMgr *llm.LanguageModelManager,
-	builtinProvider *builtin.BuiltinProviderManager, apiProvider *apitools.ApiProviderManager) *AppConfigService {
+	builtinProvider *builtin.BuiltinProviderManager, apiProvider *apitools.APIProviderManager,
+	workflowManager *workflow.WorkflowManager) *AppConfigService {
 	return &AppConfigService{
 		repo:            repo,
 		llmMgr:          llmMgr,
 		builtinProvider: builtinProvider,
 		apiProvider:     apiProvider,
+		workflowManager: workflowManager,
 	}
 }
 
@@ -203,10 +208,10 @@ func (s *AppConfigService) GetAppConfig(ctx context.Context, app *entity.App) (*
 	), nil
 }
 
-// GetLangchainToolsByToolsConfig 根据传递的工具配置列表获取langchain工具列表
-func (s *AppConfigService) GetLangchainToolsByToolsConfig(ctx context.Context, toolConfigs []map[string]any) ([]langchaintool.Tool, error) {
+// GetToolsByToolsConfig 根据传递的工具配置列表获取eino工具列表
+func (s *AppConfigService) GetToolsByToolsConfig(ctx context.Context, toolConfigs []map[string]any) ([]tool.InvokableTool, error) {
 	// 1. 循环遍历所有工具配置列表信息
-	var res []langchaintool.Tool
+	var res []tool.InvokableTool
 	for _, tool := range toolConfigs {
 		toolType, ok := tool["type"].(string)
 		if !ok {
@@ -216,76 +221,49 @@ func (s *AppConfigService) GetLangchainToolsByToolsConfig(ctx context.Context, t
 		// 3. 根据不同的工具类型执行不同的操作
 		if toolType == "builtin_tool" {
 			// 4. 内置工具，通过builtin_provider_manager获取工具实例
-			provider, ok := tool["provider"].(map[string]any)
-			if !ok {
-				continue
-			}
-			providerID, ok := provider["id"].(string)
-			if !ok {
-				continue
-			}
-			toolInfo, ok := tool["tool"].(map[string]any)
-			if !ok {
-				continue
-			}
-			toolName, ok := toolInfo["name"].(string)
+			toolID, ok := tool["tool_id"].(string)
 			if !ok {
 				continue
 			}
 
-			// 创建内置工具
-			builtinTool := s.builtinProvider.GetTool(providerID, toolName)
-			if builtinTool != nil {
-				res = append(res, builtinTool.(langchaintool.Tool))
+			// 通过 builtin provider manager 获取实际的可执行工具
+			builtinTool, err := s.builtinProvider.GetTool(toolID)
+			if err != nil || builtinTool == nil {
+				continue
 			}
+
+			res = append(res, builtinTool)
 		} else {
 			// 5. API工具，首先根据id找到ApiTool记录，然后创建实例
-			toolInfo, ok := tool["tool"].(map[string]any)
+			providerID, ok := tool["provider_id"].(string)
 			if !ok {
 				continue
 			}
-			toolID, ok := toolInfo["id"].(string)
+			toolID, ok := tool["tool_id"].(string)
 			if !ok {
 				continue
 			}
 
-			toolUUID, err := uuid.Parse(toolID)
-			if err != nil {
-				continue
-			}
-
-			apiTool, err := s.repo.GetAPIByID(ctx, toolUUID)
+			// 通过 API provider manager 创建实际的可执行工具
+			apiTool, err := s.apiProvider.GetTool(context.Background(), &entities.APIToolEntity{
+				ID:   providerID,
+				Name: toolID,
+			})
 			if err != nil || apiTool == nil {
 				continue
 			}
-			apiToolProvider, err := s.repo.GetAPIProviderByID(ctx, apiTool.ProviderID)
-			if err != nil || apiToolProvider == nil {
-				continue
-			}
 
-			// 创建API工具
-			apiToolInstance := s.apiProvider.GetTool(&entities.ToolEntity{
-				ID:          apiTool.ID.String(),
-				Name:        apiTool.Name,
-				URL:         apiTool.URL,
-				Method:      apiTool.Method,
-				Description: apiTool.Description,
-				Headers:     apiToolProvider.Headers,
-				Parameters:  nil,
-			})
-			if apiToolInstance != nil {
-				res = append(res, apiToolInstance)
-			}
+			res = append(res, apiTool)
 		}
 	}
 
 	return res, nil
 }
 
-// GetLangchainToolsByWorkflowIDs 根据传递的工作流配置列表获取langchain工具列表
-func (s *AppConfigService) GetLangchainToolsByWorkflowIDs(ctx context.Context, workflowIDs []uuid.UUID) ([]langchaintool.Tool, error) {
+// GetToolsByWorkflowIDs 根据传递的工作流配置列表获取eino工具列表
+func (s *AppConfigService) GetToolsByWorkflowIDs(ctx context.Context, workflowIDs []uuid.UUID) ([]tool.InvokableTool, error) {
 	// 1. 根据传递的工作流id查询工作流记录信息
-	var workflows []langchaintool.Tool
+	var workflows []tool.InvokableTool
 
 	for _, workflowID := range workflowIDs {
 		workflowRecord, err := s.repo.GetWorkflowByID(ctx, workflowID)
@@ -298,17 +276,28 @@ func (s *AppConfigService) GetLangchainToolsByWorkflowIDs(ctx context.Context, w
 			continue
 		}
 
-		// 2. 创建工作流工具
-		workflowTool, err := workflow.NewWorkflow(map[string]any{
-			"account_id":  workflowRecord.AccountID,
+		// 2. 使用 WorkflowManager 创建真正的工作流实例
+		workflowConfig := map[string]interface{}{
 			"name":        workflowRecord.Name,
 			"description": workflowRecord.Description,
-			"nodes":       workflowRecord.Graph["node"],
-			"edges":       workflowRecord.Graph["edge"],
-		})
-		if workflowTool != nil {
-			workflows = append(workflows, workflowTool)
+			"nodes":       workflowRecord.Graph["nodes"],
+			"edges":       workflowRecord.Graph["edges"],
 		}
+
+		// 创建工作流实例
+		workflowInstance, err := s.workflowManager.CreateWorkflow(workflowConfig, uuid.Nil) // 这里可以传入实际的 accountID
+		if err != nil {
+			continue
+		}
+
+		// 创建工作流工具包装器
+		workflowTool := &WorkflowTool{
+			id:          workflowID,
+			name:        workflowRecord.Name,
+			description: workflowRecord.Description,
+			workflow:    workflowInstance,
+		}
+		workflows = append(workflows, workflowTool)
 	}
 
 	return workflows, nil
@@ -355,8 +344,8 @@ func (s *AppConfigService) processAndValidateTools(ctx context.Context, toolConf
 			}
 
 			// 获取内置工具提供者
-			provider := s.builtinProvider.GetProvider(providerID)
-			if provider == nil {
+			provider, err := s.builtinProvider.GetProvider(providerID)
+			if err != nil || provider == nil {
 				continue
 			}
 
@@ -650,4 +639,28 @@ func (s *AppConfigService) getModelDefaultParameters(provider, model string) map
 		"temperature": 0.7,
 		"max_tokens":  1000,
 	}
+}
+
+// WorkflowTool 实现工作流工具的可执行接口
+type WorkflowTool struct {
+	id          uuid.UUID
+	name        string
+	description string
+	workflow    *workflow.Workflow
+}
+
+func (w *WorkflowTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{
+		Name: w.name,
+		Desc: w.description,
+	}, nil
+}
+
+func (w *WorkflowTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
+	// 使用真正的工作流实例来执行
+	if w.workflow == nil {
+		return "", fmt.Errorf("workflow instance is not initialized")
+	}
+
+	return w.workflow.InvokableRun(ctx, argumentsInJSON, opts...)
 }

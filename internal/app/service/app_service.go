@@ -12,29 +12,25 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/chains"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/prompts"
 
 	"github.com/crazyfrankie/voidx/internal/app/repository"
 	"github.com/crazyfrankie/voidx/internal/app_config"
 	"github.com/crazyfrankie/voidx/internal/conversation"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	agenteneity "github.com/crazyfrankie/voidx/internal/core/agent/entities"
-	llmManager "github.com/crazyfrankie/voidx/internal/core/llm"
-	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm"
+	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/core/tools/api_tools/providers"
 	builtin "github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/providers"
-	"github.com/crazyfrankie/voidx/internal/llm"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/internal/retriever"
 	"github.com/crazyfrankie/voidx/internal/upload"
-	"github.com/crazyfrankie/voidx/internal/vecstore"
-	"github.com/crazyfrankie/voidx/pkg/langchainx/dalle"
+	"github.com/crazyfrankie/voidx/pkg/dalle"
 	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/pkg/sonic"
 	"github.com/crazyfrankie/voidx/pkg/util"
@@ -44,40 +40,36 @@ import (
 
 type AppService struct {
 	repo                *repository.AppRepo
-	vecStore            *vecstore.VecStoreService
 	appConfigService    *app_config.Service
 	conversationService *conversation.Service
-	apiProvider         *providers.ApiProviderManager
+	apiProvider         *providers.APIProviderManager
 	builtinProvider     *builtin.BuiltinProviderManager
 	retrieverSvc        *retriever.Service
 	ossSvc              *upload.Service
-	agentManager        *agent.AgentQueueManager
+	agentManager        *agent.AgentQueueManagerFactory
+	llmService          *llm.LanguageModelManager
 	llm                 llmentity.BaseLanguageModel
-	llmManager          *llmManager.LanguageModelManager
-	llmSvc              *llm.Service
 	tokenBufMem         *memory.TokenBufferMemory
 	activeSessions      sync.Map
 }
 
-func NewAppService(repo *repository.AppRepo, vecStore *vecstore.VecStoreService,
+func NewAppService(repo *repository.AppRepo,
 	appConfigSvc *app_config.Service, conversationSvc *conversation.Service,
-	retrieverSvc *retriever.Service, ossSvc *upload.Service, apiProvider *providers.ApiProviderManager,
-	builtinProvider *builtin.BuiltinProviderManager, agentManager *agent.AgentQueueManager, llm llmentity.BaseLanguageModel,
-	llmSvc *llm.Service, tokenBufMem *memory.TokenBufferMemory, llmManager *llmManager.LanguageModelManager) *AppService {
+	retrieverSvc *retriever.Service, ossSvc *upload.Service, apiProvider *providers.APIProviderManager,
+	builtinProvider *builtin.BuiltinProviderManager, agentManager *agent.AgentQueueManagerFactory,
+	llmService *llm.LanguageModelManager, tokenBufMem *memory.TokenBufferMemory, llm llmentity.BaseLanguageModel) *AppService {
 	return &AppService{
 		repo:                repo,
-		llm:                 llm,
-		llmSvc:              llmSvc,
-		vecStore:            vecStore,
 		appConfigService:    appConfigSvc,
 		conversationService: conversationSvc,
 		retrieverSvc:        retrieverSvc,
 		ossSvc:              ossSvc,
-		agentManager:        agentManager,
 		apiProvider:         apiProvider,
 		builtinProvider:     builtinProvider,
+		agentManager:        agentManager,
+		llmService:          llmService,
 		tokenBufMem:         tokenBufMem,
-		llmManager:          llmManager,
+		llm:                 llm,
 	}
 }
 
@@ -100,20 +92,22 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 	}
 	iconURL = res[0].URL
 
-	prompt := prompts.NewChatPromptTemplate([]prompts.MessageFormatter{
-		prompts.NewSystemMessagePromptTemplate(consts.OptimizePromptTemplate, nil),
-		prompts.NewHumanMessagePromptTemplate("应用名称: {{.name}}\n\n应用描述: {{.description}}",
-			[]string{"name", "description"}),
-	})
-
-	promptRes, err := chains.Call(ctx, chains.NewLLMChain(s.llm, prompt), map[string]any{
-		"name":        name,
-		"description": description,
-	})
+	// 使用新的LLM服务生成预设提示词
+	model, err := s.llmService.CreateModel(ctx, "openai", "gpt-3.5-turbo", map[string]any{})
 	if err != nil {
 		return err
 	}
-	generatedPresetPrompt = promptRes["text"].(string)
+
+	messages := []*schema.Message{
+		schema.SystemMessage(consts.OptimizePromptTemplate),
+		schema.UserMessage(fmt.Sprintf("应用名称: %s\n\n应用描述: %s", name, description)),
+	}
+
+	response, err := model.Generate(ctx, messages)
+	if err != nil {
+		return err
+	}
+	generatedPresetPrompt = response.Content
 
 	// 5. 将图片下载到本地后上传到OSS中
 	if iconURL != "" {
@@ -903,21 +897,15 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 		return nil, err
 	}
 
-	// 5. 从语言模型管理器中加载大语言模型
-	model, err := s.llmSvc.LoadLanguageModel(draftAppConfig.ModelConfig)
-	if err != nil {
-		return nil, err
-	}
-
 	// 6. 使用TokenBufferMemory用于提取短期记忆
-	s.tokenBufMem = s.tokenBufMem.WithLLM(model).WithConversationID(debugConversation.ID)
+	s.tokenBufMem.WithConversationID(debugConversation.ID)
 	history, err := s.tokenBufMem.GetHistoryPromptMessages(2000, 10)
 	if err != nil {
 		return nil, err
 	}
 
-	// 7. 将草稿配置中的tools转换成LangChain工具
-	tools, err := s.appConfigService.GetLangchainToolsByToolsConfig(ctx, draftAppConfig.Tools)
+	// 7. 将草稿配置中的tools转换成eino工具
+	tools, err := s.appConfigService.GetToolsByToolsConfig(ctx, draftAppConfig.Tools)
 	if err != nil {
 		return nil, err
 	}
@@ -928,7 +916,7 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 		for _, dataset := range draftAppConfig.Datasets {
 			datasets = append(datasets, dataset["id"].(uuid.UUID))
 		}
-		datasetRetrieval, err := s.retrieverSvc.CreateLangchainToolFromSearch(ctx, accountID, datasets, consts.RetrievalSourceApp, draftAppConfig.ReviewConfig)
+		datasetRetrieval, err := s.retrieverSvc.CreateToolFromSearch(ctx, accountID, datasets, consts.RetrievalSourceApp, draftAppConfig.ReviewConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -941,7 +929,7 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 		for _, workflow := range draftAppConfig.Workflows {
 			workflows = append(workflows, workflow["id"].(uuid.UUID))
 		}
-		workflowTools, err := s.appConfigService.GetLangchainToolsByWorkflowIDs(ctx, workflows)
+		workflowTools, err := s.appConfigService.GetToolsByWorkflowIDs(ctx, workflows)
 		if err != nil {
 			return nil, err
 		}
@@ -949,7 +937,7 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 	}
 
 	// 10. 根据LLM是否支持tool_call决定使用不同的Agent
-	agentCfg := agenteneity.AgentConfig{
+	agentCfg := &agenteneity.AgentConfig{
 		UserID:               accountID,
 		InvokeFrom:           consts.InvokeFromDebugger,
 		PresetPrompt:         draftAppConfig.PresetPrompt,
@@ -966,7 +954,6 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 			break
 		}
 	}
-
 	// 创建响应流通道
 	responseStream := make(chan string, 100)
 
@@ -980,8 +967,8 @@ func (s *AppService) DebugChat(ctx context.Context, appID uuid.UUID, accountID u
 func (s *AppService) processDebugChat(
 	ctx context.Context,
 	appID uuid.UUID,
-	agent agent.BaseAgent,
-	history []llms.MessageContent,
+	agentIns agent.BaseAgent,
+	history []*schema.Message,
 	debugConversation *entity.Conversation,
 	message *entity.Message,
 	chatReq req.DebugChatReq,
@@ -993,20 +980,20 @@ func (s *AppService) processDebugChat(
 	// 实现完整的Agent流式处理逻辑
 	agentState := agenteneity.AgentState{
 		TaskID:         uuid.New(),
-		Messages:       util.MessageContentToChatMessages(history),
-		History:        util.MessageContentToChatMessages(history),
+		Messages:       history,
+		History:        history,
 		LongTermMemory: debugConversation.Summary,
 		IterationCount: 0,
 	}
 
 	// 添加当前用户消息
 	if len(chatReq.Query) > 0 {
-		userMsg := llms.HumanChatMessage{Content: chatReq.Query}
+		userMsg := schema.UserMessage(chatReq.Query)
 		agentState.Messages = append(agentState.Messages, userMsg)
 	}
 
 	// 获取Agent流式输出
-	thoughtChan, err := agent.Stream(ctx, agentState)
+	thoughtChan, err := agentIns.Stream(ctx, agentState)
 	if err != nil {
 		select {
 		case responseStream <- fmt.Sprintf("event: error\ndata: %s\n\n", err.Error()):
@@ -1016,7 +1003,7 @@ func (s *AppService) processDebugChat(
 	}
 
 	// 存储agent思考过程
-	agentThoughts := make(map[string]agenteneity.AgentThought)
+	agentThoughts := make(map[string]*agenteneity.AgentThought)
 
 	// 处理流式输出
 	for agentThought := range thoughtChan {
@@ -1070,7 +1057,22 @@ func (s *AppService) processDebugChat(
 	// 将agent思考过程转换为切片
 	agentThoughtsList := make([]agenteneity.AgentThought, 0, len(agentThoughts))
 	for _, thought := range agentThoughts {
-		agentThoughtsList = append(agentThoughtsList, thought)
+		agentThoughtsList = append(agentThoughtsList, *thought)
+	}
+
+	// 更新消息状态和结果
+	finalAnswer := ""
+	if len(agentThoughtsList) > 0 {
+		finalAnswer = agentThoughtsList[len(agentThoughtsList)-1].Answer
+	}
+
+	// 更新消息记录
+	err = s.conversationService.UpdateMessage(ctx, accountID, message.ID, &req.UpdateMessageReq{
+		Answer: finalAnswer,
+		Status: consts.MessageStatusNormal.String(),
+	})
+	if err != nil {
+		logs.Error("Failed to update message: %v", err)
 	}
 
 	// 将消息以及推理过程添加到数据库
@@ -1091,7 +1093,7 @@ func (s *AppService) StopDebugChat(ctx context.Context, appID, taskID uuid.UUID,
 
 	// 2. 调用智能体队列管理器停止特定任务
 
-	return s.agentManager.SetStopFlag(taskID, consts.InvokeFromDebugger, accountID)
+	return s.agentManager.StopTask(ctx, taskID, accountID, consts.InvokeFromDebugger)
 }
 
 // GetDebugConversationMessagesWithPage 根据传递的应用id+请求数据，获取调试会话消息列表分页数据
@@ -1252,7 +1254,7 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 			if provider, ok := modelConfigMap["provider"].(string); !ok || provider == "" {
 				return nil, errno.ErrValidate.AppendBizMessage(errors.New("模型服务提供商类型必须为字符串"))
 			}
-			provider, err := s.llmManager.GetProvider(modelConfigMap["provider"].(string))
+			provider, err := s.llmService.GetProvider(modelConfigMap["provider"].(string))
 			if err != nil {
 				return nil, err
 			}
@@ -1404,8 +1406,8 @@ func (s *AppService) validateDraftAppConfig(draftAppConfig map[string]any, accou
 
 			// 6.7 校验对应的工具是否存在
 			if toolType == "builtin_tool" {
-				builtinTool := s.builtinProvider.GetTool(providerID, toolID)
-				if builtinTool == nil {
+				builtinTool, err := s.builtinProvider.GetTool(toolID)
+				if err != nil || builtinTool == nil {
 					continue
 				}
 			} else {

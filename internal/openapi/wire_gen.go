@@ -24,7 +24,7 @@ import (
 
 // Injectors from wire.go:
 
-func InitOpenAIModule(db *gorm.DB, conversationSvc *conversation.ConversationModule, retrieverModule *retriever.RetrieverModule, llmModule *llm.LLMModule, appConfig *app_config.AppConfigModule, appModule *app.AppModule, agent2 *agent.AgentQueueManager, token *memory.TokenBufferMemory) *OpenAPIModule {
+func InitOpenAIModule(db *gorm.DB, conversationSvc *conversation.ConversationModule, retrieverModule *retriever.RetrieverModule, llmModule *llm.LLMModule, appConfig *app_config.AppConfigModule, appModule *app.AppModule, agent2 *agent.AgentQueueManagerFactory, token *memory.TokenBufferMemory) *OpenAPIModule {
 	openAPIDao := dao.NewOpenAPIDao(db)
 	openAPIRepo := repository.NewOpenAPIRepo(openAPIDao)
 	conversationService := conversationSvc.Service

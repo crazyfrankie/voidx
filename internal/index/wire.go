@@ -3,6 +3,7 @@
 package index
 
 import (
+	"github.com/crazyfrankie/voidx/infra/contract/document/vecstore"
 	"github.com/crazyfrankie/voidx/internal/core/embedding"
 	"github.com/crazyfrankie/voidx/internal/core/file_extractor"
 	"github.com/crazyfrankie/voidx/internal/core/retrievers"
@@ -11,7 +12,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/index/service"
 	"github.com/crazyfrankie/voidx/internal/process_rule"
 	"github.com/crazyfrankie/voidx/internal/retriever"
-	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -25,7 +25,7 @@ type IndexModule struct {
 
 func InitIndexModule(db *gorm.DB, cmd redis.Cmdable, fileExtractor *file_extractor.FileExtractor,
 	embeddingsSvc *embedding.EmbeddingService, jiebaService *retrievers.JiebaService, processRuleService *process_rule.ProcessRuleModule,
-	keywordSvc *retriever.RetrieverModule, vectorDatabaseService *vecstore.VecStoreService) *IndexModule {
+	keywordSvc *retriever.RetrieverModule, vectorDatabaseService vecstore.SearchStore) *IndexModule {
 	wire.Build(
 		dao.NewIndexingDao,
 		repository.NewIndexingRepo,

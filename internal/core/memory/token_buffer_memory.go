@@ -5,10 +5,10 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/tmc/langchaingo/llms"
 	"gorm.io/gorm"
 
-	"github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/cloudwego/eino/schema"
+
 	model "github.com/crazyfrankie/voidx/internal/models/entity"
 )
 
@@ -21,23 +21,10 @@ const (
 	MessageStatusTimeout MessageStatus = "timeout"
 )
 
-func (m *TokenBufferMemory) WithConversationID(conversionID uuid.UUID) *TokenBufferMemory {
-	m.conversationID = conversionID
-
-	return m
-}
-
-func (m *TokenBufferMemory) WithLLM(modelInstance entity.BaseLanguageModel) *TokenBufferMemory {
-	m.modelInstance = modelInstance
-
-	return m
-}
-
-// TokenBufferMemory implements token-based buffer memory
+// TokenBufferMemory implements token-based buffer memory using eino schema
 type TokenBufferMemory struct {
 	db             *gorm.DB
 	conversationID uuid.UUID
-	modelInstance  entity.BaseLanguageModel
 }
 
 // NewTokenBufferMemory creates a new TokenBufferMemory instance
@@ -47,8 +34,14 @@ func NewTokenBufferMemory(db *gorm.DB) *TokenBufferMemory {
 	}
 }
 
-// GetHistoryPromptMessages returns a list of messages based on token and message count limits
-func (m *TokenBufferMemory) GetHistoryPromptMessages(maxTokenLimit int, messageLimit int) ([]llms.MessageContent, error) {
+// WithConversationID sets the conversation ID for this memory instance
+func (m *TokenBufferMemory) WithConversationID(conversationID uuid.UUID) *TokenBufferMemory {
+	m.conversationID = conversationID
+	return m
+}
+
+// GetHistoryPromptMessages returns a list of eino messages based on token and message count limits
+func (m *TokenBufferMemory) GetHistoryPromptMessages(maxTokenLimit int, messageLimit int) ([]*schema.Message, error) {
 	// Check if conversation exists
 	if m.conversationID == uuid.Nil {
 		return nil, nil
@@ -61,7 +54,7 @@ func (m *TokenBufferMemory) GetHistoryPromptMessages(maxTokenLimit int, messageL
 		m.conversationID,
 		false,
 		[]MessageStatus{MessageStatusNormal, MessageStatusStop, MessageStatusTimeout},
-	).Order("ctime desc").Limit(messageLimit).Find(&messages)
+	).Order("created_at desc").Limit(messageLimit).Find(&messages)
 
 	if result.Error != nil {
 		return nil, fmt.Errorf("failed to query messages: %w", result.Error)
@@ -72,18 +65,15 @@ func (m *TokenBufferMemory) GetHistoryPromptMessages(maxTokenLimit int, messageL
 		messages[i], messages[j] = messages[j], messages[i]
 	}
 
-	// Convert to LangChain messages
-	var promptMessages []llms.MessageContent
+	// Convert to eino schema messages
+	var promptMessages []*schema.Message
 	for _, msg := range messages {
 		// Add human message
-		humanMsg := m.modelInstance.ConvertToHumanMessage(msg.Query, msg.ImageUrls)
+		humanMsg := m.convertToHumanMessage(msg.Query, msg.ImageUrls)
 		promptMessages = append(promptMessages, humanMsg)
 
 		// Add AI message
-		aiMsg := llms.MessageContent{
-			Role:  llms.ChatMessageTypeAI,
-			Parts: []llms.ContentPart{llms.TextPart(msg.Answer)},
-		}
+		aiMsg := schema.AssistantMessage(msg.Answer, nil)
 		promptMessages = append(promptMessages, aiMsg)
 	}
 
@@ -113,8 +103,43 @@ func (m *TokenBufferMemory) GetHistoryPromptText(
 	return m.getBufferString(messages, humanPrefix, aiPrefix), nil
 }
 
-// trimMessages trims the message list based on token limit
-func (m *TokenBufferMemory) trimMessages(messages []llms.MessageContent, maxTokens int) ([]llms.MessageContent, error) {
+// convertToHumanMessage converts query and image URLs to eino human message
+func (m *TokenBufferMemory) convertToHumanMessage(query string, imageUrls []string) *schema.Message {
+	if len(imageUrls) == 0 {
+		// Simple text message
+		return schema.UserMessage(query)
+	}
+
+	// Multi-content message with text and images
+	var parts []schema.ChatMessagePart
+
+	// Add text part
+	if query != "" {
+		parts = append(parts, schema.ChatMessagePart{
+			Type: schema.ChatMessagePartTypeText,
+			Text: query,
+		})
+	}
+
+	// Add image parts
+	for _, imageUrl := range imageUrls {
+		parts = append(parts, schema.ChatMessagePart{
+			Type: schema.ChatMessagePartTypeImageURL,
+			ImageURL: &schema.ChatMessageImageURL{
+				URL: imageUrl,
+			},
+		})
+	}
+
+	return &schema.Message{
+		Role:         schema.User,
+		Content:      query,
+		MultiContent: parts,
+	}
+}
+
+// trimMessages trims the message list based on token limit using eino messages
+func (m *TokenBufferMemory) trimMessages(messages []*schema.Message, maxTokens int) ([]*schema.Message, error) {
 	if len(messages) == 0 {
 		return messages, nil
 	}
@@ -131,14 +156,14 @@ func (m *TokenBufferMemory) trimMessages(messages []llms.MessageContent, maxToke
 	}
 
 	// Trim from the beginning, keeping the most recent messages
-	var trimmedMessages []llms.MessageContent
+	var trimmedMessages []*schema.Message
 	currentTokens := 0
 
 	// Start from the end and work backwards
 	for i := len(messages) - 1; i >= 0; i-- {
 		msgTokens := m.estimateTokenCount(messages[i])
 		if currentTokens+msgTokens <= maxTokens {
-			trimmedMessages = append([]llms.MessageContent{messages[i]}, trimmedMessages...)
+			trimmedMessages = append([]*schema.Message{messages[i]}, trimmedMessages...)
 			currentTokens += msgTokens
 		} else {
 			break
@@ -151,20 +176,34 @@ func (m *TokenBufferMemory) trimMessages(messages []llms.MessageContent, maxToke
 	return trimmedMessages, nil
 }
 
-// estimateTokenCount provides a simple token count estimation for a message
-func (m *TokenBufferMemory) estimateTokenCount(msg llms.MessageContent) int {
-	totalChars := 0
-	for _, part := range msg.Parts {
-		if textPart, ok := part.(llms.TextContent); ok {
-			totalChars += len(textPart.Text)
+// estimateTokenCount provides simple token count estimation for eino messages
+func (m *TokenBufferMemory) estimateTokenCount(msg *schema.Message) int {
+	// Simple character-based estimation (roughly 4 characters per token)
+	totalTokens := len(msg.Content) / 4
+
+	// Add tokens for multi-content parts
+	for _, part := range msg.MultiContent {
+		if part.Type == schema.ChatMessagePartTypeText {
+			totalTokens += len(part.Text) / 4
 		}
 	}
-	// Rough estimation: 4 characters per token (this can be improved with actual tokenizer)
-	return totalChars / 4
+
+	// Add tokens for tool calls
+	for _, toolCall := range msg.ToolCalls {
+		totalTokens += len(toolCall.Function.Name) / 4
+		totalTokens += len(toolCall.Function.Arguments) / 4
+	}
+
+	// Ensure minimum token count
+	if totalTokens < 1 {
+		totalTokens = 1
+	}
+
+	return totalTokens
 }
 
 // ensureProperMessageOrder ensures messages start with human and end with AI
-func (m *TokenBufferMemory) ensureProperMessageOrder(messages []llms.MessageContent) []llms.MessageContent {
+func (m *TokenBufferMemory) ensureProperMessageOrder(messages []*schema.Message) []*schema.Message {
 	if len(messages) == 0 {
 		return messages
 	}
@@ -172,7 +211,7 @@ func (m *TokenBufferMemory) ensureProperMessageOrder(messages []llms.MessageCont
 	// Find first human message
 	startIdx := 0
 	for i, msg := range messages {
-		if msg.Role == llms.ChatMessageTypeHuman {
+		if msg.Role == schema.User {
 			startIdx = i
 			break
 		}
@@ -181,7 +220,7 @@ func (m *TokenBufferMemory) ensureProperMessageOrder(messages []llms.MessageCont
 	// Find last AI message
 	endIdx := len(messages) - 1
 	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == llms.ChatMessageTypeAI {
+		if messages[i].Role == schema.Assistant {
 			endIdx = i
 			break
 		}
@@ -195,8 +234,8 @@ func (m *TokenBufferMemory) ensureProperMessageOrder(messages []llms.MessageCont
 	return messages
 }
 
-// getBufferString converts chat messages to a formatted string (improved version)
-func (m *TokenBufferMemory) getBufferString(messages []llms.MessageContent, humanPrefix, aiPrefix string) string {
+// getBufferString converts eino messages to a formatted string
+func (m *TokenBufferMemory) getBufferString(messages []*schema.Message, humanPrefix, aiPrefix string) string {
 	var buffer strings.Builder
 
 	for i, msg := range messages {
@@ -204,23 +243,53 @@ func (m *TokenBufferMemory) getBufferString(messages []llms.MessageContent, huma
 			buffer.WriteString("\n\n")
 		}
 
-		// Extract text content from message parts
-		var content string
-		for _, part := range msg.Parts {
-			if textPart, ok := part.(llms.TextContent); ok {
-				content += textPart.Text
-			}
-		}
-
 		switch msg.Role {
-		case llms.ChatMessageTypeHuman:
-			buffer.WriteString(fmt.Sprintf("%s: %s", humanPrefix, content))
-		case llms.ChatMessageTypeAI:
-			buffer.WriteString(fmt.Sprintf("%s: %s", aiPrefix, content))
-		case llms.ChatMessageTypeSystem:
-			buffer.WriteString(fmt.Sprintf("System: %s", content))
+		case schema.User:
+			buffer.WriteString(fmt.Sprintf("%s: %s", humanPrefix, msg.Content))
+		case schema.Assistant:
+			buffer.WriteString(fmt.Sprintf("%s: %s", aiPrefix, msg.Content))
+		case schema.System:
+			buffer.WriteString(fmt.Sprintf("System: %s", msg.Content))
+		case schema.Tool:
+			buffer.WriteString(fmt.Sprintf("Tool: %s", msg.Content))
 		}
 	}
 
 	return buffer.String()
+}
+
+// ClearHistory clears the conversation history
+func (m *TokenBufferMemory) ClearHistory() error {
+	if m.conversationID == uuid.Nil {
+		return nil
+	}
+
+	// Soft delete messages by setting is_deleted = true
+	result := m.db.Model(&model.Message{}).
+		Where("conversation_id = ?", m.conversationID).
+		Update("is_deleted", true)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to clear history: %w", result.Error)
+	}
+
+	return nil
+}
+
+// GetMessageCount returns the number of messages in the conversation
+func (m *TokenBufferMemory) GetMessageCount() (int64, error) {
+	if m.conversationID == uuid.Nil {
+		return 0, nil
+	}
+
+	var count int64
+	result := m.db.Model(&model.Message{}).
+		Where("conversation_id = ? AND is_deleted = ?", m.conversationID, false).
+		Count(&count)
+
+	if result.Error != nil {
+		return 0, fmt.Errorf("failed to get message count: %w", result.Error)
+	}
+
+	return count, nil
 }

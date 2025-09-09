@@ -23,14 +23,14 @@ import (
 
 // Injectors from wire.go:
 
-func InitWebAppModule(db *gorm.DB, tokenBufMem *memory.TokenBufferMemory, appConfigModule *app_config.AppConfigModule, conversationModule *conversation.ConversationModule, llmModule *llm.LLMModule, agentManager *agent.AgentQueueManager, retrievalModule *retriever.RetrieverModule) *WebAppModule {
+func InitWebAppModule(db *gorm.DB, tokenBufMem *memory.TokenBufferMemory, appConfigModule *app_config.AppConfigModule, conversationModule *conversation.ConversationModule, llmModule *llm.LLMModule, agentService *agent.Service, retrievalModule *retriever.RetrieverModule) *WebAppModule {
 	webAppDao := dao.NewWebAppDao(db)
 	webAppRepo := repository.NewWebAppRepo(webAppDao)
 	appConfigService := appConfigModule.Service
 	conversationService := conversationModule.Service
 	llmService := llmModule.Service
 	retrievalService := retrievalModule.Service
-	webAppService := service.NewWebAppService(webAppRepo, appConfigService, conversationService, llmService, retrievalService, tokenBufMem, agentManager)
+	webAppService := service.NewWebAppService(webAppRepo, appConfigService, conversationService, llmService, retrievalService, tokenBufMem, agentService)
 	webAppHandler := handler.NewWebAppHandler(webAppService)
 	webAppModule := &WebAppModule{
 		Handler: webAppHandler,

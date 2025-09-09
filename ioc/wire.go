@@ -36,8 +36,8 @@ import (
 	"github.com/google/wire"
 )
 
-var baseSet = wire.NewSet(InitCache, InitDB, InitJWT, InitEmbedding, InitVectorStore, InitMinIO, InitWechat)
-var coreSet = wire.NewSet(InitAgentManager, InitBuiltinAppManager, InitBuiltinToolsCategories,
+var baseSet = wire.NewSet(InitCache, InitDB, InitJWT, InitVectorStore, InitMinIO, InitWechat)
+var coreSet = wire.NewSet(InitBuiltinAppManager, InitBuiltinToolsCategories,
 	InitEmbeddingService, InitFileExtractor, InitJiebaService, InitLLMCore, InitTokenBufMem, InitApiToolsManager, InitBuiltinToolsManager)
 
 type Application struct {

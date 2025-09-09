@@ -3,127 +3,80 @@ package entities
 import (
 	"time"
 
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 )
 
-// QueueEvent represents different types of agent events
+// QueueEvent represents different types of events in the agent queue
 type QueueEvent string
 
 const (
-	// EventPing represents a ping event to check agent status
-	EventPing QueueEvent = "ping"
-
-	// EventAgentMessage represents an agent message event
-	EventAgentMessage QueueEvent = "agent_message"
-
-	// EventAgentEnd represents an agent end event
-	EventAgentEnd QueueEvent = "agent_end"
-
-	// EventLongTermMemoryRecall represents a long-term memory recall event
+	EventPing                 QueueEvent = "ping"
+	EventAgentMessage         QueueEvent = "agent_message"
+	EventAgentThought         QueueEvent = "agent_thought"
+	EventAgentAction          QueueEvent = "agent_action"
+	EventDatasetRetrieval     QueueEvent = "dataset_retrieval"
 	EventLongTermMemoryRecall QueueEvent = "long_term_memory_recall"
-
-	// EventStop represents a stop event
-	EventStop QueueEvent = "stop"
-
-	// EventTimeout represents a timeout event
-	EventTimeout QueueEvent = "timeout"
-
-	// EventError represents an error event
-	EventError QueueEvent = "error"
-
-	// EventAgentThought represents an agent thought event
-	EventAgentThought QueueEvent = "agent_thought"
-
-	// EventAgentAction represents an agent action event
-	EventAgentAction QueueEvent = "agent_action"
-
-	// EventDatasetRetrieval represents a dataset retrieval event
-	EventDatasetRetrieval QueueEvent = "dataset_retrieval"
+	EventAgentEnd             QueueEvent = "agent_end"
+	EventStop                 QueueEvent = "stop"
+	EventTimeout              QueueEvent = "timeout"
+	EventError                QueueEvent = "error"
 )
 
-// AgentThought represents a single thought or action by the agent
+// AgentThought represents a single thought or action in the agent's reasoning process
 type AgentThought struct {
-	// ID represents the unique identifier for this thought
-	ID uuid.UUID `json:"id"`
+	ID     uuid.UUID  `json:"id"`
+	TaskID uuid.UUID  `json:"task_id"`
+	Event  QueueEvent `json:"event"`
 
-	// TaskID represents the associated task identifier
-	TaskID uuid.UUID `json:"task_id"`
-
-	// Event represents the type of event
-	Event QueueEvent `json:"event"`
-
-	// Thought represents the agent's reasoning process
+	// Thought content
 	Thought string `json:"thought,omitempty"`
+	Answer  string `json:"answer,omitempty"`
 
-	// Message represents the chat messages involved
-	Message []map[string]any `json:"message,omitempty"`
+	// Message related fields
+	Message           []*schema.Message `json:"message,omitempty"`
+	MessageTokenCount int               `json:"message_token_count,omitempty"`
+	MessageUnitPrice  float64           `json:"message_unit_price,omitempty"`
+	MessagePriceUnit  float64           `json:"message_price_unit,omitempty"`
 
-	// Answer represents the agent's response
-	Answer string `json:"answer,omitempty"`
+	// Answer related fields
+	AnswerTokenCount int     `json:"answer_token_count,omitempty"`
+	AnswerUnitPrice  float64 `json:"answer_unit_price,omitempty"`
+	AnswerPriceUnit  float64 `json:"answer_price_unit,omitempty"`
 
-	// Observation represents additional information or tool output
+	// Tool related fields
+	Tool      string                 `json:"tool,omitempty"`
+	ToolInput map[string]interface{} `json:"tool_input,omitempty"`
+
+	// Observation and error
 	Observation string `json:"observation,omitempty"`
 
-	// Tool represents the name of the tool being used
-	Tool string `json:"tool,omitempty"`
+	// Statistics
+	TotalTokenCount int     `json:"total_token_count,omitempty"`
+	TotalPrice      float64 `json:"total_price,omitempty"`
+	Latency         float64 `json:"latency,omitempty"`
 
-	// ToolInput represents the input parameters for the tool
-	ToolInput map[string]any `json:"tool_input,omitempty"`
-
-	// MessageTokenCount represents the token count of the input message
-	MessageTokenCount int `json:"message_token_count,omitempty"`
-
-	// MessageUnitPrice represents the unit price for input tokens
-	MessageUnitPrice float64 `json:"message_unit_price,omitempty"`
-
-	// MessagePriceUnit represents the price unit for input tokens
-	MessagePriceUnit string `json:"message_price_unit,omitempty"`
-
-	// AnswerTokenCount represents the token count of the output answer
-	AnswerTokenCount int `json:"answer_token_count,omitempty"`
-
-	// AnswerUnitPrice represents the unit price for output tokens
-	AnswerUnitPrice float64 `json:"answer_unit_price,omitempty"`
-
-	// AnswerPriceUnit represents the price unit for output tokens
-	AnswerPriceUnit string `json:"answer_price_unit,omitempty"`
-
-	// TotalTokenCount represents the total token count
-	TotalTokenCount int `json:"total_token_count,omitempty"`
-
-	// TotalPrice represents the total price
-	TotalPrice float64 `json:"total_price,omitempty"`
-
-	// Latency represents the processing time in seconds
-	Latency float64 `json:"latency"`
+	// Timestamps
+	CreatedAt time.Time `json:"created_at"`
 }
 
-// AgentResult represents the final result of agent execution
+// AgentResult represents the final result of an agent execution
 type AgentResult struct {
-	// Query represents the original query
-	Query string `json:"query"`
-
-	// ImageURLs represents any image URLs in the query
+	Query     string   `json:"query"`
+	Answer    string   `json:"answer"`
 	ImageURLs []string `json:"image_urls,omitempty"`
 
-	// Answer represents the final answer
-	Answer string `json:"answer"`
+	// Message and thoughts
+	Message       []*schema.Message `json:"message,omitempty"`
+	AgentThoughts []AgentThought    `json:"agent_thoughts"`
 
-	// Status represents the execution status
+	// Status and error
 	Status QueueEvent `json:"status"`
+	Error  string     `json:"error,omitempty"`
 
-	// Error represents any error message
-	Error string `json:"error,omitempty"`
-
-	// Message represents the chat messages
-	Message []map[string]any `json:"message"`
-
-	// AgentThoughts represents the sequence of thoughts
-	AgentThoughts []AgentThought `json:"agent_thoughts"`
-
-	// Latency represents the total processing time in seconds
+	// Statistics
 	Latency float64 `json:"latency"`
 
-	// CreatedAt represents the creation timestamp
+	// Timestamps
 	CreatedAt time.Time `json:"created_at"`
 }

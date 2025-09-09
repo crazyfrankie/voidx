@@ -4,26 +4,25 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/schema"
 	"github.com/google/uuid"
 	"github.com/sashabaranov/go-openai"
-	"github.com/tmc/langchaingo/llms"
-	"github.com/tmc/langchaingo/tools"
 
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/repository"
 	"github.com/crazyfrankie/voidx/internal/assistant_agent/task"
 	"github.com/crazyfrankie/voidx/internal/conversation/service"
 	"github.com/crazyfrankie/voidx/internal/core/agent"
 	agenteneity "github.com/crazyfrankie/voidx/internal/core/agent/entities"
-	llmentity "github.com/crazyfrankie/voidx/internal/core/llm/entity"
+	"github.com/crazyfrankie/voidx/internal/core/llm"
+	"github.com/crazyfrankie/voidx/internal/core/llm/entities"
 	"github.com/crazyfrankie/voidx/internal/core/memory"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
 	"github.com/crazyfrankie/voidx/pkg/logs"
 	"github.com/crazyfrankie/voidx/pkg/sonic"
-	"github.com/crazyfrankie/voidx/pkg/util"
 	"github.com/crazyfrankie/voidx/types/consts"
 	"github.com/crazyfrankie/voidx/types/errno"
 )
@@ -33,22 +32,22 @@ type AssistantAgentService struct {
 	conversationService *service.ConversationService
 	appProducer         *task.AppProducer
 	tokenBufMem         *memory.TokenBufferMemory
-	agentManager        *agent.AgentQueueManager
-	llm                 llmentity.BaseLanguageModel
-	// 用于跟踪活跃的聊天会话，按用户ID分组
-	activeSessions sync.Map // map[string]map[string]context.CancelFunc - key: userID, value: map[taskID]cancelFunc
+	llmService          *llm.LanguageModelManager
+	agentManager        *agent.AgentQueueManagerFactory
+	llm                 entities.BaseLanguageModel
 }
 
 func NewAssistantAgentService(repo *repository.AssistantAgentRepo, conversationService *service.ConversationService,
-	appProducer *task.AppProducer, llm llmentity.BaseLanguageModel, tokenBufMem *memory.TokenBufferMemory,
-	agentManager *agent.AgentQueueManager) *AssistantAgentService {
+	appProducer *task.AppProducer, llmService *llm.LanguageModelManager, tokenBufMem *memory.TokenBufferMemory,
+	agentManager *agent.AgentQueueManagerFactory, llm entities.BaseLanguageModel) *AssistantAgentService {
 	return &AssistantAgentService{
-		llm:                 llm,
+		llmService:          llmService,
 		repo:                repo,
 		conversationService: conversationService,
 		tokenBufMem:         tokenBufMem,
 		appProducer:         appProducer,
 		agentManager:        agentManager,
+		llm:                 llm,
 	}
 }
 
@@ -76,19 +75,18 @@ func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chat
 		return nil, err
 	}
 
-	s.tokenBufMem = s.tokenBufMem.WithLLM(s.llm)
 	history, err := s.tokenBufMem.GetHistoryPromptMessages(2000, 3)
 	if err != nil {
 		return nil, err
 	}
 
-	tool := s.convertCreateAppToTool(userID, s.appProducer)
+	tl := s.convertCreateAppToTool(userID, s.appProducer)
 
-	agentCfg := agenteneity.AgentConfig{
+	agentCfg := &agenteneity.AgentConfig{
 		UserID:               userID,
 		InvokeFrom:           consts.InvokeFromDebugger,
 		EnableLongTermMemory: true,
-		Tools:                []tools.Tool{tool},
+		Tools:                []tool.InvokableTool{tl},
 	}
 	agentIns := agent.NewFunctionCallAgent(s.llm, agentCfg, s.agentManager)
 
@@ -102,7 +100,7 @@ func (s *AssistantAgentService) Chat(ctx context.Context, userID uuid.UUID, chat
 
 func (s *AssistantAgentService) processChat(ctx context.Context,
 	appID uuid.UUID, userID uuid.UUID,
-	agent agent.BaseAgent, history []llms.MessageContent,
+	agent agent.BaseAgent, history []*schema.Message,
 	message *entity.Message, conversation *entity.Conversation,
 	chatReq req.AssistantAgentChatReq,
 	responseStream chan string) {
@@ -112,15 +110,15 @@ func (s *AssistantAgentService) processChat(ctx context.Context,
 	// 实现完整的Agent流式处理逻辑
 	agentState := agenteneity.AgentState{
 		TaskID:         uuid.New(),
-		Messages:       util.MessageContentToChatMessages(history),
-		History:        util.MessageContentToChatMessages(history),
+		Messages:       history,
+		History:        history,
 		LongTermMemory: conversation.Summary,
 		IterationCount: 0,
 	}
 
 	// 添加当前用户消息
 	if len(chatReq.Query) > 0 {
-		userMsg := llms.HumanChatMessage{Content: chatReq.Query}
+		userMsg := schema.UserMessage(chatReq.Query)
 		agentState.Messages = append(agentState.Messages, userMsg)
 	}
 
@@ -135,7 +133,7 @@ func (s *AssistantAgentService) processChat(ctx context.Context,
 	}
 
 	// 存储agent思考过程
-	agentThoughts := make(map[string]agenteneity.AgentThought)
+	agentThoughts := make(map[string]*agenteneity.AgentThought)
 
 	// 处理流式输出
 	for agentThought := range thoughtChan {
@@ -189,7 +187,7 @@ func (s *AssistantAgentService) processChat(ctx context.Context,
 	// 将agent思考过程转换为切片
 	agentThoughtsList := make([]agenteneity.AgentThought, 0, len(agentThoughts))
 	for _, thought := range agentThoughts {
-		agentThoughtsList = append(agentThoughtsList, thought)
+		agentThoughtsList = append(agentThoughtsList, *thought)
 	}
 
 	// 将消息以及推理过程添加到数据库
@@ -213,7 +211,7 @@ func (s *AssistantAgentService) StopChat(ctx context.Context, taskID, userID uui
 		return errno.ErrValidate.AppendBizMessage(errors.New("没有正在进行的对话"))
 	}
 
-	return s.agentManager.SetStopFlag(taskID, consts.InvokeFromWebApp, userID)
+	return s.agentManager.StopTask(ctx, taskID, account.ID, consts.InvokeFromWebApp)
 }
 
 // GetMessagesWithPage 获取辅助智能体消息分页列表
@@ -356,8 +354,8 @@ func (s *AssistantAgentService) buildChatMessages(historyMessages []entity.Messa
 }
 
 type CreateAppTool struct {
-	accountID uuid.UUID
-
+	CreateAppInput
+	accountID   uuid.UUID
 	appProducer *task.AppProducer
 }
 
@@ -366,45 +364,47 @@ type CreateAppInput struct {
 	Description string `json:"description"`
 }
 
-func (s *AssistantAgentService) convertCreateAppToTool(accountID uuid.UUID, producer *task.AppProducer) tools.Tool {
+func (s *AssistantAgentService) convertCreateAppToTool(accountID uuid.UUID, producer *task.AppProducer) tool.InvokableTool {
 	return &CreateAppTool{
+		CreateAppInput: CreateAppInput{
+			Name:        "create_app",
+			Description: "创建新的应用程序",
+		},
 		accountID:   accountID,
 		appProducer: producer,
 	}
 }
 
-func (t *CreateAppTool) Name() string {
-	return "需要创建的Agent/应用名称，长度不超过50个字符"
+func (c *CreateAppTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{
+		Name: c.Name,
+		Desc: c.Description,
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"name": {
+				Type:     schema.String,
+				Desc:     "应用程序名称",
+				Required: true,
+			},
+			"description": {
+				Type:     schema.String,
+				Desc:     "应用程序描述",
+				Required: true,
+			},
+		}),
+	}, nil
 }
 
-func (t *CreateAppTool) Description() string {
-	return "需要创建的Agent/应用描述，请详细概括该应用的功能"
-}
-
-func (t *CreateAppTool) Call(ctx context.Context, input string) (string, error) {
+func (c *CreateAppTool) InvokableRun(ctx context.Context, argumentsInJSON string, opts ...tool.Option) (string, error) {
 	// 解析输入参数
-	var params CreateAppInput
-	err := sonic.Unmarshal([]byte(input), &params)
-	if err != nil {
-		return "", fmt.Errorf("invalid input format: %v", err)
+	var input CreateAppInput
+	if err := sonic.Unmarshal([]byte(argumentsInJSON), &input); err != nil {
+		return "", fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
-	// 验证参数
-	if params.Name == "" || len(params.Name) > 50 {
-		return "", fmt.Errorf("name must be between 1 and 50 characters")
-	}
-	if params.Description == "" {
-		return "", fmt.Errorf("description cannot be empty")
-	}
-
-	// 1. 调用异步任务在后端创建应用
-	err = t.appProducer.PublishAutoCreateAppTask(ctx, params.Name, params.Description, t.accountID)
+	err := c.appProducer.PublishAutoCreateAppTask(ctx, input.Name, input.Description, c.accountID)
 	if err != nil {
 		return "", err
 	}
 
-	// 2. 返回成功提示
-	result := fmt.Sprintf("已调用后端异步任务创建Agent应用。\n应用名称: %s\n应用描述: %s",
-		params.Name, params.Description)
-	return result, nil
+	return "", nil
 }

@@ -1,108 +1,136 @@
 package template_transform
 
 import (
-	"bytes"
+	"context"
 	"fmt"
+	"strings"
 	"text/template"
 	"time"
 
 	"github.com/crazyfrankie/voidx/internal/core/workflow/entities"
-	"github.com/crazyfrankie/voidx/internal/core/workflow/nodes"
-	"github.com/crazyfrankie/voidx/pkg/sonic"
 )
 
-// TemplateTransformNode 模板转换节点，将多个变量信息合并成一个
+// TemplateTransformNode represents a template transformation workflow node
 type TemplateTransformNode struct {
-	*nodes.BaseNodeImpl
 	nodeData *TemplateTransformNodeData
 }
 
-// NewTemplateTransformNode 创建新的模板转换节点
+// NewTemplateTransformNode creates a new template transform node instance
 func NewTemplateTransformNode(nodeData *TemplateTransformNodeData) *TemplateTransformNode {
 	return &TemplateTransformNode{
-		BaseNodeImpl: nodes.NewBaseNodeImpl(nodeData.BaseNodeData),
-		nodeData:     nodeData,
+		nodeData: nodeData,
 	}
 }
 
-// Invoke 模板转换节点执行函数，将传递的多个变量合并成字符串后返回
-func (t *TemplateTransformNode) Invoke(state *entities.WorkflowState) (*entities.WorkflowState, error) {
-	startAt := time.Now()
+// Execute executes the template transform node with the given workflow state
+func (n *TemplateTransformNode) Execute(ctx context.Context, state *entities.WorkflowState) (*entities.NodeResult, error) {
+	startTime := time.Now()
 
-	// 1. 提取节点中的输入数据
-	inputsDict := t.extractVariablesFromState(state)
+	// Create node result
+	result := entities.NewNodeResult(n.nodeData.BaseNodeData)
+	result.StartTime = startTime.Unix()
 
-	// 2. 使用Go template格式模板信息
-	tmpl, err := template.New("transform").Parse(t.nodeData.Template)
+	// Extract input variables from state
+	inputsDict, err := n.extractVariablesFromState(state)
 	if err != nil {
-		nodeResult := entities.NewNodeResult(t.nodeData.BaseNodeData)
-		nodeResult.Status = entities.NodeStatusFailed
-		nodeResult.Error = fmt.Sprintf("模板解析失败: %v", err)
-		nodeResult.Latency = time.Since(startAt)
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to extract input variables: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
+	}
+	result.Inputs = inputsDict
 
-		newState := &entities.WorkflowState{
-			Inputs:      state.Inputs,
-			Outputs:     state.Outputs,
-			NodeResults: append(state.NodeResults, nodeResult),
-		}
-
-		return newState, err
+	// Render template using extracted variables
+	transformedValue, err := n.renderTemplate(inputsDict)
+	if err != nil {
+		result.Status = entities.NodeStatusFailed
+		result.Error = fmt.Sprintf("failed to render template: %v", err)
+		result.EndTime = time.Now().Unix()
+		return result, err
 	}
 
-	// 3. 渲染模板
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, inputsDict); err != nil {
-		nodeResult := entities.NewNodeResult(t.nodeData.BaseNodeData)
-		nodeResult.Status = entities.NodeStatusFailed
-		nodeResult.Error = fmt.Sprintf("模板渲染失败: %v", err)
-		nodeResult.Latency = time.Since(startAt)
-
-		newState := &entities.WorkflowState{
-			Inputs:      state.Inputs,
-			Outputs:     state.Outputs,
-			NodeResults: append(state.NodeResults, nodeResult),
-		}
-
-		return newState, err
+	// Build output data structure
+	outputs := make(map[string]interface{})
+	if len(n.nodeData.Outputs) > 0 {
+		outputs[n.nodeData.Outputs[0].Name] = transformedValue
+	} else {
+		outputs["output"] = transformedValue
 	}
+	result.Outputs = outputs
 
-	templateValue := buf.String()
+	// Set success status
+	result.Status = entities.NodeStatusSucceeded
+	result.EndTime = time.Now().Unix()
 
-	// 4. 提取并构建输出数据结构
-	outputs := map[string]any{
-		"output": templateValue,
-	}
-
-	// 5. 构建节点结果
-	nodeResult := entities.NewNodeResult(t.nodeData.BaseNodeData)
-	nodeResult.Status = entities.NodeStatusSucceeded
-	nodeResult.Inputs = inputsDict
-	nodeResult.Outputs = outputs
-	nodeResult.Latency = time.Since(startAt)
-
-	// 6. 构建新状态
-	newState := &entities.WorkflowState{
-		Inputs:      state.Inputs,
-		Outputs:     state.Outputs,
-		NodeResults: append(state.NodeResults, nodeResult),
-	}
-
-	return newState, nil
+	return result, nil
 }
 
-// extractVariablesFromState 从状态中提取变量
-func (t *TemplateTransformNode) extractVariablesFromState(state *entities.WorkflowState) map[string]any {
-	result := make(map[string]any)
+// extractVariablesFromState extracts input variables from the workflow state
+func (n *TemplateTransformNode) extractVariablesFromState(state *entities.WorkflowState) (map[string]interface{}, error) {
+	inputsDict := make(map[string]interface{})
 
-	for _, input := range t.nodeData.Inputs {
-		inputs := make(map[string]any)
-		if err := sonic.UnmarshalString(state.Inputs, &inputs); err != nil {
-			return nil
+	for _, input := range n.nodeData.Inputs {
+		var value interface{}
+		var found bool
+
+		// Check if it's a reference to another node's output
+		if input.Value.Type == entities.VariableValueTypeRef {
+			if content, ok := input.Value.Content.(*entities.VariableContent); ok {
+				if content.RefNodeID != nil {
+					// Find the referenced node's output in state
+					for _, nodeResult := range state.NodeResults {
+						if nodeResult.NodeID == *content.RefNodeID {
+							if refValue, exists := nodeResult.Outputs[content.RefVarName]; exists {
+								value = refValue
+								found = true
+								break
+							}
+						}
+					}
+				}
+			}
+		} else {
+			// It's a constant value
+			value = input.Value.Content
+			found = true
 		}
-		if val, exists := inputs[input.Name]; exists {
-			result[input.Name] = val
+
+		if !found && input.Required {
+			return nil, fmt.Errorf("required input variable %s not found", input.Name)
+		}
+
+		if found {
+			inputsDict[input.Name] = value
 		}
 	}
 
-	return result
+	// Also include workflow inputs
+	for key, value := range state.Inputs {
+		if _, exists := inputsDict[key]; !exists {
+			inputsDict[key] = value
+		}
+	}
+
+	return inputsDict, nil
+}
+
+// renderTemplate renders the template with the given variables
+func (n *TemplateTransformNode) renderTemplate(variables map[string]interface{}) (string, error) {
+	// Use Go's text/template to render the template
+	tmpl, err := template.New("transform").Parse(n.nodeData.Template)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var result strings.Builder
+	if err := tmpl.Execute(&result, variables); err != nil {
+		return "", fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return result.String(), nil
+}
+
+// GetNodeData returns the node data
+func (n *TemplateTransformNode) GetNodeData() *TemplateTransformNodeData {
+	return n.nodeData
 }

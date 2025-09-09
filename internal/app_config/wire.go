@@ -28,7 +28,7 @@ var ProviderSet = wire.NewSet(
 
 func InitAppConfigModule(db *gorm.DB, llmMgr *llm.LanguageModelManager,
 	builtinProvider *builtin.BuiltinProviderManager,
-	apiProvider *apitools.ApiProviderManager) *AppConfigModule {
+	apiProvider *apitools.APIProviderManager) *AppConfigModule {
 	wire.Build(
 		ProviderSet,
 

@@ -34,7 +34,7 @@ var ProviderSet = wire.NewSet(
 
 func InitOpenAIModule(db *gorm.DB, conversationSvc *conversation.ConversationModule,
 	retrieverModule *retriever.RetrieverModule, llmModule *llm.LLMModule, appConfig *app_config.AppConfigModule,
-	appModule *app.AppModule, agent *agent.AgentQueueManager, token *memory.TokenBufferMemory) *OpenAPIModule {
+	appModule *app.AppModule, agent *agent.AgentQueueManagerFactory, token *memory.TokenBufferMemory) *OpenAPIModule {
 	wire.Build(
 		ProviderSet,
 

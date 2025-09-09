@@ -8,7 +8,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/crazyfrankie/voidx/internal/core/tools/builtin_tools/entities"
+	"github.com/crazyfrankie/voidx/internal/core/tools/entities"
 )
 
 // CategoryInfo holds category entity and its icon data
