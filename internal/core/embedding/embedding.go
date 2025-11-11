@@ -23,7 +23,7 @@ func NewEmbeddingService(cmd redis.Cmdable, embedder embedding.Embedder) *Embedd
 	return &EmbeddingService{cmd: cmd, embedder: embedder}
 }
 
-func (s *EmbeddingService) Embeddings(ctx context.Context, query string) ([]float32, error) {
+func (s *EmbeddingService) Embeddings(ctx context.Context, query string) ([]float64, error) {
 	// 使用eino的Embedder接口
 	embeddings, err := s.embedder.EmbedStrings(ctx, []string{query})
 	if err != nil {
@@ -34,13 +34,7 @@ func (s *EmbeddingService) Embeddings(ctx context.Context, query string) ([]floa
 		return nil, nil
 	}
 
-	// 转换float64到float32
-	result := make([]float32, len(embeddings[0]))
-	for i, v := range embeddings[0] {
-		result[i] = float32(v)
-	}
-
-	return result, nil
+	return embeddings[0], nil
 }
 
 func (s *EmbeddingService) StoreEmbedded(ctx context.Context, query string, embedded []float32) error {

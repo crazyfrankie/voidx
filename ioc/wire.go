@@ -28,7 +28,6 @@ import (
 	"github.com/crazyfrankie/voidx/internal/segment"
 	"github.com/crazyfrankie/voidx/internal/task"
 	"github.com/crazyfrankie/voidx/internal/upload"
-	"github.com/crazyfrankie/voidx/internal/vecstore"
 	"github.com/crazyfrankie/voidx/internal/webapp"
 	"github.com/crazyfrankie/voidx/internal/wechat"
 	"github.com/crazyfrankie/voidx/internal/workflow"
@@ -74,7 +73,6 @@ func InitApplication() *Application {
 		retriever.InitRetrieverModule,
 		segment.InitSegmentModule,
 		upload.InitUploadModule,
-		vecstore.NewVecStoreService,
 		webapp.InitWebAppModule,
 		wechat.InitWechatModule,
 		workflow.InitWorkflowModule,

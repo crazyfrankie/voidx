@@ -45,5 +45,5 @@ func InitRetrieverModule(db *gorm.DB, cmd redis.Cmdable, vectorStore *milvus.Sto
 
 // initRetrieverFactory 初始化检索器工厂
 func initRetrieverFactory(db *gorm.DB, vectorStore *milvus.Store, embedding *embedding.EmbeddingService, jiebaService *retrievers.JiebaService) *retrievers.RetrieverFactory {
-	return retrievers.NewRetrieverFactory(db, vectorStore, embedding, jiebaService)
+	return retrievers.NewRetrieverFactory(db, embedding, jiebaService)
 }

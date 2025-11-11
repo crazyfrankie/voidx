@@ -1,0 +1,36 @@
+# Example common error codes that can be used across all business domains
+error_code:
+  - name: CommonNoPermission
+    code: 101
+    message: no access permission
+    no_affect_stability: true
+
+  - name: CommonBadRequest
+    code: 201
+    message: bad request
+    no_affect_stability: true
+
+  - name: CommonInvalidParam
+    code: 202
+    message: invalid param
+    no_affect_stability: true
+
+  - name: CommonResourceNotFound
+    code: 404
+    message: resource not found
+    no_affect_stability: true
+
+  - name: CommonInternalError
+    code: 500
+    message: internal server error
+    no_affect_stability: false
+
+  - name: CommonDatabaseError
+    code: 501
+    message: database error
+    no_affect_stability: false
+
+  - name: CommonNetworkError
+    code: 502
+    message: network error
+    no_affect_stability: false

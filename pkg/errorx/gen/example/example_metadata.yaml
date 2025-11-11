@@ -1,0 +1,40 @@
+# Example metadata configuration for any project
+# code format:
+# code: 123456789（九位十进制数字）
+#    1  2  3  4  5  6  7  8  9
+#  ___________________________
+# |   |  |  |  |  |  |  |  |  |
+# |app|    biz    |  sub_code |
+# ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+# app: 产品枚举，可以是任意 1-9 的数字
+# biz: 业务域信息，如用户、订单、支付等各业务模块信息
+# sub_code: 业务域内的子码
+version: 'v1'
+
+# Error code configuration
+error_code:
+  # Total length of the error code (default: 9)
+  total_length: 6
+  # Length of app code (default: 1)
+  app_length: 1
+  # Length of business code (default: 3)
+  biz_length: 2
+  # Length of sub code (default: 4)
+  sub_length: 3
+
+app: # app 取值
+  - name: myapp  # 可以改成任意应用名
+    code: 6      # 根据 app_length 长度限制设置
+    business:
+      - name: common
+        code: 0
+      - name: user
+        code: 10
+      - name: order
+        code: 20
+      - name: payment
+        code: 30
+      - name: product
+        code: 40
+      - name: notification
+        code: 50

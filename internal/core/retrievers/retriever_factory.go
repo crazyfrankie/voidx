@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/embedding"
 	"github.com/cloudwego/eino/components/retriever"
+	"github.com/crazyfrankie/voidx/internal/core/embedding"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -29,17 +29,12 @@ const (
 type RetrieverFactory struct {
 	db           *gorm.DB
 	vectorStore  vecstore.SearchStore
-	embedder     embedding.Embedder
+	embedder     *embedding.EmbeddingService
 	jiebaService *JiebaService
 }
 
 // NewRetrieverFactory 创建一个新的检索器工厂
-func NewRetrieverFactory(
-	db *gorm.DB,
-	vectorStore vecstore.SearchStore,
-	embedder embedding.Embedder,
-	jiebaService *JiebaService,
-) *RetrieverFactory {
+func NewRetrieverFactory(db *gorm.DB, vectorStore vecstore.SearchStore, embedder *embedding.EmbeddingService, jiebaService *JiebaService) *RetrieverFactory {
 	return &RetrieverFactory{
 		db:           db,
 		vectorStore:  vectorStore,
@@ -75,7 +70,7 @@ func (f *RetrieverFactory) createFullTextRetriever(ctx context.Context, datasetI
 
 // createSemanticRetriever 创建语义检索器，支持多个数据集
 func (f *RetrieverFactory) createSemanticRetriever(ctx context.Context, datasetIDs []uuid.UUID, options map[string]any) (retriever.Retriever, error) {
-	return NewSemanticRetriever(f.db, f.embedder), nil
+	return NewSemanticRetriever(f.vectorStore, f.embedder, datasetIDs), nil
 }
 
 // createHybridRetriever 创建混合检索器，支持多个数据集

@@ -3,14 +3,13 @@ package repository
 import (
 	"context"
 
-	"github.com/crazyfrankie/voidx/types/consts"
-
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/app/repository/dao"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"
+	"github.com/crazyfrankie/voidx/types/consts"
 )
 
 type AppRepo struct {

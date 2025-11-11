@@ -336,3 +336,327 @@ func (s *WorkflowService) CancelPublishWorkflow(ctx context.Context, workflowID,
 
 	return s.repo.UpdateWorkflow(ctx, workflowID, updates)
 }
+
+// validateGraph 校验传递的graph信息，涵盖nodes和edges对应的数据
+func (s *WorkflowService) validateGraph(ctx context.Context, workflowID uuid.UUID, graph map[string]any, accountID uuid.UUID) (map[string]any, error) {
+	// 1. 提取 nodes 和 edges 数据
+	nodes, _ := graph["nodes"].([]any)
+	edges, _ := graph["edges"].([]any)
+
+	// 2. 循环校验 nodes 中各个节点对应的数据
+	nodeDataDict := make(map[uuid.UUID]*entities.BaseNodeData)
+	startNodes := 0
+	endNodes := 0
+
+	for _, nodeInterface := range nodes {
+		nodeMap, ok := nodeInterface.(map[string]any)
+		if !ok {
+			continue // 跳过无效节点
+		}
+
+		// 解析节点数据
+		nodeData, err := s.parseNodeFromMap(nodeMap)
+		if err != nil {
+			continue // 跳过解析失败的节点
+		}
+
+		// 判断节点 id 是否唯一
+		if _, exists := nodeDataDict[nodeData.ID]; exists {
+			return nil, fmt.Errorf("工作流节点id必须唯一，请核实后重试")
+		}
+
+		// 判断节点 title 是否唯一
+		for _, existingNode := range nodeDataDict {
+			if strings.TrimSpace(existingNode.Title) == strings.TrimSpace(nodeData.Title) {
+				return nil, fmt.Errorf("工作流节点title必须唯一，请核实后重试")
+			}
+		}
+
+		// 对特殊节点进行判断
+		switch nodeData.NodeType {
+		case entities.NodeTypeStart:
+			if startNodes >= 1 {
+				return nil, fmt.Errorf("工作流中只允许有1个开始节点")
+			}
+			startNodes++
+		case entities.NodeTypeEnd:
+			if endNodes >= 1 {
+				return nil, fmt.Errorf("工作流中只允许有1个结束节点")
+			}
+			endNodes++
+		}
+
+		nodeDataDict[nodeData.ID] = nodeData
+	}
+
+	// 3. 循环校验 edges 中各个节点对应的数据
+	edgeDataDict := make(map[uuid.UUID]*entities.BaseEdgeData)
+	for _, edgeInterface := range edges {
+		edgeMap, ok := edgeInterface.(map[string]any)
+		if !ok {
+			continue // 跳过无效边
+		}
+
+		edgeData, err := s.parseEdgeFromMap(edgeMap)
+		if err != nil {
+			continue // 跳过解析失败的边
+		}
+
+		// 校验边 edges 的 id 是否唯一
+		if _, exists := edgeDataDict[edgeData.ID]; exists {
+			continue // 跳过重复边
+		}
+
+		// 校验边中的 source/target/source_type/target_type 必须和 nodes 对得上
+		sourceNode, sourceExists := nodeDataDict[edgeData.Source]
+		targetNode, targetExists := nodeDataDict[edgeData.Target]
+		if !sourceExists || !targetExists ||
+			edgeData.SourceType != sourceNode.NodeType ||
+			edgeData.TargetType != targetNode.NodeType {
+			continue // 跳过无效边
+		}
+
+		// 校验边 Edges 里的边必须唯一
+		isDuplicate := false
+		for _, existingEdge := range edgeDataDict {
+			if existingEdge.Source == edgeData.Source &&
+				existingEdge.Target == edgeData.Target &&
+				((existingEdge.SourceHandleID == nil && edgeData.SourceHandleID == nil) ||
+					(existingEdge.SourceHandleID != nil && edgeData.SourceHandleID != nil &&
+						*existingEdge.SourceHandleID == *edgeData.SourceHandleID)) {
+				isDuplicate = true
+				break
+			}
+		}
+		if isDuplicate {
+			continue // 跳过重复边
+		}
+
+		edgeDataDict[edgeData.ID] = edgeData
+	}
+
+	// 转换结果
+	resNodes := make([]*entities.BaseNodeData, 0, len(nodeDataDict))
+	for _, nodeData := range nodeDataDict {
+		resNodes = append(resNodes, nodeData)
+	}
+
+	resEdges := make([]*entities.BaseEdgeData, 0, len(edgeDataDict))
+	for _, edgeData := range edgeDataDict {
+		resEdges = append(resEdges, edgeData)
+	}
+
+	result := map[string]any{
+		"nodes": resNodes,
+		"edges": resEdges,
+	}
+
+	return result, nil
+}
+
+// parseNodeFromMap 从 map 解析节点数据
+func (s *WorkflowService) parseNodeFromMap(nodeMap map[string]any) (*entities.BaseNodeData, error) {
+	// Parse ID
+	idStr, ok := nodeMap["id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid node id")
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid node id format: %w", err)
+	}
+
+	// Parse title
+	title, ok := nodeMap["title"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid node title")
+	}
+
+	// Parse node type
+	nodeTypeStr, ok := nodeMap["node_type"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid node type")
+	}
+
+	nodeType := entities.NodeType(nodeTypeStr)
+
+	return &entities.BaseNodeData{
+		ID:       id,
+		Title:    title,
+		NodeType: nodeType,
+	}, nil
+}
+
+// parseEdgeFromMap 从 map 解析边数据
+func (s *WorkflowService) parseEdgeFromMap(edgeMap map[string]any) (*entities.BaseEdgeData, error) {
+	// Parse ID
+	idStr, ok := edgeMap["id"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid edge id")
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid edge id format: %w", err)
+	}
+
+	// Parse source
+	sourceStr, ok := edgeMap["source"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid edge source")
+	}
+
+	source, err := uuid.Parse(sourceStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid edge source format: %w", err)
+	}
+
+	// Parse target
+	targetStr, ok := edgeMap["target"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid edge target")
+	}
+
+	target, err := uuid.Parse(targetStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid edge target format: %w", err)
+	}
+
+	// Parse source and target types
+	sourceTypeStr, ok := edgeMap["source_type"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid edge source_type")
+	}
+
+	targetTypeStr, ok := edgeMap["target_type"].(string)
+	if !ok {
+		return nil, fmt.Errorf("invalid edge target_type")
+	}
+
+	edgeData := &entities.BaseEdgeData{
+		ID:         id,
+		Source:     source,
+		Target:     target,
+		SourceType: entities.NodeType(sourceTypeStr),
+		TargetType: entities.NodeType(targetTypeStr),
+	}
+
+	// Parse optional source handle ID
+	if sourceHandleID, exists := edgeMap["source_handle_id"]; exists && sourceHandleID != nil {
+		if handleIDStr, ok := sourceHandleID.(string); ok {
+			edgeData.SourceHandleID = &handleIDStr
+		}
+	}
+
+	return edgeData, nil
+}
+
+// processWorkflowDebug 处理工作流调试
+func (s *WorkflowService) processWorkflowDebug(ctx context.Context, workflow *entity.Workflow, workflowTool *corewf.Workflow,
+	inputs map[string]any, eventChan chan<- resp.WorkflowDebugEvent) {
+	defer close(eventChan)
+
+	var nodeResults []map[string]any
+
+	// 创建工作流运行结果记录
+	workflowResult := &entity.WorkflowResult{
+		AccountID:  workflow.AccountID,
+		WorkflowID: workflow.ID,
+		Graph:      workflow.DraftGraph,
+		Status:     consts.WorkflowResultStatusRunning,
+	}
+
+	if err := s.repo.CreateWorkflowResult(ctx, workflowResult); err != nil {
+		eventChan <- resp.WorkflowDebugEvent{
+			Error: errno.ErrInternalServer.AppendBizMessage(errors.New("创建工作流结果记录失败")).Error(),
+		}
+		return
+	}
+
+	startTime := time.Now()
+
+	defer func() {
+		// 在函数结束时更新工作流结果和工作流状态
+		latency := time.Since(startTime).Milliseconds()
+
+		updateFields := map[string]any{
+			"state":   nodeResults,
+			"latency": latency,
+		}
+
+		if err := s.repo.UpdateWorkflowResult(ctx, workflowResult.ID, updateFields); err != nil {
+			// 记录错误但不中断流程
+		}
+
+		if err := s.repo.UpdateWorkflow(ctx, workflow.ID, map[string]any{
+			"is_debug_passed": workflowResult.Status == consts.WorkflowResultStatusSucceeded,
+		}); err != nil {
+			// 记录错误但不中断流程
+		}
+	}()
+
+	// 执行工作流
+	streamChan, err := workflowTool.Stream(ctx, inputs)
+	if err != nil {
+		workflowResult.Status = consts.WorkflowResultStatusFailed
+		eventChan <- resp.WorkflowDebugEvent{
+			Error: errno.ErrInternalServer.AppendBizMessage(errors.New("创建工作流流式处理失败")).Error(),
+		}
+		return
+	}
+
+	// 处理流式结果
+	for nodeResult := range streamChan {
+		// 转换为调试事件
+		debugEvent := resp.WorkflowDebugEvent{
+			ID:          uuid.New().String(),
+			NodeID:      nodeResult.NodeID.String(),
+			NodeType:    string(nodeResult.NodeType),
+			Title:       nodeResult.NodeID.String(), // 可以根据需要调整
+			Status:      string(nodeResult.Status),
+			Inputs:      nodeResult.Inputs,
+			Outputs:     nodeResult.Outputs,
+			ElapsedTime: float64(time.Since(startTime).Milliseconds()) / 1000.0,
+		}
+
+		if nodeResult.Error != "" {
+			debugEvent.Error = nodeResult.Error
+		}
+
+		// 记录节点结果
+		nodeResultMap := map[string]any{
+			"node_id":      nodeResult.NodeID.String(),
+			"node_type":    string(nodeResult.NodeType),
+			"status":       string(nodeResult.Status),
+			"inputs":       nodeResult.Inputs,
+			"outputs":      nodeResult.Outputs,
+			"elapsed_time": debugEvent.ElapsedTime,
+		}
+		if nodeResult.Error != "" {
+			nodeResultMap["error"] = nodeResult.Error
+		}
+		nodeResults = append(nodeResults, nodeResultMap)
+
+		select {
+		case eventChan <- debugEvent:
+		case <-ctx.Done():
+			return
+		}
+	}
+
+	// 更新工作流运行结果
+	latency := time.Since(startTime).Seconds()
+	stateJSON, _ := sonic.Marshal(nodeResults)
+	updates := map[string]any{
+		"status":  consts.WorkflowResultStatusSucceeded,
+		"state":   stateJSON,
+		"latency": latency,
+	}
+	s.repo.UpdateWorkflowResult(ctx, workflowResult.ID, updates)
+
+	// 更新工作流调试状态
+	s.repo.UpdateWorkflow(ctx, workflow.ID, map[string]any{
+		"is_debug_passed": true,
+	})
+}

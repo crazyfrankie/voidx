@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/crazyfrankie/voidx/internal/apitool/repository"
-	toolsentity "github.com/crazyfrankie/voidx/internal/core/tools/api_tools/entities"
+	toolsentity "github.com/crazyfrankie/voidx/internal/core/tools/entities"
 	"github.com/crazyfrankie/voidx/internal/models/entity"
 	"github.com/crazyfrankie/voidx/internal/models/req"
 	"github.com/crazyfrankie/voidx/internal/models/resp"

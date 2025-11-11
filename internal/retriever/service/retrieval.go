@@ -58,6 +58,11 @@ func (t *datasetRetrievalTool) InvokableRun(ctx context.Context, argumentsInJSON
 		return "", fmt.Errorf("failed to parse arguments: %w", err)
 	}
 
+	// 智能检索判断
+	if !t.service.intentClassifier.ShouldRetrieve(input.Query) {
+		return "我理解了，有什么具体问题需要帮助吗？", nil
+	}
+
 	// 创建检索请求
 	searchReq := req.SearchRequest{
 		Query:          input.Query,
@@ -84,13 +89,15 @@ func (t *datasetRetrievalTool) InvokableRun(ctx context.Context, argumentsInJSON
 
 // RetrievalService 检索服务，提供统一的检索接口
 type RetrievalService struct {
-	RetrieverFactory *retrievers.RetrieverFactory
+	RetrieverFactory  *retrievers.RetrieverFactory
+	intentClassifier  *IntentClassifier
 }
 
 // NewRetrievalService 创建一个新的检索服务
 func NewRetrievalService(retrieverFactory *retrievers.RetrieverFactory) *RetrievalService {
 	return &RetrievalService{
 		RetrieverFactory: retrieverFactory,
+		intentClassifier: NewIntentClassifier(),
 	}
 }
 
@@ -128,6 +135,16 @@ func (s *RetrievalService) CreateToolFromSearch(ctx context.Context, userID uuid
 	}
 
 	return tool, nil
+}
+
+// SmartSearchInDatasets 智能检索，先判断是否需要检索
+func (s *RetrievalService) SmartSearchInDatasets(ctx context.Context, userID uuid.UUID, searchReq req.SearchRequest) ([]resp.SearchResult, error) {
+	// 前置意图判断
+	if !s.intentClassifier.ShouldRetrieve(searchReq.Query) {
+		return []resp.SearchResult{}, nil
+	}
+	
+	return s.SearchInDatasets(ctx, userID, searchReq)
 }
 
 // SearchInDatasets 在指定数据集中执行检索

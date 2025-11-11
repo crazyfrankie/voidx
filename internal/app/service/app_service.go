@@ -176,7 +176,7 @@ func (s *AppService) AutoCreateApp(ctx context.Context, name, description string
 }
 
 // CreateApp 创建Agent应用服务
-func (s *AppService) CreateApp(ctx context.Context, accountID uuid.UUID, req req.CreateAppReq) (*entity.App, error) {
+func (s *AppService) CreateApp(ctx context.Context, accountID uuid.UUID, req *req.CreateAppReq) (*entity.App, error) {
 	// 创建应用记录，并刷新数据，从而可以拿到应用id
 	app := &entity.App{
 		ID:          uuid.New(),
@@ -292,7 +292,7 @@ func (s *AppService) DeleteApp(ctx context.Context, appID uuid.UUID, accountID u
 }
 
 // UpdateApp 根据传递的应用id+账号+信息，更新指定的应用
-func (s *AppService) UpdateApp(ctx context.Context, appID uuid.UUID, accountID uuid.UUID, updateReq req.UpdateAppReq) error {
+func (s *AppService) UpdateApp(ctx context.Context, appID uuid.UUID, accountID uuid.UUID, updateReq *req.UpdateAppReq) error {
 	_, err := s.GetApp(ctx, appID, accountID)
 	if err != nil {
 		return err

@@ -1,0 +1,31 @@
+# Example business-specific error codes for user domain
+error_code:
+  - name: UserNotFound
+    code: 101
+    message: user not found
+    description: the specified user does not exist
+    no_affect_stability: true
+
+  - name: UserAlreadyExists
+    code: 102
+    message: user already exists
+    description: user with this email/username already exists
+    no_affect_stability: true
+
+  - name: InvalidCredentials
+    code: 103
+    message: invalid credentials
+    description: username or password is incorrect
+    no_affect_stability: true
+
+  - name: UserAccountLocked
+    code: 104
+    message: user account is locked
+    description: user account has been locked due to security reasons
+    no_affect_stability: true
+
+  - name: EmailNotVerified
+    code: 105
+    message: email not verified
+    description: user email address has not been verified
+    no_affect_stability: true
